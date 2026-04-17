@@ -1,81 +1,81 @@
 # State
 
 **Last Updated:** 2026-04-17
-**Current Work:** Organização inicial do projeto — Specs de `M1 / Ingestão Documental (Fase 1)` em andamento
+**Current Work:** Initial project organization — specs for `M1 / Document Ingestion (Phase 1)` in progress
 
 ---
 
 ## Recent Decisions
 
-### AD-001: Stack core — Next.js + TS + Drizzle + Vitest + Zod (2026-04-17)
+### AD-001: Core stack — Next.js + TS + Drizzle + Vitest + Zod (2026-04-17)
 
-**Decision:** Next.js 15 (App Router) + TypeScript strict, Drizzle ORM, Vitest para testes, Zod para validação. Deploy em Vercel + Neon (Postgres + pgvector).
-**Reason:** Stack TypeScript-first coesa com o deploy-alvo. Drizzle tem suporte idiomático a pgvector; Prisma exigiria raw queries. Vitest é mais rápido e direto que Jest para TDD em TS/ESM.
-**Trade-off:** Drizzle tem ecossistema menor que Prisma. Vercel AI SDK amarra à Vercel (aceitável — já é o provedor alvo).
-**Impact:** Todo schema de DB passa por Drizzle; todas as fronteiras (request bodies, env vars, respostas externas) validadas com Zod; testes escritos antes da implementação.
+**Decision:** Next.js 15 (App Router) + TypeScript strict, Drizzle ORM, Vitest for tests, Zod for validation. Deployed on Vercel + Neon (Postgres + pgvector).
+**Reason:** A cohesive TypeScript-first stack that matches the target deployment. Drizzle has idiomatic pgvector support; Prisma would require raw queries. Vitest is faster and more direct than Jest for TDD in TS/ESM.
+**Trade-off:** Drizzle has a smaller ecosystem than Prisma. The Vercel AI SDK ties us to Vercel (acceptable — it is already the target provider).
+**Impact:** All DB schemas go through Drizzle; all boundaries (request bodies, env vars, external responses) are validated with Zod; tests are written before the implementation.
 
-### AD-002: Google Drive via Service Account + pasta fixa (2026-04-17)
+### AD-002: Google Drive via Service Account + fixed folder (2026-04-17)
 
-**Decision:** Ingestão consome uma pasta compartilhada do Google Drive autenticada por Service Account. Sem OAuth individual.
-**Reason:** Projeto é um DEMO interno; não há usuário final autenticado. Service Account simplifica drasticamente o fluxo.
-**Trade-off:** Não suporta multi-tenancy ou múltiplos Drives. Aceitável enquanto o escopo for DEMO.
-**Impact:** Secrets: um JSON de service account + ID da pasta. Sem fluxo de login no frontend para Drive.
+**Decision:** Ingestion consumes a shared Google Drive folder authenticated via a Service Account. No per-user OAuth.
+**Reason:** The project is an internal DEMO with no end-user authentication. A Service Account drastically simplifies the flow.
+**Trade-off:** Does not support multi-tenancy or multiple Drives. Acceptable while the scope is DEMO.
+**Impact:** Secrets: one Service Account JSON + the folder ID. No Drive login flow in the frontend.
 
-### AD-003: Framework de agents em aberto (2026-04-17)
+### AD-003: Agents framework left open (2026-04-17)
 
-**Decision:** A escolha entre Vercel AI SDK (nativo), Mastra, LangChain.js, LlamaIndex.TS fica adiada até o milestone M4.
-**Reason:** Premature lock-in sem caso de uso concreto. Fases 1–3 (ingestão + RAG base) não dependem de framework de agents.
-**Trade-off:** Precisaremos de um PoC curto quando chegarmos em M4.
-**Impact:** Código de RAG base não pode assumir APIs específicas de agents; a camada de geração fica atrás de uma interface própria.
+**Decision:** The choice between Vercel AI SDK (native), Mastra, LangChain.js, LlamaIndex.TS is deferred until milestone M4.
+**Reason:** Avoid premature lock-in without a concrete use case. Phases 1–3 (ingestion + base RAG) do not depend on an agents framework.
+**Trade-off:** We will need a short PoC when we reach M4.
+**Impact:** Base RAG code must not assume agent-framework-specific APIs; the generation layer stays behind its own interface.
 
-### AD-004: Sem tratamento automático de duplicidade na v1 (2026-04-17)
+### AD-004: No automatic duplicate handling in v1 (2026-04-17)
 
-**Decision:** Controle de arquivos repetidos é responsabilidade manual do usuário; o sistema não bloqueia ingestão por hash igual.
-**Reason:** Explicitado em `regras_operacionais_pipeline_fase1 (1).md` §4 — reduz complexidade inicial.
-**Trade-off:** Corpus pode conter duplicatas reais se o usuário não cuidar.
-**Impact:** `hash` do arquivo é armazenado para governança/futura deduplicação, mas não é UNIQUE constraint obrigatória.
+**Decision:** Control over duplicate files is the user's manual responsibility; the system does not block ingestion when hashes match.
+**Reason:** Made explicit in `phase1_pipeline_rules.md` §4 — reduces initial complexity.
+**Trade-off:** The corpus may contain real duplicates if the user is careless.
+**Impact:** The file `hash` is stored for governance / future dedup, but is not required as a UNIQUE constraint.
 
-### AD-005: DOI e metadados bibliográficos são manuais (2026-04-17)
+### AD-005: DOI and bibliographic metadata are manual (2026-04-17)
 
-**Decision:** Não buscar DOI nem inferir autores/ano automaticamente. Título inicial = nome do arquivo no Drive; demais campos são opcionais e preenchidos pelo usuário depois.
-**Reason:** Explicitado em `regras_operacionais_pipeline_fase1 (1).md` §5–7.
-**Trade-off:** Menos rico em metadados out-of-the-box.
-**Impact:** Schema precisa permitir NULLs em `doi`, `authors`, `publication_year`; endpoint de edição de metadados.
+**Decision:** Do not look up DOI, nor infer authors/year automatically. Initial title = file name in Drive; remaining fields are optional and filled in by the user later.
+**Reason:** Made explicit in `phase1_pipeline_rules.md` §5–7.
+**Trade-off:** Less rich metadata out of the box.
+**Impact:** Schema must allow NULLs in `doi`, `authors`, `publication_year`; a metadata-edit endpoint is required.
 
 ---
 
 ## Active Blockers
 
-_Nenhum por enquanto._
+_None for now._
 
 ---
 
 ## Lessons Learned
 
-_A preencher conforme o projeto avança._
+_To be filled in as the project evolves._
 
 ---
 
 ## Quick Tasks Completed
 
-_Nenhum por enquanto._
+_None for now._
 
 ---
 
 ## Deferred Ideas
 
-- [ ] Avaliação automatizada de qualidade de respostas (ragas/evals) — Captured during: roadmap inicial
-- [ ] Streaming de respostas no frontend — Captured during: roadmap inicial
-- [ ] Reprocessamento em lote versionado por pipeline — Captured during: roadmap inicial
-- [ ] Integração com fontes externas (Scielo, arXiv) — Captured during: roadmap inicial
+- [ ] Automated answer-quality evaluation (ragas/evals) — Captured during: initial roadmap
+- [ ] Streaming answers in the frontend — Captured during: initial roadmap
+- [ ] Pipeline-versioned batch reprocessing — Captured during: initial roadmap
+- [ ] Integration with external sources (Scielo, arXiv) — Captured during: initial roadmap
 
 ---
 
 ## Todos
 
-- [ ] Decidir biblioteca de extração de PDF (`unpdf` vs `pdf-parse` vs `pdfjs-dist`) via benchmark antes de começar Fase 1
-- [ ] Definir estratégia concreta de refino textual (regras determinísticas vs LLM-assistido) na spec da Fase 1
-- [ ] Dar nome definitivo ao projeto (placeholder atual: "AIA Insight")
+- [ ] Decide PDF-extraction library (`unpdf` vs `pdf-parse` vs `pdfjs-dist`) via benchmark before starting Phase 1
+- [ ] Define concrete text-refinement strategy (deterministic rules vs LLM-assisted) in the Phase 1 spec
+- [ ] Choose a definitive project name (current placeholder: "AIA Insight")
 
 ---
 

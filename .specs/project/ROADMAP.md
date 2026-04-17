@@ -1,107 +1,107 @@
 # Roadmap — AIA Insight
 
-**Current Milestone:** M1 — Fundação de Dados e Ingestão
+**Current Milestone:** M1 — Data Foundation and Ingestion
 **Status:** Planning
 
-> Cada fase do `starter.md` vira um milestone. Features dentro de um milestone são incrementos demo-áveis. Os três primeiros milestones entregam o DEMO funcional mínimo.
+> Each phase of `starter.md` becomes a milestone. Features inside a milestone are demo-able increments. The first three milestones deliver the minimum functional DEMO.
 
 ---
 
-## M1 — Fundação de Dados e Ingestão
+## M1 — Data Foundation and Ingestion
 
-**Goal:** Um PDF colocado numa pasta do Google Drive termina persistido no Postgres com `raw_text`, `refined_text`, metadados de governança e status `processed`, apto para chunking. Todo o fluxo coberto por testes (TDD).
-**Target:** Primeira entrega demonstrável do projeto.
+**Goal:** A PDF placed into a Google Drive folder ends up persisted in Postgres with `raw_text`, `refined_text`, governance metadata, and status `processed`, ready for chunking. The entire flow is covered by tests (TDD).
+**Target:** First demonstrable delivery of the project.
 
 ### Features
 
-**Setup inicial do repositório e infraestrutura** — PLANNED
+**Initial repository and infrastructure setup** — PLANNED
 
 - Next.js 15 + TypeScript strict + ESLint + Prettier
-- Drizzle + migrations + conexão Neon/Postgres local com pgvector
-- Vitest + estrutura de testes (unit / integration)
-- Variáveis de ambiente e secrets (Service Account, DB URL)
-- CI mínimo (lint + typecheck + testes em PR)
+- Drizzle + migrations + connection to Neon / local Postgres with pgvector
+- Vitest + test structure (unit / integration)
+- Environment variables and secrets (Service Account, DB URL)
+- Minimum CI (lint + typecheck + tests on PR)
 
-**Ingestão Documental (Fase 1)** — PLANNED
+**Document Ingestion (Phase 1)** — PLANNED
 
-- Integração Google Drive via Service Account, pasta fixa
-- Schema relacional com campos de governança (id, hash, origem, versão, timestamps, status)
-- Extração de `raw_text` a partir do PDF
-- Refinamento textual gerando `refined_text`
-- Máquina de estados simples: `pending` → `processed` | `failed`
-- Reprocessamento de documentos em `failed`
-- Título inicial derivado do nome do arquivo; campos opcionais (DOI, autores, ano) editáveis manualmente
-
----
-
-## M2 — RAG Base (Global + Focado)
-
-**Goal:** Usuário consegue perguntar sobre o corpus inteiro OU sobre um documento específico e receber resposta com citações de trechos.
-
-### Features
-
-**Chunking + Embeddings (Fase 2)** — PLANNED
-
-- Estratégia de chunking sobre `refined_text`
-- Geração e armazenamento de embeddings em pgvector
-- Indexação vetorial com metadados (doc_id, chunk_index, versão)
-
-**RAG Global (Fase 3)** — PLANNED
-
-- Endpoint de pergunta multi-documento
-- Retrieval top-k + construção de contexto + geração
-- Resposta com lista de fontes
-
-**RAG Focado (Fase 4)** — PLANNED
-
-- Filtro por documento específico na recuperação
-- UI para seleção do documento alvo
+- Google Drive integration via Service Account, fixed folder
+- Relational schema with governance fields (id, hash, origin, version, timestamps, status)
+- `raw_text` extraction from the PDF
+- Text refinement producing `refined_text`
+- Simple state machine: `pending` → `processed` | `failed`
+- Reprocessing of documents in `failed`
+- Initial title derived from the file name; optional fields (DOI, authors, year) editable manually
 
 ---
 
-## M3 — Explicabilidade e Observabilidade
+## M2 — Base RAG (Global + Focused)
 
-**Goal:** Toda resposta é inspecionável e o sistema tem telemetria mínima para avaliar uso e custo.
+**Goal:** The user can ask questions about the entire corpus OR about a specific document and receive answers with passage citations.
 
 ### Features
 
-**XAI mínimo (Fase 5)** — PLANNED
+**Chunking + Embeddings (Phase 2)** — PLANNED
 
-- Exibição, por resposta, de: documentos-fonte, chunks utilizados, scores de similaridade
-- UI para inspeção de trechos recuperados
+- Chunking strategy over `refined_text`
+- Embedding generation and storage in pgvector
+- Vector indexing with metadata (doc_id, chunk_index, version)
 
-**Observabilidade básica (Fase 6)** — PLANNED
+**Global RAG (Phase 3)** — PLANNED
 
-- Log de perguntas e respostas
-- Métricas: tokens, custo estimado, latência
-- Versão do modelo e do prompt registrada por requisição
+- Multi-document question endpoint
+- Top-k retrieval + context assembly + generation
+- Answer with source list
+
+**Focused RAG (Phase 4)** — PLANNED
+
+- Filter by specific document during retrieval
+- UI for selecting the target document
 
 ---
 
-## M4 — Agents (Prova Arquitetural)
+## M3 — Explainability and Observability
 
-**Goal:** Demonstrar a camada de agents rodando uma tarefa mais complexa que RAG simples.
+**Goal:** Every answer is inspectable and the system has minimal telemetry to evaluate usage and cost.
 
 ### Features
 
-**Decisão de framework de agents** — PLANNED
+**Minimal XAI (Phase 5)** — PLANNED
 
-- PoC curto comparando 2–3 opções (Vercel AI SDK, Mastra, LangChain.js, LlamaIndex.TS)
-- Critérios: integração com Next.js, observabilidade, custo de manutenção
-- Registro da decisão em `.specs/project/STATE.md`
+- Per-answer display of: source documents, chunks used, similarity scores
+- UI for inspecting retrieved passages
 
-**Agent piloto** — PLANNED
+**Basic observability (Phase 6)** — PLANNED
 
-- Escolher uma das tarefas do `starter.md` §3.6 (sumarização / comparação / extração de temas / relatório)
-- Implementar end-to-end com explicabilidade e governança
+- Question and answer logging
+- Metrics: tokens, estimated cost, latency
+- Model and prompt version recorded per request
+
+---
+
+## M4 — Agents (Architectural Proof)
+
+**Goal:** Demonstrate the agents layer running a task more complex than simple RAG.
+
+### Features
+
+**Agents framework decision** — PLANNED
+
+- Short PoC comparing 2–3 options (Vercel AI SDK, Mastra, LangChain.js, LlamaIndex.TS)
+- Criteria: Next.js integration, observability, maintenance cost
+- Decision recorded in `.specs/project/STATE.md`
+
+**Pilot agent** — PLANNED
+
+- Pick one of the tasks from `starter.md` §3.6 (summarization / comparison / theme extraction / report)
+- Implement end-to-end with explainability and governance
 
 ---
 
 ## Future Considerations
 
-- Interface interativa mais sofisticada (streaming de respostas, histórico de conversa)
-- Integração com bases externas (ex.: Scielo, arXiv) além do corpus fixo
-- Automação de análises recorrentes
-- Expansão para domínios além de AIA
-- Avaliação automatizada de qualidade de respostas (ragas/evals)
-- Reprocessamento em lote com versionamento do pipeline
+- More sophisticated interactive UI (streaming answers, conversation history)
+- Integration with external bases (e.g., Scielo, arXiv) beyond the fixed corpus
+- Automation of recurring analyses
+- Expansion to domains beyond EIA
+- Automated answer-quality evaluation (ragas/evals)
+- Batch reprocessing with pipeline versioning

@@ -1,229 +1,229 @@
-# Sumário do Projeto — Plataforma Inteligente de Consulta com RAG, Agents e Governança
+# Project Summary — Intelligent Query Platform with RAG, Agents, and Governance
 
-## 1. Objetivo do Projeto
+## 1. Project Objective
 
-Desenvolver uma **plataforma inteligente de exploração de documentos** que permita:
+Build an **intelligent document exploration platform** that enables:
 
-- Consultar um conjunto de documentos de forma contextualizada
-- Obter respostas baseadas em **múltiplos documentos ou em um documento específico**
-- Garantir **transparência, rastreabilidade e explicabilidade** das respostas geradas
+- Contextualized queries over a document corpus
+- Answers grounded in **multiple documents or a single specific document**
+- **Transparency, traceability, and explainability** of every generated answer
 
-A proposta vai além de um RAG tradicional, incorporando:
+The proposal goes beyond a traditional RAG by combining:
 
-- **RAG (Retrieval-Augmented Generation)** → recuperação + geração
-- **Agents** → execução de tarefas e fluxos mais complexos
-- **XAI (Explainable AI)** → explicação das decisões do sistema
-- **Governança de Dados** → controle, auditoria e confiabilidade
-
----
-
-## 2. Proposta Central
-
-> Um sistema que não apenas responde, mas **explica como chegou na resposta**.
-
-O usuário deve ser capaz de:
-
-- Perguntar algo e receber uma resposta fundamentada
-- Saber **quais documentos foram usados**
-- Inspecionar os **trechos (chunks)** utilizados
-- Entender **como o sistema tomou a decisão**
-- Confiar na origem e no processamento dos dados
+- **RAG (Retrieval-Augmented Generation)** → retrieval + generation
+- **Agents** → execution of more complex tasks and workflows
+- **XAI (Explainable AI)** → explanation of system decisions
+- **Data Governance** → control, auditability, and reliability
 
 ---
 
-## 3. Capacidades da Plataforma
+## 2. Core Proposition
 
-### 3.1 Consulta Inteligente
+> A system that not only answers, but **explains how it arrived at the answer**.
 
-- Perguntas abertas sobre todo o conjunto de documentos
-- Respostas com base em múltiplas fontes (RAG global)
-- Possibilidade de restringir a:
-  - Um documento específico
-  - Um conjunto filtrado (por metadados)
+The user must be able to:
 
----
-
-### 3.2 Consulta Focada por Documento
-
-- Seleção de um documento específico
-- Perguntas contextualizadas apenas naquele conteúdo
-- Ideal para:
-  - Leitura assistida
-  - Análise aprofundada
-  - Validação de informações
+- Ask something and receive a well-grounded answer
+- Know **which documents were used**
+- Inspect the **chunks** that were retrieved
+- Understand **how the system made its decision**
+- Trust the origin and processing of the data
 
 ---
 
-### 3.3 Explicabilidade (XAI)
+## 3. Platform Capabilities
 
-Cada resposta deve ser acompanhada de:
+### 3.1 Intelligent Querying
 
-- Fontes utilizadas (documentos)
-- Trechos relevantes recuperados
-- Score de similaridade (opcional)
-- Raciocínio estruturado do modelo (quando aplicável)
-
-Objetivo:
-
-> Evitar respostas como “caixa-preta”
+- Open-ended questions across the whole document set
+- Answers grounded in multiple sources (global RAG)
+- Ability to narrow to:
+  - A specific document
+  - A filtered subset (by metadata)
 
 ---
 
-### 3.4 Governança de Dados
+### 3.2 Document-Focused Querying
 
-Controle completo sobre o ciclo de vida dos dados:
-
-- Origem do documento (fonte)
-- Data de ingestão
-- Versão do dado
-- Status de processamento
-- Histórico de transformações
-
-Permite responder perguntas como:
-
-- De onde veio essa informação?
-- Quando esse dado foi processado?
-- Qual pipeline gerou esse resultado?
+- Selection of a specific document
+- Questions scoped to that single content
+- Useful for:
+  - Assisted reading
+  - In-depth analysis
+  - Fact validation
 
 ---
 
-### 3.5 Observabilidade
+### 3.3 Explainability (XAI)
 
-Monitoramento do comportamento do sistema:
+Every answer must be accompanied by:
 
-- Perguntas realizadas
-- Respostas geradas
-- Tokens utilizados
-- Custo estimado
-- Tempo de resposta
-- Versões de modelo e prompt
+- Source documents used
+- Relevant retrieved chunks
+- Similarity scores (optional)
+- Structured reasoning from the model (when applicable)
 
----
+Objective:
 
-### 3.6 Agents (Evolução do Sistema)
-
-Uso de agentes para tarefas mais complexas, como:
-
-- Sumarização de documentos
-- Comparação entre artigos
-- Extração de temas
-- Geração de relatórios
-- Execução de fluxos multi-step
+> Avoid "black-box" answers.
 
 ---
 
-## 4. Arquitetura Conceitual
+### 3.4 Data Governance
 
-### 4.1 Camada de Dados
+Full control over the data lifecycle:
 
-- Armazenamento de documentos
-- Metadados estruturados
-- Versionamento
+- Document origin (source)
+- Ingestion date
+- Data version
+- Processing status
+- Transformation history
 
-### 4.2 Camada de Processamento
+Enables answering questions such as:
 
-- Extração de texto
-- Limpeza e normalização
+- Where did this information come from?
+- When was this data processed?
+- Which pipeline produced this result?
+
+---
+
+### 3.5 Observability
+
+System behavior monitoring:
+
+- Questions asked
+- Generated answers
+- Tokens consumed
+- Estimated cost
+- Response latency
+- Model and prompt versions
+
+---
+
+### 3.6 Agents (System Evolution)
+
+Use of agents for more complex tasks, such as:
+
+- Document summarization
+- Cross-article comparison
+- Theme extraction
+- Report generation
+- Multi-step workflow execution
+
+---
+
+## 4. Conceptual Architecture
+
+### 4.1 Data Layer
+
+- Document storage
+- Structured metadata
+- Versioning
+
+### 4.2 Processing Layer
+
+- Text extraction
+- Cleaning and normalization
 - Chunking
 - Embeddings
-- Indexação vetorial
+- Vector indexing
 
-### 4.3 Camada RAG
+### 4.3 RAG Layer
 
-- Recuperação semântica
-- Construção de contexto
-- Geração de respostas
+- Semantic retrieval
+- Context assembly
+- Answer generation
 
-### 4.4 Camada de Agentes
+### 4.4 Agent Layer
 
-- Orquestração de tarefas complexas
-- Encadeamento de ações
-- Uso de ferramentas internas
+- Orchestration of complex tasks
+- Action chaining
+- Internal tool use
 
-### 4.5 Camada de Governança e XAI
+### 4.5 Governance and XAI Layer
 
-- Auditoria de dados
-- Explicação das respostas
-- Rastreabilidade completa
-
----
-
-## 5. Fluxo Simplificado
-
-1. Documento é ingerido e versionado
-2. Dados são processados e indexados
-3. Usuário realiza uma pergunta
-4. Sistema decide:
-   - Consulta global (multi-doc)
-   - Consulta específica (single-doc)
-5. Recuperação de chunks relevantes
-6. Construção de contexto
-7. Geração da resposta
-8. Retorno com:
-   - Resposta
-   - Fontes
-   - Explicação (XAI)
-   - Logs (opcional)
+- Data auditing
+- Answer explanation
+- End-to-end traceability
 
 ---
 
-## 6. Modos de Uso
+## 5. Simplified Flow
 
-### Modo 1 — Exploração Geral
-
-- Busca em todo o dataset
-- Descoberta de padrões e temas
-
-### Modo 2 — Análise Focada
-
-- Um documento específico
-- Deep dive no conteúdo
-
-### Modo 3 — Assistente Inteligente (Agents)
-
-- Execução de tarefas complexas
-- Interações multi-step
-
----
-
-## 7. Diretrizes do Sistema
-
-- Priorizar transparência sobre conveniência
-- Toda resposta deve ser rastreável
-- Evitar alucinação sem fonte
-- Separar claramente:
-  - dado
-  - processamento
-  - decisão
-- Permitir inspeção em todas as etapas
+1. Document is ingested and versioned
+2. Data is processed and indexed
+3. User submits a question
+4. System decides:
+   - Global query (multi-doc)
+   - Focused query (single-doc)
+5. Retrieval of relevant chunks
+6. Context assembly
+7. Answer generation
+8. Response with:
+   - Answer
+   - Sources
+   - Explanation (XAI)
+   - Logs (optional)
 
 ---
 
-## 8. Diferencial do Projeto
+## 6. Usage Modes
 
-O diferencial não está apenas no uso de RAG, mas na integração de:
+### Mode 1 — Global Exploration
 
-- **RAG + Governança → confiabilidade**
-- **RAG + XAI → interpretabilidade**
-- **RAG + Agents → capacidade operacional**
+- Search across the whole dataset
+- Discovery of patterns and themes
 
-Resultado:
+### Mode 2 — Focused Analysis
 
-> Um sistema confiável, auditável e evolutivo para exploração de conhecimento.
+- A specific document
+- Deep dive on its content
 
----
+### Mode 3 — Intelligent Assistant (Agents)
 
-## 9. Evolução Esperada
-
-- Interfaces interativas mais avançadas
-- Integração com bases externas
-- Automação de análises
-- Expansão para múltiplos domínios
-- Uso em ambientes próximos de produção
+- Execution of complex tasks
+- Multi-step interactions
 
 ---
 
-## 10. Referências do Projeto
+## 7. System Guidelines
 
-- Documento base de arquitetura e governança :contentReference[oaicite:0]{index=0}
-- Processo de ingestão e pipeline de dados :contentReference[oaicite:1]{index=1}
+- Prefer transparency over convenience
+- Every answer must be traceable
+- Avoid hallucinations without a source
+- Clearly separate:
+  - data
+  - processing
+  - decision
+- Allow inspection at every stage
+
+---
+
+## 8. Project Differentiator
+
+The differentiator is not merely the use of RAG, but the integration of:
+
+- **RAG + Governance → reliability**
+- **RAG + XAI → interpretability**
+- **RAG + Agents → operational capability**
+
+Result:
+
+> A reliable, auditable, and evolvable system for knowledge exploration.
+
+---
+
+## 9. Expected Evolution
+
+- More advanced interactive interfaces
+- Integration with external sources
+- Automation of analyses
+- Expansion to multiple domains
+- Use in near-production environments
+
+---
+
+## 10. Project References
+
+- Base architecture and governance document :contentReference[oaicite:0]{index=0}
+- Ingestion process and data pipeline :contentReference[oaicite:1]{index=1}
