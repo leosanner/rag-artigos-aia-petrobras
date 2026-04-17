@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-04-17
-**Current Work:** Initial project organization — specs for `M1 / Document Ingestion (Phase 1)` in progress
+**Current Work:** Unblocking `M1 / Document Ingestion (Phase 1)` — PDF library chosen; agents framework narrowed
 
 ---
 
@@ -21,12 +21,23 @@
 **Trade-off:** Does not support multi-tenancy or multiple Drives. Acceptable while the scope is DEMO.
 **Impact:** Secrets: one Service Account JSON + the folder ID. No Drive login flow in the frontend.
 
-### AD-003: Agents framework left open (2026-04-17)
+### AD-003: Agents framework left open — preference narrowed (2026-04-17)
 
-**Decision:** The choice between Vercel AI SDK (native), Mastra, LangChain.js, LlamaIndex.TS is deferred until milestone M4.
-**Reason:** Avoid premature lock-in without a concrete use case. Phases 1–3 (ingestion + base RAG) do not depend on an agents framework.
-**Trade-off:** We will need a short PoC when we reach M4.
-**Impact:** Base RAG code must not assume agent-framework-specific APIs; the generation layer stays behind its own interface.
+**Decision:** The final choice is deferred until milestone M4, but the candidate list is narrowed to two: **Mastra (primary preference)** and **Vercel AI SDK used directly (fallback)**. LangChain.js and LlamaIndex.TS are no longer first-class candidates.
+**Reason:**
+- **Mastra is built on top of the Vercel AI SDK** — adopting it does not invalidate AD-001 (Vercel AI SDK as provider abstraction). It adds agent primitives, deterministic workflows, evals, and native observability (OTEL/Sentry/Langfuse exporters) without forcing a different provider layer.
+- **Vercel AI SDK alone may be sufficient** if the M4 pilot task fits within `generateText` + tools + `maxSteps` without needing workflows or evals. In that case the extra Mastra layer is not justified.
+- **LangChain.js** is rejected as primary because its strongest observability path is LangSmith (paid + vendor lock-in), its abstractions are heavy and churn often, and its own provider layer would compete with AD-001.
+- **LlamaIndex.TS** is rejected because its index/query-engine features duplicate the RAG pipeline we are building manually in M1–M3.
+**Trade-off:** Mastra has a smaller community and is a younger framework. Using Vercel AI SDK alone means writing more orchestration ourselves.
+**Impact:** Base RAG code must still not assume any agent-framework-specific API; the generation layer stays behind its own interface so either option can plug in at M4. The PoC at M4 compares Mastra vs. Vercel AI SDK alone against the selected pilot task from `starter.md` §3.6, judged on Next.js integration, observability out of the box, and maintenance cost.
+
+### AD-006: PDF extraction via `unpdf` (2026-04-17)
+
+**Decision:** Use [`unpdf`](https://github.com/unjs/unpdf) as the default `PdfExtractor` implementation.
+**Reason:** TypeScript-first, ESM, works in Node and serverless/Edge runtimes (compatible with Vercel). `pdf-parse` is CJS-only, effectively unmaintained, and has the well-known "tries to read a test PDF at import time" bug. `pdfjs-dist` is browser-oriented, heavy, and exposes a low-level API that is overkill for extracting text from 31 papers.
+**Trade-off:** `unpdf` is younger than `pdfjs-dist` (from which it derives) and has a smaller ecosystem. Acceptable because the corpus is small and the extractor is kept behind the `PdfExtractor` Strategy interface (AD-001 + architectural patterns), so it can be swapped without touching business logic.
+**Impact:** Phase 1 ingestion implements `PdfExtractor` with `unpdf`. `pdf-parse` and `pdfjs-dist` are no longer candidates in open decisions. Protected PDFs and empty-extraction cases are classified as failures in the document state machine.
 
 ### AD-004: No automatic duplicate handling in v1 (2026-04-17)
 
@@ -73,9 +84,10 @@ _None for now._
 
 ## Todos
 
-- [ ] Decide PDF-extraction library (`unpdf` vs `pdf-parse` vs `pdfjs-dist`) via benchmark before starting Phase 1
+- [x] ~~Decide PDF-extraction library~~ — resolved by AD-006 (`unpdf`)
 - [ ] Define concrete text-refinement strategy (deterministic rules vs LLM-assisted) in the Phase 1 spec
 - [ ] Choose a definitive project name (current placeholder: "AIA Insight")
+- [ ] M4 PoC: compare **Mastra** vs **Vercel AI SDK alone** on one pilot task from `starter.md` §3.6 — criteria: Next.js integration, observability out of the box, maintenance cost (AD-003)
 
 ---
 

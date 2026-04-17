@@ -126,11 +126,11 @@ The intended v1 deployment target is:
 - **Document source:** fixed Google Drive folder accessed through a Service Account.
 - **Validation:** Zod at runtime boundaries, with inferred TypeScript types where useful.
 - **LLM and embeddings:** Vercel AI SDK as the provider abstraction.
+- **PDF extraction:** `unpdf` (AD-006), used behind a `PdfExtractor` Strategy interface.
 - **Tests:** Vitest, with unit tests for business logic and integration tests for database-facing flows.
 
 Open runtime decisions:
 
-- PDF extraction library: `unpdf`, `pdf-parse`, or `pdfjs-dist`.
 - Whether ingestion runs synchronously through an API route, through a CLI, through a scheduled job, or through a queue.
 - Whether long-running processing needs a background-job provider such as Inngest, Trigger.dev, or QStash.
 - Whether original PDFs are always re-downloaded from Drive or cached in object storage.
@@ -206,7 +206,7 @@ Potential pilot agent tasks:
 - theme extraction;
 - report generation.
 
-The agent framework decision is open until milestone M4.
+The agent framework decision is open until milestone M4, but the candidates are narrowed to **Mastra** (primary preference — built on top of the Vercel AI SDK, native observability, deterministic workflows) and **Vercel AI SDK used directly** (fallback if the pilot task does not need extra orchestration). LangChain.js and LlamaIndex.TS are no longer first-class candidates. See AD-003 for the rationale. The `Generation` service must remain framework-neutral so either option can plug in at M4.
 
 ---
 
@@ -249,7 +249,7 @@ Responsibilities:
 - extract textual content into `raw_text`;
 - classify known failures such as protected PDFs or empty extraction.
 
-Decision still open: `unpdf`, `pdf-parse`, or `pdfjs-dist`.
+Implementation: `unpdf` (AD-006), plugged in as a `PdfExtractor` Strategy so it can be replaced without touching ingestion logic.
 
 ### Text Refiner
 
@@ -367,7 +367,6 @@ Business logic should not be merged without tests. Infrastructure glue may be co
 
 These decisions are intentionally left open:
 
-- PDF extraction library.
 - Text refinement strategy.
 - Chunking strategy.
 - Embedding model.
@@ -377,7 +376,7 @@ These decisions are intentionally left open:
 - Maximum PDF size.
 - Original PDF caching strategy.
 - Observability storage schema.
-- Agents framework.
+- Agents framework: narrowed to Mastra (preferred) vs Vercel AI SDK alone — to be closed by the M4 PoC.
 - Final project name.
 
 Open decisions should be resolved in `STATE.md` as architecture decisions when enough evidence exists.

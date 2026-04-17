@@ -2,6 +2,23 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(project): lock in PDF extractor and narrow agents framework
+
+Date: 2026-04-17
+
+Changed:
+
+- Added `AD-006`: use `unpdf` as the default `PdfExtractor` implementation, replacing the open three-way choice between `unpdf`, `pdf-parse`, and `pdfjs-dist`. Rationale: TypeScript/ESM-first, serverless-friendly, swappable behind a Strategy interface.
+- Updated `AD-003`: kept deferred to M4 but narrowed the agents-framework candidates to Mastra (primary preference, built on top of the Vercel AI SDK with native observability and deterministic workflows) and Vercel AI SDK used directly (fallback). LangChain.js and LlamaIndex.TS are no longer first-class candidates.
+- Updated `ARCHITECTURE.md`: removed PDF extraction library from the open runtime decisions; clarified `Text Extractor` implementation; narrowed the agents-framework wording in Phase 7 and in Section 13 (Open Decisions).
+- Updated `STATE.md` Todos: closed the PDF-library todo; added an M4 PoC todo to compare Mastra vs Vercel AI SDK alone on a pilot task from `starter.md` §3.6.
+
+Files:
+
+- `.specs/project/STATE.md`
+- `.specs/project/ARCHITECTURE.md`
+- `.specs/project/CHANGELOG.md`
+
 ## 338ae04 - docs(project): consolidate scope in architecture spec
 
 Date: 2026-04-17
