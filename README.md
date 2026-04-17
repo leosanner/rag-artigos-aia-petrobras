@@ -82,6 +82,35 @@ flowchart TD
 - Vercel AI SDK para LLMs e embeddings
 - Google Drive via Service Account
 
+## Setup Local
+
+Requisitos:
+
+- Node.js 22 ou superior
+- pnpm 9.15.4
+- Docker e Docker Compose
+
+Comandos principais:
+
+```bash
+pnpm install
+docker compose up -d
+pnpm db:migrate
+pnpm dev
+```
+
+Checks de desenvolvimento:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+O Postgres local usa `pgvector/pgvector:pg17` e fica disponível em
+`localhost:5432`, com a URL padrão documentada em `.env.example`.
+
 ## Documentação do Projeto
 
 - `.specs/project/ARCHITECTURE.md` - escopo canônico, arquitetura, fluxo de dados, componentes e decisões abertas.
