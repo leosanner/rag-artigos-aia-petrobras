@@ -7,6 +7,7 @@ export default defineConfig({
   dbCredentials: {
     url:
       process.env.DATABASE_URL ??
-      "postgres://aia_insight:aia_insight@localhost:5432/aia_insight"
-  }
+      "postgres://aia_insight:aia_insight@localhost:5432/aia_insight",
+    ssl: process.env.NODE_ENV !== "development" ? true : false,
+  },
 });
