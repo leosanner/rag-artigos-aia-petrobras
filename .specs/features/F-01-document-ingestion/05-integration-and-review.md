@@ -13,7 +13,7 @@ Prove the full F-01 flow end to end, then prepare the change for independent rev
 
 ## Implementation Notes
 
-- The integration test should use mocked Drive files and a small fixture PDF or extractor stub where appropriate.
+- The integration test should use mocked Drive files and `assets/pdfs/article-example.pdf` as the controlled local fixture PDF, or an extractor stub where appropriate.
 - The test must prove the batch limit of 3 new documents.
 - The test must prove existing `drive_file_id` values are skipped and not modified.
 - The test must prove per-document failure isolation.

@@ -6,9 +6,9 @@ O objetivo do projeto é permitir perguntas sobre um conjunto de documentos, ou 
 
 ## Status
 
-O projeto ainda está em fase de organização e especificação. A prioridade atual é fechar a base da Fase 1: ingestão documental a partir de uma pasta fixa do Google Drive, registro governado em banco relacional, extração de texto bruto, geração de texto refinado e preparação para chunking.
+O projeto ainda está em fase de organização e especificação. A prioridade atual é implementar a base da Fase 1: ingestão documental assíncrona a partir de uma pasta fixa do Google Drive, registro governado em banco relacional, extração de texto bruto, geração determinística de texto refinado e preparação para chunking.
 
-Algumas decisões técnicas ainda estão abertas, como biblioteca de extração de PDF, estratégia final de refino textual, modelo de embeddings, modelo LLM e forma definitiva de execução da ingestão.
+As decisões de ingestão da Fase 1 estão registradas em `.specs/features/F-01-document-ingestion/spec.md`: `unpdf` para extração de PDF, refino determinístico, execução em background com Inngest e limite inicial de 3 novos documentos por execução. Ainda ficam abertas decisões de fases futuras, como chunking, embeddings e modelo LLM.
 
 ## Fluxo Proposto
 
@@ -25,10 +25,8 @@ flowchart TD
     E --> F[Extrair texto bruto]
     F --> G[(raw_text)]
 
-    G --> H[Limpeza deterministica<br/>normalizacao e remocao de ruidos]
-    H --> I[Quebra em blocos controlados]
-    I --> J[Refino estrutural com LLM<br/>sem resumir e sem alterar sentido]
-    J --> K[(refined_text)]
+    G --> H[Refino deterministico<br/>normalizacao e remocao de ruidos]
+    H --> K[(refined_text)]
 
     K --> L[Chunking]
     L --> M[Embeddings]
@@ -134,6 +132,10 @@ O Postgres local usa `pgvector/pgvector:pg17` e fica disponível em
 - `.specs/features/F-01-document-ingestion/*.md` - blocos pequenos de execução da F-01.
 - `.specs/features/F-0X-document-ingestion/spec.md` - especificação histórica de ingestão, depreciada.
 - `phase1_pipeline_rules.md` - regras operacionais da pipeline da Fase 1.
+
+## Assets Locais
+
+- `assets/pdfs/article-example.pdf` - artigo PDF de exemplo para testes locais de extração, refino, integração e experimentos com modelos. Não é parte do corpus governado em produção; use como fixture controlada durante desenvolvimento.
 
 Sempre que as specs do projeto forem alteradas, o `CHANGELOG.md` deve ser atualizado com um resumo do que mudou e por que mudou.
 

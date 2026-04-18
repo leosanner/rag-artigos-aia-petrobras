@@ -2,6 +2,24 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(assets): add local PDF fixture
+
+Date: 2026-04-18
+
+Changed:
+
+- Added `assets/pdfs/article-example.pdf` as a local sample PDF for extraction, refinement, integration, and model experiments.
+- Documented the asset as a development fixture, not as part of the governed production corpus.
+- Updated the F-01 integration block to reference the fixture path.
+- Refreshed the README status and flow wording to match the current F-01 ingestion decisions.
+
+Files:
+
+- `assets/pdfs/article-example.pdf`
+- `README.md`
+- `.specs/features/F-01-document-ingestion/05-integration-and-review.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(features): split F-01 into implementation blocks
 
 Date: 2026-04-18
