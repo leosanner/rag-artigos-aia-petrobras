@@ -26,6 +26,9 @@ pnpm test:watch           # vitest watch
 pnpm build                # next build
 ```
 
+Commit messages follow Conventional Commits and are enforced by Husky +
+commitlint through the `commit-msg` hook.
+
 Run a single test: `pnpm vitest run path/to/file.test.ts` (or `-t "name"` to filter by test name). Tests are discovered as `src/**/*.test.ts(x)`.
 
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → test on PRs and pushes to `main`. All four must pass locally before marking work complete.

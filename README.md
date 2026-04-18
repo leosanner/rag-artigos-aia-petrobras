@@ -110,6 +110,17 @@ pnpm test
 pnpm build
 ```
 
+Padrão de commits:
+
+```bash
+git commit -m "feat: adicionar ingestao de documentos"
+git commit -m "fix: corrigir validacao do banco"
+git commit -m "docs: atualizar setup local"
+```
+
+As mensagens seguem Conventional Commits e são validadas pelo Husky no hook
+`commit-msg`.
+
 O Postgres local usa `pgvector/pgvector:pg17` e fica disponível em
 `localhost:5432`, com a URL padrão documentada em `.env.example`.
 
