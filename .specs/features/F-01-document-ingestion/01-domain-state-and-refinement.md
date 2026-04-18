@@ -55,7 +55,7 @@ Each RF is unit-testable in isolation. Prefix `RF-B01-` to distinguish from feat
 - RF-B01-16: `refineText` collapses three or more consecutive line breaks into exactly two (preserves paragraph boundaries).
 - RF-B01-17: `refineText` `trim()`s the final output.
 - RF-B01-18: `refineText` throws `IngestionError` with code `refined_text_empty` when the input is empty, whitespace-only, or becomes empty after cleanup.
-- RF-B01-19: `refineText` does not invent content: the refined output contains no characters that were not in the input (sanity check for "no semantic expansion").
+- RF-B01-19: `refineText` does not invent content: every character in the refined output comes from the input alphabet, **except for the space character `" "` (U+0020)**, which may appear in the output even when absent from the input as a direct consequence of RF-B01-12 (collapsing `[ \t]+` → `" "`). No other character may be introduced.
 
 ## State Transition Table
 

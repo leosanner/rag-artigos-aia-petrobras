@@ -86,13 +86,17 @@ describe("refineText - sanity", () => {
     expect(refineText("   hello world   ")).toBe("hello world");
   });
 
-  it("does not invent characters outside the input alphabet", () => {
-    const input = "alpha beta\ngamma";
-    const output = refineText(input);
-    const inputChars = new Set(input);
+  it("does not invent characters outside the input alphabet (space allowed by RF-B01-12)", () => {
+    const cases = ["alpha beta\ngamma", "a\tb", "x\t\ty\n\n\nz"];
 
-    for (const ch of output) {
-      expect(inputChars.has(ch)).toBe(true);
+    for (const input of cases) {
+      const output = refineText(input);
+      const allowed = new Set(input);
+      allowed.add(" ");
+
+      for (const ch of output) {
+        expect(allowed.has(ch)).toBe(true);
+      }
     }
   });
 });
