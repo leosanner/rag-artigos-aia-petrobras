@@ -108,6 +108,10 @@ pnpm test
 pnpm build
 ```
 
+`pnpm test` usa `TEST_DATABASE_URL` e recusa executar os testes destrutivos de
+repositório se o nome do banco não contiver `test` como segmento. Na
+configuração local padrão, o banco de teste é `aia_insight_test`.
+
 Padrão de commits:
 
 ```bash
