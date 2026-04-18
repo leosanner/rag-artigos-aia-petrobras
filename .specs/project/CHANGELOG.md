@@ -2,6 +2,22 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(features): expand F-01 persistence block contract
+
+Date: 2026-04-18
+
+Changed:
+
+- Expanded F-01 block 02 into a feature-spec-style contract for persistence, ingestion runs, run items, and document repositories.
+- Locked in Postgres-level active-run exclusivity for `queued` and `processing` ingestion runs.
+- Defined repository interfaces, real Postgres test expectations, and CI migration requirements for the persistence block.
+- Documented the `TEST_DATABASE_URL` safety guard for destructive repository tests.
+
+Files:
+
+- `.specs/features/F-01-document-ingestion/02-persistence-runs-and-documents.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(assets): add local PDF fixture
 
 Date: 2026-04-18
