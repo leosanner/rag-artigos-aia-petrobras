@@ -2,6 +2,21 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(project): adopt spec-first workflow for milestone features
+
+Date: 2026-04-18
+
+Changed:
+
+- Added `AD-007`: milestone features now follow a four-step workflow — Discuss → `/feature-spec` → Implement → Codex review via `codex:rescue`. The `.specs/features/F-NN-<slug>.md` contract is the cold-start input for reviewers.
+- Updated `CLAUDE.md` §Project-specific rules: replaced the `/feature-dev:feature-dev` guidance with the new spec-first flow. Bugfixes, config tweaks, and isolated refactors remain out of scope for this workflow.
+
+Files:
+
+- `.specs/project/STATE.md`
+- `.specs/project/CHANGELOG.md`
+- `CLAUDE.md`
+
 ## (unreleased) - docs(project): lock in PDF extractor and narrow agents framework
 
 Date: 2026-04-17

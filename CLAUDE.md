@@ -58,7 +58,12 @@ Repository (persistence isolation), Strategy (swap extractor/refiner/chunker/emb
 - **Chunking reads `refined_text` only**, and only from documents with status `processed`.
 - TypeScript is `strict`. Validate env vars with Zod at boundaries ([src/env/server.ts](src/env/server.ts)) — don't read `process.env` directly elsewhere.
 - **UI language is Portuguese** (PT-BR). No i18n in v1.
-- **Milestone features go through `/feature-dev:feature-dev`.** When building a feature listed in [.specs/project/ROADMAP.md](.specs/project/ROADMAP.md) (M1 ingestion, M2 RAG, M3 XAI/observability, M4 agents), drive the work through the `feature-dev:feature-dev` skill and version the resulting documentation with the feature. Downstream review agents (`feature-dev:code-reviewer`, `feature-dev:code-explorer`) rely on this artifact for cold-start context. Skip the skill for bugfixes, config tweaks, and isolated refactors.
+- **Milestone features follow the spec-first workflow.** For any feature listed in [.specs/project/ROADMAP.md](.specs/project/ROADMAP.md) (M1 ingestion, M2 RAG, M3 XAI/observability, M4 agents):
+  1. **Discuss** the feature with the user to align scope, invariants, and open questions.
+  2. **Spec** — invoke `/feature-spec` to produce the contract at `.specs/features/F-NN-<slug>.md`. The agent may ask follow-up questions to ground each section; the spec is the authoritative input for implementation and review.
+  3. **Implement** end-to-end (plan + code + tests) against that contract. Keep the spec in sync if scope shifts mid-implementation.
+  4. **Review** — when the code is ready, delegate an independent review to Codex via `codex:rescue`, passing the git diff + the `F-NN` spec file as context. If the user prefers a different reviewer, ask before proceeding.
+  Skip this workflow for bugfixes, config tweaks, and isolated refactors. This supersedes the previous `/feature-dev:feature-dev` workflow (AD-007).
 
 ## Open decisions (unresolved — do not lock in without discussion)
 

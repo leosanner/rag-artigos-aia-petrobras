@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-04-17
+**Last Updated:** 2026-04-18
 **Current Work:** Unblocking `M1 / Document Ingestion (Phase 1)` — PDF library chosen; agents framework narrowed
 
 ---
 
 ## Recent Decisions
+
+### AD-007: Spec-first workflow for milestone features (2026-04-18)
+
+**Decision:** Milestone features follow a four-step workflow — Discuss → `/feature-spec` → Implement → Codex review via `codex:rescue`. The spec file (`.specs/features/F-NN-<slug>.md`) is the contract consumed by both implementer and reviewer. Replaces the previous `/feature-dev:feature-dev` rule.
+**Reason:** The prior workflow bundled specification, planning, and implementation under a single skill whose artifacts were heavy and duplicated architecture docs. The new flow separates concerns: `/feature-spec` produces a compact contract (scope, business rules, functional requirements, system flow, invariants, acceptance criteria) sized to be the cold-start input for a review agent. Delegating review to Codex gives an independent read using `git diff` + the spec as context, without the implementer reviewing its own work.
+**Trade-off:** Two artifacts (spec + code) instead of one guided skill run. Requires discipline to keep the spec in sync if scope shifts mid-implementation.
+**Impact:** Update `CLAUDE.md` §Project-specific rules. All new milestone features start by invoking `/feature-spec`. Codex review step is the default; the user may opt for another reviewer when asked.
 
 ### AD-001: Core stack — Next.js + TS + Drizzle + Vitest + Zod (2026-04-17)
 
