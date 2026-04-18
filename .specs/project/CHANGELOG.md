@@ -2,13 +2,36 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(features): replace legacy ingestion spec with F-01 contract
+
+Date: 2026-04-18
+
+Changed:
+
+- Standardized feature specs into folder-based paths, including `.specs/features/F-00-health-endpoint/spec.md`.
+- Marked `.specs/features/F-0X-document-ingestion/spec.md` as deprecated historical context.
+- Added `.specs/features/F-01-document-ingestion/spec.md` as the active implementation contract for M1 document ingestion under the folder-based feature-spec workflow.
+- Added `AD-008`: document ingestion runs asynchronously through Inngest, started from an English `/ingestion` page and tracked through persisted ingestion-run state.
+- Fixed the F-01 scope to P1 MVP only: 3 new PDFs per run, `unpdf` extraction, deterministic text refinement, no application-level PDF size limit, and no reprocessing or metadata editing in this contract.
+- Updated agent guidance to use `.specs/features/F-NN-<slug>/spec.md` and to allow feature-specific UI language exceptions.
+- Updated `STATE.md` todos to close the text-refinement decision and add the next implementation-breakdown task.
+
+Files:
+
+- `.specs/features/F-0X-document-ingestion/spec.md`
+- `.specs/features/F-00-health-endpoint/spec.md`
+- `.specs/features/F-01-document-ingestion/spec.md`
+- `.specs/project/STATE.md`
+- `.specs/project/CHANGELOG.md`
+- `CLAUDE.md`
+
 ## (unreleased) - docs(project): adopt spec-first workflow for milestone features
 
 Date: 2026-04-18
 
 Changed:
 
-- Added `AD-007`: milestone features now follow a four-step workflow — Discuss → `/feature-spec` → Implement → Codex review via `codex:rescue`. The `.specs/features/F-NN-<slug>.md` contract is the cold-start input for reviewers.
+- Added `AD-007`: milestone features now follow a four-step workflow — Discuss → `/feature-spec` → Implement → Codex review via `codex:rescue`. The `.specs/features/F-NN-<slug>/spec.md` contract is the cold-start input for reviewers.
 - Updated `CLAUDE.md` §Project-specific rules: replaced the `/feature-dev:feature-dev` guidance with the new spec-first flow. Bugfixes, config tweaks, and isolated refactors remain out of scope for this workflow.
 
 Files:

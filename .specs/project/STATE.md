@@ -1,15 +1,22 @@
 # State
 
 **Last Updated:** 2026-04-18
-**Current Work:** Unblocking `M1 / Document Ingestion (Phase 1)` — PDF library chosen; agents framework narrowed
+**Current Work:** Formalizing `M1 / Document Ingestion (Phase 1)` under the `F-01` feature contract
 
 ---
 
 ## Recent Decisions
 
+### AD-008: Document ingestion runs asynchronously via Inngest (2026-04-18)
+
+**Decision:** The first implementable document-ingestion contract (`F-01`) uses Inngest as the external workflow runner. The operator starts ingestion from an English `/ingestion` page, `POST /api/ingestion/sync` creates a queued run and publishes an Inngest event, and `/api/inngest` hosts the background function. Each run processes at most 3 new Drive PDFs and is inspectable through persisted ingestion-run state.
+**Reason:** Ingestion can take longer than a request/response interaction, especially once real PDFs and Drive downloads are involved. Inngest gives the project a Vercel-friendly async execution model with retries and event-driven functions while keeping the route handler thin and the application service testable.
+**Trade-off:** Adds an external service and new environment variables earlier than a synchronous MVP would. Local and CI tests must mock Drive/Inngest at the application boundary while persistence tests cover run state directly.
+**Impact:** The deprecated `.specs/features/F-0X-document-ingestion/spec.md` is replaced by `.specs/features/F-01-document-ingestion/spec.md` as the implementation contract. F-01 fixes deterministic text refinement, no application-level PDF size limit, a batch limit of 3 documents per run, and leaves reprocessing/metadata editing for later feature specs.
+
 ### AD-007: Spec-first workflow for milestone features (2026-04-18)
 
-**Decision:** Milestone features follow a four-step workflow — Discuss → `/feature-spec` → Implement → Codex review via `codex:rescue`. The spec file (`.specs/features/F-NN-<slug>.md`) is the contract consumed by both implementer and reviewer. Replaces the previous `/feature-dev:feature-dev` rule.
+**Decision:** Milestone features follow a four-step workflow — Discuss → `/feature-spec` → Implement → Codex review via `codex:rescue`. The spec file (`.specs/features/F-NN-<slug>/spec.md`) is the contract consumed by both implementer and reviewer. Replaces the previous `/feature-dev:feature-dev` rule.
 **Reason:** The prior workflow bundled specification, planning, and implementation under a single skill whose artifacts were heavy and duplicated architecture docs. The new flow separates concerns: `/feature-spec` produces a compact contract (scope, business rules, functional requirements, system flow, invariants, acceptance criteria) sized to be the cold-start input for a review agent. Delegating review to Codex gives an independent read using `git diff` + the spec as context, without the implementer reviewing its own work.
 **Trade-off:** Two artifacts (spec + code) instead of one guided skill run. Requires discipline to keep the spec in sync if scope shifts mid-implementation.
 **Impact:** Update `CLAUDE.md` §Project-specific rules. All new milestone features start by invoking `/feature-spec`. Codex review step is the default; the user may opt for another reviewer when asked.
@@ -92,7 +99,8 @@ _None for now._
 ## Todos
 
 - [x] ~~Decide PDF-extraction library~~ — resolved by AD-006 (`unpdf`)
-- [ ] Define concrete text-refinement strategy (deterministic rules vs LLM-assisted) in the Phase 1 spec
+- [x] ~~Define concrete text-refinement strategy~~ — resolved in `F-01` as deterministic refinement without LLM calls
+- [ ] Break `F-01 / Document Ingestion` into small implementation blocks and execute with TDD
 - [ ] Choose a definitive project name (current placeholder: "AIA Insight")
 - [ ] M4 PoC: compare **Mastra** vs **Vercel AI SDK alone** on one pilot task from `starter.md` §3.6 — criteria: Next.js integration, observability out of the box, maintenance cost (AD-003)
 

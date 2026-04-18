@@ -1,3 +1,16 @@
+# Deprecated Specification
+
+This document is retained as historical context only. It belongs to the
+previous feature-spec structure and must not be used as the implementation
+contract for M1 document ingestion.
+
+The active contract is now
+[`../F-01-document-ingestion/spec.md`](../F-01-document-ingestion/spec.md),
+created under the `F-NN-<slug>/spec.md` spec-first workflow defined by `AD-007` in
+[`../../project/STATE.md`](../../project/STATE.md).
+
+---
+
 # Document Ingestion (Phase 1) — Specification
 
 ## Problem Statement

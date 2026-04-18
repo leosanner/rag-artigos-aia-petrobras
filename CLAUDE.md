@@ -60,14 +60,14 @@ Repository (persistence isolation), Strategy (swap extractor/refiner/chunker/emb
 - **Failures are first-class states**, not invisible logs. `failed` documents must be reprocessable.
 - **Chunking reads `refined_text` only**, and only from documents with status `processed`.
 - TypeScript is `strict`. Validate env vars with Zod at boundaries ([src/env/server.ts](src/env/server.ts)) — don't read `process.env` directly elsewhere.
-- **UI language is Portuguese** (PT-BR). No i18n in v1.
+- **UI language is Portuguese** (PT-BR) by default. No i18n in v1. Feature specs may define a deliberate exception; `F-01 / Document Ingestion` uses English for `/ingestion`.
 - **Milestone features follow the spec-first workflow.** For any feature listed in [.specs/project/ROADMAP.md](.specs/project/ROADMAP.md) (M1 ingestion, M2 RAG, M3 XAI/observability, M4 agents):
   1. **Discuss** the feature with the user to align scope, invariants, and open questions.
-  2. **Spec** — invoke `/feature-spec` to produce the contract at `.specs/features/F-NN-<slug>.md`. The agent may ask follow-up questions to ground each section; the spec is the authoritative input for implementation and review.
+  2. **Spec** — invoke `/feature-spec` to produce the contract at `.specs/features/F-NN-<slug>/spec.md`. The agent may ask follow-up questions to ground each section; the spec is the authoritative input for implementation and review.
   3. **Implement** end-to-end (plan + code + tests) against that contract. Keep the spec in sync if scope shifts mid-implementation.
   4. **Review** — when the code is ready, delegate an independent review to Codex via `codex:rescue`, passing the git diff + the `F-NN` spec file as context. If the user prefers a different reviewer, ask before proceeding.
   Skip this workflow for bugfixes, config tweaks, and isolated refactors. This supersedes the previous `/feature-dev:feature-dev` workflow (AD-007).
 
 ## Open decisions (unresolved — do not lock in without discussion)
 
-PDF extraction library (`unpdf` vs `pdf-parse` vs `pdfjs-dist`); text-refinement strategy (deterministic vs LLM-assisted vs hybrid); chunking strategy; embedding and LLM models; ingestion trigger (API / CLI / cron / queue); background-job provider; agents framework (deferred to M4). See [.specs/project/STATE.md](.specs/project/STATE.md) §Todos.
+Chunking strategy; embedding and LLM models; definitive project name; agents framework final choice (deferred to M4). F-01 resolves the document-ingestion choices for PDF extraction (`unpdf`), text refinement (deterministic), trigger (`/ingestion` + `POST /api/ingestion/sync`), and background processing (Inngest). See [.specs/project/STATE.md](.specs/project/STATE.md) §Todos.
