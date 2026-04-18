@@ -14,10 +14,10 @@ Package manager is **pnpm 9.15.4**, Node **22+**. Path alias `@/*` → `./src/*`
 
 ```bash
 pnpm install
-docker compose up -d      # local Postgres 17 + pgvector on :5432
+pnpm dev                  # start local Postgres, wait for readiness, migrate, then run Next.js
+docker compose up -d      # optional: local Postgres 17 + pgvector on :5432 only
 pnpm db:generate          # drizzle-kit generate (after schema changes)
 pnpm db:migrate           # apply migrations in drizzle/
-pnpm dev                  # Next.js dev server
 
 pnpm lint                 # eslint .
 pnpm typecheck            # next typegen && tsc --noEmit

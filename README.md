@@ -94,10 +94,12 @@ Comandos principais:
 
 ```bash
 pnpm install
-docker compose up -d
-pnpm db:migrate
 pnpm dev
 ```
+
+`pnpm dev` (ou `npm run dev`) sobe o Postgres local com Docker Compose,
+aguarda o banco responder via `pg_isready`, aplica as migrações Drizzle e
+inicia o servidor Next.js.
 
 Checks de desenvolvimento:
 
