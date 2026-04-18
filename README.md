@@ -130,7 +130,9 @@ O Postgres local usa `pgvector/pgvector:pg17` e fica disponível em
 - `.specs/project/ROADMAP.md` - milestones e sequência planejada de entrega.
 - `.specs/project/STATE.md` - decisões arquiteturais, bloqueios, ideias adiadas e TODOs.
 - `.specs/project/CHANGELOG.md` - histórico das alterações nas specs.
-- `.specs/features/document-ingestion/spec.md` - especificação detalhada da Fase 1 de ingestão documental.
+- `.specs/features/F-01-document-ingestion/spec.md` - contrato ativo da Fase 1 de ingestão documental.
+- `.specs/features/F-01-document-ingestion/*.md` - blocos pequenos de execução da F-01.
+- `.specs/features/F-0X-document-ingestion/spec.md` - especificação histórica de ingestão, depreciada.
 - `phase1_pipeline_rules.md` - regras operacionais da pipeline da Fase 1.
 
 Sempre que as specs do projeto forem alteradas, o `CHANGELOG.md` deve ser atualizado com um resumo do que mudou e por que mudou.

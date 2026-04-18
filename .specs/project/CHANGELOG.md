@@ -2,6 +2,25 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(features): split F-01 into implementation blocks
+
+Date: 2026-04-18
+
+Changed:
+
+- Added execution block files under `.specs/features/F-01-document-ingestion/` so implementation can proceed in small TDD slices.
+- Updated `README.md` to point to the active F-01 contract, the execution blocks, and the deprecated historical ingestion spec.
+
+Files:
+
+- `.specs/features/F-01-document-ingestion/01-domain-state-and-refinement.md`
+- `.specs/features/F-01-document-ingestion/02-persistence-runs-and-documents.md`
+- `.specs/features/F-01-document-ingestion/03-infrastructure-drive-pdf-inngest.md`
+- `.specs/features/F-01-document-ingestion/04-interface-api-and-page.md`
+- `.specs/features/F-01-document-ingestion/05-integration-and-review.md`
+- `.specs/project/CHANGELOG.md`
+- `README.md`
+
 ## (unreleased) - docs(features): replace legacy ingestion spec with F-01 contract
 
 Date: 2026-04-18
