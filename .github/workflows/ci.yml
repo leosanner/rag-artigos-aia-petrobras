@@ -9,6 +9,23 @@ on:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: aia_insight_test
+          POSTGRES_USER: aia_insight
+          POSTGRES_PASSWORD: aia_insight
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aia_insight -d aia_insight_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://aia_insight:aia_insight@localhost:5432/aia_insight_test
+      TEST_DATABASE_URL: postgres://aia_insight:aia_insight@localhost:5432/aia_insight_test
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +49,9 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Migrate test database
+        run: pnpm db:migrate
 
       - name: Test
         run: pnpm test
