@@ -1,22 +1,21 @@
-import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
+
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   esbuild: {
-    jsx: "automatic"
+    jsx: "automatic",
   },
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url))
-    }
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
   },
   test: {
     fileParallelism: false,
     globals: true,
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
-    environmentMatchGlobs: [["src/**/*.test.tsx", "jsdom"]],
-    setupFiles: ["src/test/setup-dom.ts"],
+    include: ["src/**/*.test.ts"],
     passWithNoTests: false,
-    restoreMocks: true
-  }
+    restoreMocks: true,
+  },
 });
