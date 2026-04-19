@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-04-18
-**Current Work:** Formalizing `M1 / Document Ingestion (Phase 1)` under the `F-01` feature contract
+**Last Updated:** 2026-04-19
+**Current Work:** `F-01 / Document Ingestion` is implementation-complete and ready for independent review
 
 ---
 
 ## Recent Decisions
+
+### AD-010: F-01 Block 05 completes processing orchestration with per-item isolation (2026-04-19)
+
+**Decision:** `ProcessIngestionRun` is the production application service for F-01 background processing. It is wired into `/api/inngest` with the Google Drive source, `UnpdfPdfExtractor`, deterministic `refineText`, `Sha256FileHasher`, `DocumentsRepository`, and `IngestionRunsRepository`. The pipeline uses the persisted run `max_documents` value returned by `markProcessing`, persists `pipelineVersion = "f01-1.0.0"` from a domain constant, records Drive listing failures as `drive_listing_failed`, and isolates item-level failures after run-item creation so one bad file does not stop the selected batch.
+**Reason:** Block 05 closes the queued-run loop left by AD-009 and makes F-01 an end-to-end ingestion vertical: operator start, async processing, governed document records, safe failure states, and inspectable aggregate counts. Keeping hashing behind a `FileHasher` port follows the existing Strategy/Adapter boundary and keeps the application layer free of `node:crypto`.
+**Trade-off:** Failures after a run item exists but before or during document creation are recorded on the item with a safe error code, often `unknown_error`, rather than propagating to Inngest for automatic retry. This favors operator-visible partial progress and batch completion over retrying the whole run for one problematic candidate.
+**Impact:** `.specs/features/F-01-document-ingestion/spec.md` functional requirements are marked complete. `.specs/features/F-01-document-ingestion/05-integration-and-review.md` is the final block contract and records the implementation decisions. The full local verification path is now `pnpm lint`, `pnpm typecheck`, and `pnpm test`; the latest run passed with 167 Vitest tests.
 
 ### AD-009: F-01 Block 04 owns Start/Get services; operator secret lives in sessionStorage (2026-04-18)
 
@@ -107,7 +114,7 @@ _None for now._
 
 - [x] ~~Decide PDF-extraction library~~ — resolved by AD-006 (`unpdf`)
 - [x] ~~Define concrete text-refinement strategy~~ — resolved in `F-01` as deterministic refinement without LLM calls
-- [ ] Break `F-01 / Document Ingestion` into small implementation blocks and execute with TDD
+- [x] ~~Break `F-01 / Document Ingestion` into small implementation blocks and execute with TDD~~ — completed by AD-010
 - [ ] Choose a definitive project name (current placeholder: "AIA Insight")
 - [ ] M4 PoC: compare **Mastra** vs **Vercel AI SDK alone** on one pilot task from `starter.md` §3.6 — criteria: Next.js integration, observability out of the box, maintenance cost (AD-003)
 

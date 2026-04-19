@@ -57,19 +57,19 @@ The operator benefits by getting an explicit ingestion control surface: start a 
 
 ## Functional Requirements
 
-- [ ] RF-01: The `/ingestion` page allows the operator to start a new ingestion run and displays the returned run id and queued status.
-- [ ] RF-02: The `/ingestion` page can poll run status through `GET /api/ingestion/runs/:id` and display aggregate counts plus per-item statuses.
-- [ ] RF-03: `POST /api/ingestion/sync` creates one ingestion run with `status = queued`, `max_documents = 3`, and timestamps, then publishes an Inngest event.
-- [ ] RF-04: If another run is already `queued` or `processing`, `POST /api/ingestion/sync` returns 409 with the active run id and does not enqueue another run.
-- [ ] RF-05: The Inngest function marks the run `processing`, lists eligible Drive PDFs, filters out files whose `drive_file_id` already exists in `documents`, and selects at most 3 new files.
-- [ ] RF-06: When no new eligible PDFs exist, the run completes with zero selected, processed, and failed items.
-- [ ] RF-07: For each selected file, the pipeline downloads the PDF, computes `file_hash`, creates a `pending` document, extracts `raw_text`, refines it into `refined_text`, and marks the document `processed`.
-- [ ] RF-08: If PDF extraction fails or returns empty usable text, the document is marked `failed`, `last_error` is persisted, and refinement is skipped.
-- [ ] RF-09: If refinement fails or returns empty usable text, the document preserves `raw_text`, is marked `failed`, and persists `last_error`.
-- [ ] RF-10: Failure on one selected file does not prevent processing the remaining selected files.
-- [ ] RF-11: The run stores final aggregate counts for selected, processed, failed, and skipped-existing files.
-- [ ] RF-12: All API responses are validated with Zod before serialization and contain no credentials, Drive private-key content, database URLs, or provider stack traces.
-- [ ] RF-13: `POST /api/ingestion/sync` returns 401 when the `Authorization` bearer secret is missing or does not match `INGESTION_SYNC_SECRET`, and does not create or enqueue a run.
+- [x] RF-01: The `/ingestion` page allows the operator to start a new ingestion run and displays the returned run id and queued status.
+- [x] RF-02: The `/ingestion` page can poll run status through `GET /api/ingestion/runs/:id` and display aggregate counts plus per-item statuses.
+- [x] RF-03: `POST /api/ingestion/sync` creates one ingestion run with `status = queued`, `max_documents = 3`, and timestamps, then publishes an Inngest event.
+- [x] RF-04: If another run is already `queued` or `processing`, `POST /api/ingestion/sync` returns 409 with the active run id and does not enqueue another run.
+- [x] RF-05: The Inngest function marks the run `processing`, lists eligible Drive PDFs, filters out files whose `drive_file_id` already exists in `documents`, and selects at most 3 new files.
+- [x] RF-06: When no new eligible PDFs exist, the run completes with zero selected, processed, and failed items.
+- [x] RF-07: For each selected file, the pipeline downloads the PDF, computes `file_hash`, creates a `pending` document, extracts `raw_text`, refines it into `refined_text`, and marks the document `processed`.
+- [x] RF-08: If PDF extraction fails or returns empty usable text, the document is marked `failed`, `last_error` is persisted, and refinement is skipped.
+- [x] RF-09: If refinement fails or returns empty usable text, the document preserves `raw_text`, is marked `failed`, and persists `last_error`.
+- [x] RF-10: Failure on one selected file does not prevent processing the remaining selected files.
+- [x] RF-11: The run stores final aggregate counts for selected, processed, failed, and skipped-existing files.
+- [x] RF-12: All API responses are validated with Zod before serialization and contain no credentials, Drive private-key content, database URLs, or provider stack traces.
+- [x] RF-13: `POST /api/ingestion/sync` returns 401 when the `Authorization` bearer secret is missing or does not match `INGESTION_SYNC_SECRET`, and does not create or enqueue a run.
 
 ## System Flow
 

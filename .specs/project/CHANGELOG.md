@@ -2,6 +2,44 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - feat(ingestion): complete F-01 processing orchestration
+
+Date: 2026-04-19
+
+Changed:
+
+- Expanded F-01 block 05 into the final integration contract and marked its block-scoped functional requirements complete.
+- Added `ProcessIngestionRun` to orchestrate Drive listing, PDF filtering, existing-file skipping, batch capping, per-item download/hash/document/extract/refine/persist work, failure isolation, and final run counts.
+- Wired `/api/inngest` to a real `ProcessIngestionRun` built from production adapters, replacing the Block 04 placeholder handler.
+- Added `Sha256FileHasher`, the `FileHasher` port, and the `pipelineVersion` domain constant used for governed document creation.
+- Added `drive_listing_failed` to the safe ingestion error catalog and response schemas.
+- Strengthened item isolation for hashing, pending-document creation, and `raw_text` persistence failures so later selected files continue processing and persisted errors stay safe.
+- Used the persisted run `max_documents` value for selection and isolated failures in the final run-item processed transition.
+- Added unit and integration coverage for the full Block 05 flow, including real Postgres persistence with mocked Drive and a real PDF fixture.
+- Marked the parent F-01 functional requirements complete and added `AD-010` for the completed processing-orchestration decision.
+
+Files:
+
+- `.specs/features/F-01-document-ingestion/spec.md`
+- `.specs/features/F-01-document-ingestion/05-integration-and-review.md`
+- `.specs/project/STATE.md`
+- `.specs/project/CHANGELOG.md`
+- `src/application/ingestion/process-ingestion-run.ts`
+- `src/application/ingestion/process-ingestion-run.test.ts`
+- `src/application/ingestion/process-ingestion-run.integration.test.ts`
+- `src/application/ingestion/ports.ts`
+- `src/application/ingestion/get-ingestion-run.ts`
+- `src/application/ingestion/get-ingestion-run.test.ts`
+- `src/application/ingestion/schemas.ts`
+- `src/app/api/inngest/route.ts`
+- `src/app/api/inngest/route.test.ts`
+- `src/domain/documents/errors.ts`
+- `src/domain/documents/errors.test.ts`
+- `src/domain/documents/pipeline-version.ts`
+- `src/domain/documents/pipeline-version.test.ts`
+- `src/infrastructure/crypto/sha256-file-hasher.ts`
+- `src/infrastructure/crypto/sha256-file-hasher.test.ts`
+
 ## (unreleased) - feat(ingestion): add F-01 interface layer (routes + page + start/get services)
 
 Date: 2026-04-18
