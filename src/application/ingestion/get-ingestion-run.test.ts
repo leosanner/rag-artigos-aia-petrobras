@@ -129,6 +129,25 @@ describe("GetIngestionRun", () => {
     });
   });
 
+  it("round-trips drive_listing_failed from a persisted failed run row", async () => {
+    const repo = buildRepository({
+      run: buildRun({
+        status: "failed",
+        lastError: "drive_listing_failed",
+      }),
+      items: [],
+    });
+    const service = new GetIngestionRun({
+      runsRepository: repo as IngestionRunsRepository,
+    });
+
+    const result = await service.execute(RUN_ID);
+
+    expect(result?.status).toBe("failed");
+    expect(result?.lastError).toBe("drive_listing_failed");
+    expect(JSON.stringify(result)).toContain("drive_listing_failed");
+  });
+
   it("maps an unknown persisted last_error string to unknown_error", async () => {
     const repo = buildRepository({
       run: buildRun({ status: "failed", lastError: "not_a_real_code" }),

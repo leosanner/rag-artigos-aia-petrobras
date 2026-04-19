@@ -35,6 +35,12 @@ describe("toSafeErrorCode", () => {
     expect(toSafeErrorCode(error)).toBe("refined_text_empty");
   });
 
+  it("preserves drive_listing_failed as a safe run-level error code", () => {
+    const error = new IngestionError("drive_listing_failed", "Drive listing failed");
+
+    expect(toSafeErrorCode(error)).toBe("drive_listing_failed");
+  });
+
   it("returns 'unknown_error' for a plain Error and never leaks its message", () => {
     const secret = "postgres://user:pass@host/db";
     const error = new Error(secret);
@@ -64,6 +70,7 @@ describe("toSafeErrorCode", () => {
 
   it("never returns a code outside the closed IngestionErrorCode union", () => {
     const validCodes: ReadonlyArray<IngestionErrorCode> = [
+      "drive_listing_failed",
       "drive_download_failed",
       "raw_text_empty",
       "extraction_failed",

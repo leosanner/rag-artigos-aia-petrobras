@@ -10,6 +10,7 @@ import type {
 import type { IngestionRunsRepository } from "@/repositories/ingestion-runs-repository";
 
 const INGESTION_ERROR_CODES: readonly IngestionErrorCode[] = [
+  "drive_listing_failed",
   "drive_download_failed",
   "raw_text_empty",
   "extraction_failed",

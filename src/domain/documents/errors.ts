@@ -1,4 +1,5 @@
 export type IngestionErrorCode =
+  | "drive_listing_failed"
   | "drive_download_failed"
   | "raw_text_empty"
   | "extraction_failed"

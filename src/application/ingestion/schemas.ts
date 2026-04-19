@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const ingestionErrorCodeSchema = z.enum([
+  "drive_listing_failed",
   "drive_download_failed",
   "raw_text_empty",
   "extraction_failed",
