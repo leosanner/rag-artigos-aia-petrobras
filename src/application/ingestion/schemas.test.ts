@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   ingestionRunDetailResponseSchema,
+  ingestionRunInvalidIdResponseSchema,
   ingestionRunItemResponseSchema,
+  ingestionRunNotFoundResponseSchema,
   ingestionSyncConflictResponseSchema,
   ingestionSyncQueuedResponseSchema,
   ingestionSyncUnauthorizedResponseSchema,
@@ -120,6 +122,38 @@ describe("ingestionSyncUnauthorizedResponseSchema", () => {
   });
 });
 
+describe("ingestionRunInvalidIdResponseSchema", () => {
+  it("accepts exactly { error: 'invalid_id' }", () => {
+    const parsed = ingestionRunInvalidIdResponseSchema.parse({
+      error: "invalid_id",
+    });
+
+    expect(parsed).toEqual({ error: "invalid_id" });
+  });
+
+  it("rejects any other error label", () => {
+    expect(() =>
+      ingestionRunInvalidIdResponseSchema.parse({ error: "not_found" }),
+    ).toThrow();
+  });
+});
+
+describe("ingestionRunNotFoundResponseSchema", () => {
+  it("accepts exactly { error: 'not_found' }", () => {
+    const parsed = ingestionRunNotFoundResponseSchema.parse({
+      error: "not_found",
+    });
+
+    expect(parsed).toEqual({ error: "not_found" });
+  });
+
+  it("rejects any other error label", () => {
+    expect(() =>
+      ingestionRunNotFoundResponseSchema.parse({ error: "invalid_id" }),
+    ).toThrow();
+  });
+});
+
 describe("ingestionRunItemResponseSchema", () => {
   it("accepts a processed item with a document id", () => {
     const parsed = ingestionRunItemResponseSchema.parse({
@@ -229,11 +263,19 @@ describe("ingestionRunDetailResponseSchema", () => {
     const parsedUnauthorized = ingestionSyncUnauthorizedResponseSchema.parse({
       error: "unauthorized",
     });
+    const parsedInvalidId = ingestionRunInvalidIdResponseSchema.parse({
+      error: "invalid_id",
+    });
+    const parsedNotFound = ingestionRunNotFoundResponseSchema.parse({
+      error: "not_found",
+    });
     const parsedDetail = ingestionRunDetailResponseSchema.parse(validDetail);
 
     assertNoLeak(parsedQueued);
     assertNoLeak(parsedConflict);
     assertNoLeak(parsedUnauthorized);
+    assertNoLeak(parsedInvalidId);
+    assertNoLeak(parsedNotFound);
     assertNoLeak(parsedDetail);
   });
 });

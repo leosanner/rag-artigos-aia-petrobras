@@ -4,6 +4,8 @@ import type { GetIngestionRun } from "@/application/ingestion/get-ingestion-run"
 import {
   ingestionRunDetailResponseSchema,
   ingestionRunIdParamSchema,
+  ingestionRunInvalidIdResponseSchema,
+  ingestionRunNotFoundResponseSchema,
 } from "@/application/ingestion/schemas";
 
 export type RunDetailHandlerDeps = {
@@ -25,19 +27,25 @@ export function createRunDetailHandler(deps: RunDetailHandlerDeps) {
     const parsedId = ingestionRunIdParamSchema.safeParse(id);
 
     if (!parsedId.success) {
-      return NextResponse.json(
-        { error: "invalid_id" },
-        { status: 400, headers: NO_STORE_HEADERS },
-      );
+      const body = ingestionRunInvalidIdResponseSchema.parse({
+        error: "invalid_id",
+      });
+      return NextResponse.json(body, {
+        status: 400,
+        headers: NO_STORE_HEADERS,
+      });
     }
 
     const run = await deps.getRun.execute(parsedId.data);
 
     if (!run) {
-      return NextResponse.json(
-        { error: "not_found" },
-        { status: 404, headers: NO_STORE_HEADERS },
-      );
+      const body = ingestionRunNotFoundResponseSchema.parse({
+        error: "not_found",
+      });
+      return NextResponse.json(body, {
+        status: 404,
+        headers: NO_STORE_HEADERS,
+      });
     }
 
     const body = ingestionRunDetailResponseSchema.parse(run);

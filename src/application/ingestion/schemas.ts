@@ -54,6 +54,26 @@ export type IngestionSyncUnauthorizedResponse = z.infer<
   typeof ingestionSyncUnauthorizedResponseSchema
 >;
 
+export const ingestionRunInvalidIdResponseSchema = z
+  .object({
+    error: z.literal("invalid_id"),
+  })
+  .strip();
+
+export type IngestionRunInvalidIdResponse = z.infer<
+  typeof ingestionRunInvalidIdResponseSchema
+>;
+
+export const ingestionRunNotFoundResponseSchema = z
+  .object({
+    error: z.literal("not_found"),
+  })
+  .strip();
+
+export type IngestionRunNotFoundResponse = z.infer<
+  typeof ingestionRunNotFoundResponseSchema
+>;
+
 export const ingestionRunItemResponseSchema = z
   .object({
     id: z.string().uuid(),
