@@ -2,6 +2,41 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - feat(ingestion): add F-01 interface layer (routes + page + start/get services)
+
+Date: 2026-04-18
+
+Changed:
+
+- Expanded F-01 block 04 into a canonical feature-spec contract (scope, business rules, functional requirements, system flow, invariants, technical design, dependencies, acceptance criteria, decisions, reviewer checklist).
+- Narrowed F-01 block 05 scope to `ProcessIngestionRun` + integration proofs; `StartIngestionRun` and `GetIngestionRun` now live in block 04.
+- Added `StartIngestionRun` and `GetIngestionRun` application services composing the existing ingestion-runs repository and Inngest publisher.
+- Added Zod response schemas for queued, conflict, unauthorized, and run-detail responses with no-leak regression tests.
+- Added `POST /api/ingestion/sync` and `GET /api/ingestion/runs/:id` route handlers using a factory/handler split for dependency-injected unit tests.
+- Added the `/api/inngest` serve endpoint with a placeholder `ProcessIngestionRunHandler` that throws `IngestionError("unknown_error")` until block 05 replaces it.
+- Added the English `/ingestion` operator page that collects the operator secret in `sessionStorage`, starts runs, polls run detail, and stops polling on terminal statuses.
+- Added component tests for the page using `@testing-library/react` + `jsdom` scoped to `.test.tsx` files via vitest `environmentMatchGlobs`.
+- Added `AD-009` documenting the 04/05 split and the sessionStorage operator-secret UX.
+
+Files:
+
+- `.specs/features/F-01-document-ingestion/04-interface-api-and-page.md`
+- `.specs/features/F-01-document-ingestion/05-integration-and-review.md`
+- `.specs/project/STATE.md`
+- `.specs/project/CHANGELOG.md`
+- `src/application/ingestion/start-ingestion-run.ts`
+- `src/application/ingestion/get-ingestion-run.ts`
+- `src/application/ingestion/schemas.ts`
+- `src/app/api/ingestion/sync/handler.ts`
+- `src/app/api/ingestion/sync/route.ts`
+- `src/app/api/ingestion/runs/[id]/handler.ts`
+- `src/app/api/ingestion/runs/[id]/route.ts`
+- `src/app/api/inngest/route.ts`
+- `src/app/ingestion/page.tsx`
+- `src/test/setup-dom.ts`
+- `vitest.config.ts`
+- `package.json`
+
 ## (unreleased) - security(ingestion): require operator secret for sync start
 
 Date: 2026-04-18

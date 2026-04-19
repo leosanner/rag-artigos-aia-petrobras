@@ -7,6 +7,13 @@
 
 ## Recent Decisions
 
+### AD-009: F-01 Block 04 owns Start/Get services; operator secret lives in sessionStorage (2026-04-18)
+
+**Decision:** `StartIngestionRun` and `GetIngestionRun` application services are implemented in F-01 Block 04 alongside the route handlers and `/ingestion` page; Block 05 keeps ownership of `ProcessIngestionRun` and end-to-end integration. The page captures the operator secret through a password input and persists it only in `sessionStorage`, forwarding it exclusively in the `Authorization: Bearer <secret>` header of `POST /api/ingestion/sync`. `GET /api/ingestion/runs/:id` is a read-only polling endpoint and does not require the secret.
+**Reason:** The routes have no useful shape without these thin services (both are compositions of the existing `IngestionRunsRepository` and the existing `InngestIngestionEventPublisher`), so shipping them inside Block 04 keeps that block self-contained and lets Block 05 focus on the heavier `ProcessIngestionRun` plus the integration proofs. Keeping the secret out of `localStorage`, out of cookies, and out of any `NEXT_PUBLIC_*` env avoids persistent exposure while still saving the operator from retyping it across polling cycles in the same tab.
+**Trade-off:** The secret is still typed manually by the operator at least once per browser session; refreshing after closing the tab requires retyping. Block 04 is slightly larger than originally planned, but Block 05 becomes correspondingly smaller and easier to isolate for independent review.
+**Impact:** `.specs/features/F-01-document-ingestion/04-interface-api-and-page.md` expands to the canonical feature-spec format and owns the new services. `.specs/features/F-01-document-ingestion/05-integration-and-review.md` narrows its scope to `ProcessIngestionRun` + integration. No new environment variables; the existing `INGESTION_SYNC_SECRET` continues to be the server-side source of truth.
+
 ### AD-008: Document ingestion runs asynchronously via Inngest (2026-04-18)
 
 **Decision:** The first implementable document-ingestion contract (`F-01`) uses Inngest as the external workflow runner. The operator starts ingestion from an English `/ingestion` page, `POST /api/ingestion/sync` creates a queued run and publishes an Inngest event, and `/api/inngest` hosts the background function. Each run processes at most 3 new Drive PDFs and is inspectable through persisted ingestion-run state.
