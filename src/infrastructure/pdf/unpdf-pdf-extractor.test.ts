@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { IngestionError } from "@/domain/documents/errors";
 
@@ -13,7 +13,26 @@ vi.mock("unpdf", () => ({
 const mockedGetDocumentProxy = vi.mocked(getDocumentProxy);
 const mockedExtractText = vi.mocked(extractText);
 
+type PromiseConstructorWithTry = PromiseConstructor & {
+  try?: <T>(callback: () => T | PromiseLike<T>) => Promise<Awaited<T>>;
+};
+
+const nativePromiseTry = (Promise as PromiseConstructorWithTry).try;
+
 describe("UnpdfPdfExtractor", () => {
+  afterEach(() => {
+    if (nativePromiseTry === undefined) {
+      Reflect.deleteProperty(Promise, "try");
+      return;
+    }
+
+    Object.defineProperty(Promise, "try", {
+      configurable: true,
+      writable: true,
+      value: nativePromiseTry,
+    });
+  });
+
   it("extracts merged raw text from PDF bytes", async () => {
     const pdfProxy = { id: "pdf-proxy" };
     mockedGetDocumentProxy.mockResolvedValue(pdfProxy as never);
@@ -27,6 +46,26 @@ describe("UnpdfPdfExtractor", () => {
     await expect(extractor.extract(bytes)).resolves.toBe("Raw extracted text");
     expect(mockedGetDocumentProxy).toHaveBeenCalledWith(bytes);
     expect(mockedExtractText).toHaveBeenCalledWith(pdfProxy, { mergePages: true });
+  });
+
+  it("installs Promise.try compatibility before invoking unpdf", async () => {
+    Reflect.deleteProperty(Promise, "try");
+    const pdfProxy = { id: "pdf-proxy" };
+    mockedGetDocumentProxy.mockImplementation(async () => {
+      expect(typeof (Promise as PromiseConstructorWithTry).try).toBe(
+        "function",
+      );
+      return pdfProxy as never;
+    });
+    mockedExtractText.mockResolvedValue({
+      totalPages: 1,
+      text: "Raw extracted text",
+    } as never);
+    const extractor = new UnpdfPdfExtractor();
+
+    await expect(extractor.extract(new Uint8Array([1]))).resolves.toBe(
+      "Raw extracted text",
+    );
   });
 
   it("classifies whitespace-only extraction as raw_text_empty", async () => {
