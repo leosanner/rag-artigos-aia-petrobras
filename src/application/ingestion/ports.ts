@@ -15,6 +15,10 @@ export interface PdfExtractor {
   extract(pdfBytes: Uint8Array): Promise<string>;
 }
 
+export interface FileHasher {
+  hash(bytes: Uint8Array): string;
+}
+
 export interface IngestionEventPublisher {
   publishSyncRequested(runId: string): Promise<void>;
 }
