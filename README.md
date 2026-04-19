@@ -95,9 +95,34 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` (ou `npm run dev`) sobe o Postgres local com Docker Compose,
-aguarda o banco responder via `pg_isready`, aplica as migrações Drizzle e
-inicia o servidor Next.js.
+`pnpm dev` starts local Postgres with Docker Compose, waits for the database
+with `pg_isready`, applies Drizzle migrations, and starts the Next.js server.
+
+For local async ingestion work, use one of the flows below:
+
+```bash
+pnpm dev:all
+```
+
+`pnpm dev:all` starts the app (`dev:app`), waits for
+`http://localhost:3000/api/inngest` to respond, and starts the Inngest Dev Server
+pointing to that route. The Inngest UI is available at
+`http://localhost:8288`.
+
+If you prefer separate terminals:
+
+```bash
+pnpm dev:app      # Postgres + migrations + Next.js
+pnpm dev:inngest  # Inngest Dev Server at http://localhost:8288
+```
+
+Useful variables for customizing the local flow:
+
+```bash
+PORT=3001 pnpm dev:app
+INNGEST_APP_URL="http://localhost:3001/api/inngest" pnpm dev:inngest
+APP_READY_TIMEOUT_SECONDS=120 pnpm dev:all
+```
 
 Checks de desenvolvimento:
 
@@ -135,6 +160,7 @@ O Postgres local usa `pgvector/pgvector:pg17` e fica disponível em
 - `.specs/features/F-01-document-ingestion/spec.md` - contrato ativo da Fase 1 de ingestão documental.
 - `.specs/features/F-01-document-ingestion/*.md` - blocos pequenos de execução da F-01.
 - `.specs/features/F-0X-document-ingestion/spec.md` - especificação histórica de ingestão, depreciada.
+- `docs/local-ingestion.md` - quick guide for configuring and testing local ingestion with Google Drive and Inngest.
 - `phase1_pipeline_rules.md` - regras operacionais da pipeline da Fase 1.
 
 ## Assets Locais

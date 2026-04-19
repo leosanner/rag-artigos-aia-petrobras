@@ -4,7 +4,10 @@
   "private": true,
   "packageManager": "pnpm@9.15.4",
   "scripts": {
-    "dev": "bash scripts/dev.sh",
+    "dev": "pnpm dev:app",
+    "dev:app": "bash scripts/dev.sh",
+    "dev:inngest": "bash scripts/dev-inngest.sh",
+    "dev:all": "bash scripts/dev-all.sh",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

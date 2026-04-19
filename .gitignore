@@ -4,4 +4,6 @@ dist/
 coverage/
 .env
 .env*.local
+google-credentials.json
+*service-account*.json
 *.tsbuildinfo
