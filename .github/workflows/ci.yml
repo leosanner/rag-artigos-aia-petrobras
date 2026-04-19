@@ -62,7 +62,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      NODE_ENV: production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -89,4 +88,6 @@ jobs:
           fi
 
       - name: Migrate production database
+        env:
+          NODE_ENV: production
         run: pnpm db:migrate
