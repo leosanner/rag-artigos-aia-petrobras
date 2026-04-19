@@ -1,23 +1,29 @@
 import { serve } from "inngest/next";
 
-import type { ProcessIngestionRunHandler } from "@/application/ingestion/ports";
-import { IngestionError } from "@/domain/documents/errors";
+import { ProcessIngestionRun } from "@/application/ingestion/process-ingestion-run";
+import { db } from "@/db/client";
+import { refineText } from "@/domain/text/deterministic-refiner";
+import { createGoogleDriveFileSourceFromEnv } from "@/infrastructure/drive/google-drive-file-source";
+import { Sha256FileHasher } from "@/infrastructure/crypto/sha256-file-hasher";
 import {
   createProcessIngestionRunFunction,
   inngest,
 } from "@/infrastructure/ingestion/inngest";
+import { UnpdfPdfExtractor } from "@/infrastructure/pdf/unpdf-pdf-extractor";
+import { DocumentsRepository } from "@/repositories/documents-repository";
+import { IngestionRunsRepository } from "@/repositories/ingestion-runs-repository";
 
-const placeholderProcessIngestionRunHandler: ProcessIngestionRunHandler = {
-  async execute(runId: string): Promise<void> {
-    throw new IngestionError(
-      "unknown_error",
-      `ProcessIngestionRun is not wired yet (runId=${runId}); will be delivered in F-01 Block 05`,
-    );
-  },
-};
+const processIngestionRunHandler = new ProcessIngestionRun({
+  driveSource: createGoogleDriveFileSourceFromEnv(),
+  pdfExtractor: new UnpdfPdfExtractor(),
+  refiner: refineText,
+  hasher: new Sha256FileHasher(),
+  documentsRepository: new DocumentsRepository(db),
+  runsRepository: new IngestionRunsRepository(db),
+});
 
 const processIngestionRun = createProcessIngestionRunFunction(
-  placeholderProcessIngestionRunHandler,
+  processIngestionRunHandler,
 );
 
 export const { GET, POST, PUT } = serve({

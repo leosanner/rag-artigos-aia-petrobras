@@ -2,8 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ProcessIngestionRunHandler } from "@/application/ingestion/ports";
 
-const RUN_ID = "11111111-1111-4111-8111-111111111111";
-
 describe("/api/inngest route", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -12,9 +10,16 @@ describe("/api/inngest route", () => {
   afterEach(() => {
     vi.doUnmock("inngest/next");
     vi.doUnmock("@/infrastructure/ingestion/inngest");
+    vi.doUnmock("@/infrastructure/drive/google-drive-file-source");
+    vi.doUnmock("@/infrastructure/pdf/unpdf-pdf-extractor");
+    vi.doUnmock("@/infrastructure/crypto/sha256-file-hasher");
+    vi.doUnmock("@/application/ingestion/process-ingestion-run");
+    vi.doUnmock("@/repositories/documents-repository");
+    vi.doUnmock("@/repositories/ingestion-runs-repository");
+    vi.doUnmock("@/db/client");
   });
 
-  it("exports GET, POST, and PUT through serve with the placeholder ingestion function", async () => {
+  it("registers a ProcessIngestionRun handler built from production adapters and exports serve handlers", async () => {
     const routeHandlers = {
       GET: vi.fn(),
       POST: vi.fn(),
@@ -31,38 +36,68 @@ describe("/api/inngest route", () => {
     );
     const serve = vi.fn(() => routeHandlers);
 
+    const ProcessIngestionRunSpy = vi.fn();
+    const driveSourceStub = { listFiles: vi.fn(), downloadFile: vi.fn() };
+    const createGoogleDriveFileSourceFromEnv = vi.fn(() => driveSourceStub);
+    const pdfExtractorInstance = { extract: vi.fn() };
+    const UnpdfPdfExtractor = vi.fn(() => pdfExtractorInstance);
+    const hasherInstance = { hash: vi.fn() };
+    const Sha256FileHasher = vi.fn(() => hasherInstance);
+    const documentsRepositoryInstance = {};
+    const DocumentsRepository = vi.fn(() => documentsRepositoryInstance);
+    const runsRepositoryInstance = {};
+    const IngestionRunsRepository = vi.fn(() => runsRepositoryInstance);
+    const dbStub = { __mock: "db" };
+
     vi.doMock("inngest/next", () => ({ serve }));
     vi.doMock("@/infrastructure/ingestion/inngest", () => ({
       createProcessIngestionRunFunction,
       inngest: inngestClient,
     }));
+    vi.doMock("@/infrastructure/drive/google-drive-file-source", () => ({
+      createGoogleDriveFileSourceFromEnv,
+    }));
+    vi.doMock("@/infrastructure/pdf/unpdf-pdf-extractor", () => ({
+      UnpdfPdfExtractor,
+    }));
+    vi.doMock("@/infrastructure/crypto/sha256-file-hasher", () => ({
+      Sha256FileHasher,
+    }));
+    vi.doMock("@/application/ingestion/process-ingestion-run", () => ({
+      ProcessIngestionRun: ProcessIngestionRunSpy,
+    }));
+    vi.doMock("@/repositories/documents-repository", () => ({
+      DocumentsRepository,
+    }));
+    vi.doMock("@/repositories/ingestion-runs-repository", () => ({
+      IngestionRunsRepository,
+    }));
+    vi.doMock("@/db/client", () => ({ db: dbStub }));
 
     const route = await import("./route");
 
     expect(route.GET).toBe(routeHandlers.GET);
     expect(route.POST).toBe(routeHandlers.POST);
     expect(route.PUT).toBe(routeHandlers.PUT);
-    expect(createProcessIngestionRunFunction).toHaveBeenCalledOnce();
+
     expect(serve).toHaveBeenCalledWith({
       client: inngestClient,
       functions: [processIngestionRunFunction],
     });
 
-    const handler = registeredHandlers[0];
-    if (handler === undefined) {
-      throw new Error("Expected the route to register a process handler");
-    }
+    expect(ProcessIngestionRunSpy).toHaveBeenCalledTimes(1);
+    const deps = ProcessIngestionRunSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(deps.driveSource).toBe(driveSourceStub);
+    expect(deps.pdfExtractor).toBe(pdfExtractorInstance);
+    expect(deps.hasher).toBe(hasherInstance);
+    expect(deps.documentsRepository).toBe(documentsRepositoryInstance);
+    expect(deps.runsRepository).toBe(runsRepositoryInstance);
+    expect(typeof deps.refiner).toBe("function");
 
-    let thrown: unknown;
-    try {
-      await handler.execute(RUN_ID);
-    } catch (error) {
-      thrown = error;
-    }
+    expect(createProcessIngestionRunFunction).toHaveBeenCalledOnce();
+    expect(registeredHandlers[0]).toBeInstanceOf(ProcessIngestionRunSpy);
 
-    expect(thrown).toBeInstanceOf(Error);
-    expect(thrown).toHaveProperty("name", "IngestionError");
-    expect(thrown).toHaveProperty("code", "unknown_error");
-    expect(thrown).toHaveProperty("message", expect.stringContaining(RUN_ID));
+    expect(DocumentsRepository).toHaveBeenCalledWith(dbStub);
+    expect(IngestionRunsRepository).toHaveBeenCalledWith(dbStub);
   });
 });
