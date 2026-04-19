@@ -9,7 +9,7 @@ import {
   type IngestionRunDetailResponse,
 } from "@/application/ingestion/schemas";
 
-export const INGESTION_POLL_INTERVAL_MS = 2000;
+import { INGESTION_POLL_INTERVAL_MS } from "./constants";
 
 const SECRET_STORAGE_KEY = "ingestion:secret";
 

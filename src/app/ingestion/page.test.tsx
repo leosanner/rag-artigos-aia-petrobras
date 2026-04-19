@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import IngestionPage, { INGESTION_POLL_INTERVAL_MS } from "./page";
+import IngestionPage from "./page";
+import { INGESTION_POLL_INTERVAL_MS } from "./constants";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const ACTIVE_RUN_ID = "22222222-2222-4222-8222-222222222222";

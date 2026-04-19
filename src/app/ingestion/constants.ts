@@ -1,0 +1,1 @@
+export const INGESTION_POLL_INTERVAL_MS = 2000;
