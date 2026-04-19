@@ -2,6 +2,47 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - security(ingestion): require operator secret for sync start
+
+Date: 2026-04-18
+
+Changed:
+
+- Added a shared-secret barrier for `POST /api/ingestion/sync` using `Authorization: Bearer <secret>` matched against `INGESTION_SYNC_SECRET`.
+- Updated the F-01 and block-04 contracts so unauthorized sync-start requests return 401 before run creation or Inngest publishing.
+- Added a reusable constant-time authorization helper for the future sync route.
+- Extended server env validation and examples for `INGESTION_SYNC_SECRET`.
+
+Files:
+
+- `.specs/features/F-01-document-ingestion/spec.md`
+- `.specs/features/F-01-document-ingestion/03-infrastructure-drive-pdf-inngest.md`
+- `.specs/features/F-01-document-ingestion/04-interface-api-and-page.md`
+- `src/application/ingestion/authorize-ingestion-sync.ts`
+- `src/env/server.ts`
+- `.specs/project/CHANGELOG.md`
+
+## (unreleased) - feat(ingestion): add F-01 infrastructure adapters
+
+Date: 2026-04-18
+
+Changed:
+
+- Expanded F-01 block 03 into a reviewer-ready contract for Google Drive, PDF extraction, Inngest event wiring, env validation, and adapter tests.
+- Added infrastructure ports for Drive files, PDF extraction, ingestion event publishing, and the future process-run handler.
+- Added Google Drive, `unpdf`, and Inngest infrastructure implementations with mocked unit coverage.
+- Added dev-aware Inngest env validation and test defaults for server-side env imports.
+
+Files:
+
+- `.specs/features/F-01-document-ingestion/03-infrastructure-drive-pdf-inngest.md`
+- `src/application/ingestion/ports.ts`
+- `src/infrastructure/drive/google-drive-file-source.ts`
+- `src/infrastructure/pdf/unpdf-pdf-extractor.ts`
+- `src/infrastructure/ingestion/inngest.ts`
+- `src/env/server.ts`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(features): expand F-01 persistence block contract
 
 Date: 2026-04-18

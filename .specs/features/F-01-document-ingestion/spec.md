@@ -4,7 +4,7 @@
 
 **In scope:**
 - Operator-facing `/ingestion` page in English to start a document ingestion run and monitor its progress.
-- `POST /api/ingestion/sync` route that creates an ingestion run, enqueues asynchronous processing through Inngest, and returns immediately with a run id.
+- `POST /api/ingestion/sync` route that requires the configured operator secret, creates an ingestion run, enqueues asynchronous processing through Inngest, and returns immediately with a run id.
 - `GET /api/ingestion/runs/:id` route that returns the run status and per-document processing results for polling by the page.
 - `/api/inngest` route that hosts the Inngest function used to process ingestion runs.
 - Google Drive Service Account integration against the fixed Drive folder defined by environment variables.
@@ -53,6 +53,7 @@ The operator benefits by getting an explicit ingestion control surface: start a 
 - RN-12: The original PDF remains in Google Drive; Postgres stores governance metadata, extracted text, refined text, and run state.
 - RN-13: Text refinement is deterministic in F-01 and must not call an LLM or embedding provider.
 - RN-14: Route handlers validate request and response boundaries with Zod and delegate business logic to application services.
+- RN-15: Starting ingestion requires `Authorization: Bearer <secret>` matching `INGESTION_SYNC_SECRET`; unauthorized requests must not create runs or publish Inngest events.
 
 ## Functional Requirements
 
@@ -68,31 +69,34 @@ The operator benefits by getting an explicit ingestion control surface: start a 
 - [ ] RF-10: Failure on one selected file does not prevent processing the remaining selected files.
 - [ ] RF-11: The run stores final aggregate counts for selected, processed, failed, and skipped-existing files.
 - [ ] RF-12: All API responses are validated with Zod before serialization and contain no credentials, Drive private-key content, database URLs, or provider stack traces.
+- [ ] RF-13: `POST /api/ingestion/sync` returns 401 when the `Authorization` bearer secret is missing or does not match `INGESTION_SYNC_SECRET`, and does not create or enqueue a run.
 
 ## System Flow
 
 1. The operator opens `/ingestion`.
-2. The page calls `POST /api/ingestion/sync` when the operator starts ingestion.
-3. The route validates that there is no request body, calls `StartIngestionRun` in the application layer, and validates the response body with Zod.
-4. `StartIngestionRun` asks the ingestion-run repository whether a `queued` or `processing` run exists.
-5. If an active run exists, the application service returns a conflict result and the route responds 409 with `{ activeRunId }`.
-6. If no active run exists, the service creates an `ingestion_runs` record with `status = queued`, `max_documents = 3`, and initial zero counts.
-7. The service publishes Inngest event `ingestion/sync.requested` with `{ runId }`.
-8. `POST /api/ingestion/sync` returns 202 with `{ runId, status: "queued", maxDocuments: 3 }`.
-9. The `/ingestion` page polls `GET /api/ingestion/runs/:id`.
-10. The Inngest function hosted at `/api/inngest` receives `ingestion/sync.requested` and calls `ProcessIngestionRun`.
-11. `ProcessIngestionRun` marks the run `processing`, then asks the Drive adapter to list files in `GOOGLE_DRIVE_FOLDER_ID`.
-12. The application service keeps PDF candidates only, counts candidates whose `drive_file_id` already exists in `documents` as skipped-existing, and selects the first 3 new candidates in Drive listing order.
-13. For each selected file, the service creates an `ingestion_run_items` row with `status = processing`.
-14. The Drive adapter downloads the PDF bytes. If download fails before a document can be created, the run item becomes `failed` with `last_error = "drive_download_failed"`.
-15. The service computes `file_hash`, creates a `documents` row with `status = pending`, `origin = "google_drive"`, `pipeline_version`, Drive metadata, and nullable bibliographic fields left null.
-16. The `PdfExtractor` Strategy extracts text from the PDF bytes. Empty usable text is classified as `raw_text_empty`.
-17. On extraction failure, the document becomes `failed`, `last_error` is persisted, the run item becomes `failed`, and the next item is processed.
-18. The deterministic `TextRefiner` normalizes extraction noise without semantic rewriting and returns `refined_text`. Empty usable refined text is classified as `refined_text_empty`.
-19. On refinement failure, the already persisted `raw_text` is preserved, the document becomes `failed`, `last_error` is persisted, the run item becomes `failed`, and the next item is processed.
-20. On success, the repository persists `raw_text`, `refined_text`, marks the document `processed`, and marks the run item `processed`.
-21. After all selected items finish, the service updates aggregate counts and marks the run `completed`, even if some items failed.
-22. If an unrecoverable run-level failure occurs before item isolation is possible, the run becomes `failed` with a generic `last_error`; API responses still hide raw provider errors.
+2. The page calls `POST /api/ingestion/sync` with `Authorization: Bearer <secret>` when the operator starts ingestion.
+3. The route validates that there is no request body and verifies the bearer secret against `INGESTION_SYNC_SECRET`.
+4. If authorization fails, the route responds 401 and does not call `StartIngestionRun`.
+5. If authorization succeeds, the route calls `StartIngestionRun` in the application layer and validates the response body with Zod.
+6. `StartIngestionRun` asks the ingestion-run repository whether a `queued` or `processing` run exists.
+7. If an active run exists, the application service returns a conflict result and the route responds 409 with `{ activeRunId }`.
+8. If no active run exists, the service creates an `ingestion_runs` record with `status = queued`, `max_documents = 3`, and initial zero counts.
+9. The service publishes Inngest event `ingestion/sync.requested` with `{ runId }`.
+10. `POST /api/ingestion/sync` returns 202 with `{ runId, status: "queued", maxDocuments: 3 }`.
+11. The `/ingestion` page polls `GET /api/ingestion/runs/:id`.
+12. The Inngest function hosted at `/api/inngest` receives `ingestion/sync.requested` and calls `ProcessIngestionRun`.
+13. `ProcessIngestionRun` marks the run `processing`, then asks the Drive adapter to list files in `GOOGLE_DRIVE_FOLDER_ID`.
+14. The application service keeps PDF candidates only, counts candidates whose `drive_file_id` already exists in `documents` as skipped-existing, and selects the first 3 new candidates in Drive listing order.
+15. For each selected file, the service creates an `ingestion_run_items` row with `status = processing`.
+16. The Drive adapter downloads the PDF bytes. If download fails before a document can be created, the run item becomes `failed` with `last_error = "drive_download_failed"`.
+17. The service computes `file_hash`, creates a `documents` row with `status = pending`, `origin = "google_drive"`, `pipeline_version`, Drive metadata, and nullable bibliographic fields left null.
+18. The `PdfExtractor` Strategy extracts text from the PDF bytes. Empty usable text is classified as `raw_text_empty`.
+19. On extraction failure, the document becomes `failed`, `last_error` is persisted, the run item becomes `failed`, and the next item is processed.
+20. The deterministic `TextRefiner` normalizes extraction noise without semantic rewriting and returns `refined_text`. Empty usable refined text is classified as `refined_text_empty`.
+21. On refinement failure, the already persisted `raw_text` is preserved, the document becomes `failed`, `last_error` is persisted, the run item becomes `failed`, and the next item is processed.
+22. On success, the repository persists `raw_text`, `refined_text`, marks the document `processed`, and marks the run item `processed`.
+23. After all selected items finish, the service updates aggregate counts and marks the run `completed`, even if some items failed.
+24. If an unrecoverable run-level failure occurs before item isolation is possible, the run becomes `failed` with a generic `last_error`; API responses still hide raw provider errors.
 
 ## Invariants / Non-negotiables
 
@@ -107,6 +111,7 @@ The operator benefits by getting an explicit ingestion control surface: start a 
 - INV-09: No application-defined maximum PDF size is enforced in F-01.
 - INV-10: Secrets and raw provider errors must never appear in API response bodies.
 - INV-11: The base ingestion flow must not depend on any agents framework.
+- INV-12: The `INGESTION_SYNC_SECRET` value must never be exposed in client-side bundles, API response bodies, logs, run records, or run items.
 
 ## Technical Design
 
@@ -123,7 +128,7 @@ The operator benefits by getting an explicit ingestion control surface: start a 
 | Method | Route / Signature | Description |
 |--------|-------------------|-------------|
 | `GET` | `/ingestion` | English operator page for starting an ingestion run and monitoring run progress. |
-| `POST` | `/api/ingestion/sync` | Creates a queued ingestion run, publishes Inngest event `ingestion/sync.requested`, and returns 202. Returns 409 if another run is active. |
+| `POST` | `/api/ingestion/sync` | Requires `Authorization: Bearer <secret>`, creates a queued ingestion run, publishes Inngest event `ingestion/sync.requested`, and returns 202. Returns 401 when unauthorized and 409 if another run is active. |
 | `GET` | `/api/ingestion/runs/:id` | Returns validated run detail for polling, including aggregate counts and per-item statuses. |
 | `GET/POST/PUT` | `/api/inngest` | Inngest serve endpoint that hosts the document-ingestion function. |
 | Function | `StartIngestionRun.execute()` | Application service used by `POST /api/ingestion/sync`. |
@@ -155,28 +160,30 @@ The operator benefits by getting an explicit ingestion control surface: start a 
 - **Prerequisite features:** Health endpoint and existing `documents` schema baseline.
 - **External packages added:** `inngest` - event workflow SDK for async Next.js/Vercel execution; `unpdf` - default PDF text extraction implementation.
 - **External services:** Google Drive API, Inngest, Postgres/pgvector.
-- **Environment variables:** `DATABASE_URL` - Postgres connection string; `GOOGLE_DRIVE_FOLDER_ID` - fixed source folder; `GOOGLE_SERVICE_ACCOUNT_EMAIL` - Service Account identity; `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` - Service Account private key; `INNGEST_EVENT_KEY` - server-side key for sending Inngest events; `INNGEST_SIGNING_KEY` - key used by the Inngest serve endpoint to verify requests.
+- **Environment variables:** `DATABASE_URL` - Postgres connection string; `GOOGLE_DRIVE_FOLDER_ID` - fixed source folder; `GOOGLE_SERVICE_ACCOUNT_EMAIL` - Service Account identity; `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` - Service Account private key; `INGESTION_SYNC_SECRET` - operator secret required by `POST /api/ingestion/sync`; `INNGEST_EVENT_KEY` - server-side key for sending Inngest events; `INNGEST_SIGNING_KEY` - key used by the Inngest serve endpoint to verify requests.
 
 ## Acceptance Criteria
 
 1. A user can open `/ingestion`, start a run, receive a run id, and see status updates by polling the run endpoint.
 2. `POST /api/ingestion/sync` returns 202 with a queued run when no run is active and returns 409 with the active run id when another run is `queued` or `processing`.
-3. One run processes at most 3 new PDFs from the fixed Drive folder.
-4. Files already present in `documents.drive_file_id` are not modified or reprocessed by F-01.
-5. A successful selected PDF ends with one `documents` row in `status = processed`, with non-empty `raw_text`, non-empty `refined_text`, non-empty `file_hash`, `origin = "google_drive"`, and nullable bibliographic fields left null.
-6. Extraction failure or empty extracted text marks only the affected document and run item as failed, persists a safe `last_error`, and does not run refinement for that item.
-7. Refinement failure or empty refined text preserves `raw_text`, marks only the affected document and run item as failed, and persists a safe `last_error`.
-8. A mixed run with one failing PDF and at least one valid PDF completes with accurate aggregate counts and does not stop after the failed item.
-9. The deterministic refiner has unit tests proving whitespace normalization, dehyphenation across line breaks, control-character cleanup, and no semantic expansion.
-10. API responses for success and failure pass their Zod schemas and do not contain database URLs, Service Account private-key content, raw Drive errors, raw Inngest errors, or stack traces.
-11. Persistence tests cover document and ingestion-run lifecycle operations using a real Postgres database.
-12. `pnpm lint`, `pnpm typecheck`, and `pnpm test` pass after implementation.
+3. `POST /api/ingestion/sync` returns 401 without creating a run or publishing an event when the bearer secret is missing or wrong.
+4. One run processes at most 3 new PDFs from the fixed Drive folder.
+5. Files already present in `documents.drive_file_id` are not modified or reprocessed by F-01.
+6. A successful selected PDF ends with one `documents` row in `status = processed`, with non-empty `raw_text`, non-empty `refined_text`, non-empty `file_hash`, `origin = "google_drive"`, and nullable bibliographic fields left null.
+7. Extraction failure or empty extracted text marks only the affected document and run item as failed, persists a safe `last_error`, and does not run refinement for that item.
+8. Refinement failure or empty refined text preserves `raw_text`, marks only the affected document and run item as failed, and persists a safe `last_error`.
+9. A mixed run with one failing PDF and at least one valid PDF completes with accurate aggregate counts and does not stop after the failed item.
+10. The deterministic refiner has unit tests proving whitespace normalization, dehyphenation across line breaks, control-character cleanup, and no semantic expansion.
+11. API responses for success and failure pass their Zod schemas and do not contain database URLs, Service Account private-key content, operator secrets, raw Drive errors, raw Inngest errors, or stack traces.
+12. Persistence tests cover document and ingestion-run lifecycle operations using a real Postgres database.
+13. `pnpm lint`, `pnpm typecheck`, and `pnpm test` pass after implementation.
 
 ## Decisions
 
 | Decision | Alternatives considered | Rationale |
 |----------|-------------------------|-----------|
 | Use Inngest for F-01 background processing | Synchronous API request, in-process background task, local CLI, worker-only DB polling, Trigger.dev, Upstash QStash | The operator should receive an immediate response while processing continues reliably outside the request path. Inngest fits Next.js/Vercel with event-driven functions and retries without introducing a broader task platform than needed. |
+| Protect sync start with a bearer shared secret | Full user authentication/RBAC; no route-level protection; IP allowlist only | A shared server-configured secret creates a small entry barrier for the operator-triggered POST without introducing an authentication subsystem into the POC. |
 | Provide `/ingestion` as the operator surface in English | API-only status inspection, Portuguese route/text, API plus larger document-management UI | The user asked for an English operational page. A page avoids requiring SQL or manual API calls while keeping scope focused on ingestion status only. |
 | Limit each run to 3 new documents | 1, 5, 10, or all documents | Three documents keep early tests and demos fast while still proving batch behavior and per-document failure isolation. |
 | Do not enforce an application-level PDF size limit in F-01 | 20 MB, 50 MB, 100 MB | The user explicitly chose no limit for now. Runtime/provider failures are recorded as failed run items or failed documents depending on when the failure occurs. |

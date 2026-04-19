@@ -15,13 +15,16 @@ Expose the operator-facing entry points for starting ingestion and polling run p
 
 - Route handlers must validate request and response boundaries with Zod.
 - `POST /api/ingestion/sync` must return 202 for a queued run and 409 when another run is active.
+- `POST /api/ingestion/sync` must require `Authorization: Bearer <secret>` matching `INGESTION_SYNC_SECRET`; unauthorized requests return 401 before any run is created or event is published.
 - `GET /api/ingestion/runs/:id` must return aggregate counts and per-item statuses without secrets or raw provider stack traces.
 - The page must be in English, call the start endpoint, store/display the run id, and poll status until the run reaches `completed` or `failed`.
+- The page must not embed the server secret in code or public env. If it starts runs directly, the operator must provide the secret at runtime and the request must send it only in the `Authorization` header.
 - The page is an operational surface only; broader document listing and metadata editing remain out of scope.
 
 ## Tests First
 
 - API tests for 202 queued response.
+- API tests for 401 missing/wrong operator secret with no run creation and no Inngest event.
 - API tests for 409 active-run response.
 - API tests for run status response schema and no-leak behavior.
 - UI tests or component-level tests for start and polling behavior, using mocked fetch/application boundaries.
