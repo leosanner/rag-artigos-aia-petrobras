@@ -67,6 +67,7 @@ Repository (persistence isolation), Strategy (swap extractor/refiner/chunker/emb
   3. **Implement** end-to-end (plan + code + tests) against that contract. Keep the spec in sync if scope shifts mid-implementation.
   4. **Review** — when the code is ready, delegate an independent review to Codex via `codex:rescue`, passing the git diff + the `F-NN` spec file as context. If the user prefers a different reviewer, ask before proceeding.
   Skip this workflow for bugfixes, config tweaks, and isolated refactors. This supersedes the previous `/feature-dev:feature-dev` workflow (AD-007).
+- **Feature docs map:** treat `.specs/features/F-NN-<slug>/spec.md` as the feature overview and implementation contract. For completed or in-progress features, that overview should point to sibling documents in the same feature folder (for example `01-*.md`, `02-*.md`) with the detailed execution notes, decisions, and proof of what was done. Start by reading `spec.md`, then open only the referenced detail docs needed for the task.
 
 ## Open decisions (unresolved — do not lock in without discussion)
 

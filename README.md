@@ -157,8 +157,10 @@ O Postgres local usa `pgvector/pgvector:pg17` e fica disponível em
 - `.specs/project/ROADMAP.md` - milestones e sequência planejada de entrega.
 - `.specs/project/STATE.md` - decisões arquiteturais, bloqueios, ideias adiadas e TODOs.
 - `.specs/project/CHANGELOG.md` - histórico das alterações nas specs.
+- `.specs/features/F-NN-<slug>/spec.md` - overview da feature e contrato principal de implementação/review.
+- `.specs/features/F-NN-<slug>/*.md` - documentos irmãos referenciados pelo `spec.md`, com detalhes de execução, decisões e provas do que foi feito.
 - `.specs/features/F-01-document-ingestion/spec.md` - contrato ativo da Fase 1 de ingestão documental.
-- `.specs/features/F-01-document-ingestion/*.md` - blocos pequenos de execução da F-01.
+- `.specs/features/F-01-document-ingestion/*.md` - blocos pequenos de execução da F-01, referenciados pelo `spec.md` quando um agente precisa aprofundar contexto.
 - `.specs/features/F-0X-document-ingestion/spec.md` - especificação histórica de ingestão, depreciada.
 - `docs/m1-data-foundation-and-ingestion.md` - English overview of what M1 delivered, the technologies used, and the basic ingestion flow.
 - `docs/local-ingestion.md` - quick guide for configuring and testing local ingestion with Google Drive and Inngest.
