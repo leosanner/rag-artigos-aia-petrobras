@@ -135,14 +135,15 @@ function buildDeps(overrides: {
   const embeddingProvider: EmbeddingProvider = {
     embedMany: vi.fn(
       overrides.embedMany ??
-        (async (texts) => texts.map((_, index) => vector(index / 10))),
+        (async (texts: string[]) =>
+          texts.map((_text, index) => vector(index / 10))),
     ),
   };
 
   const service = new ProcessIndexingRun({
-    runsRepository: runsRepository as RagIndexingRunsRepository,
+    runsRepository,
     documentsRepository,
-    chunksRepository: chunksRepository as DocumentChunksRepository,
+    chunksRepository,
     chunker,
     embeddingProvider,
   });

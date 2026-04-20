@@ -69,7 +69,7 @@ describe("GetIndexingRun", () => {
       }),
     } satisfies Partial<RagIndexingRunsRepository>;
     const service = new GetIndexingRun({
-      runsRepository: runsRepository as RagIndexingRunsRepository,
+      runsRepository,
     });
 
     await expect(service.execute(RUN_ID)).resolves.toEqual({
@@ -108,7 +108,7 @@ describe("GetIndexingRun", () => {
       getRunWithItems: vi.fn().mockResolvedValue(null),
     } satisfies Partial<RagIndexingRunsRepository>;
     const service = new GetIndexingRun({
-      runsRepository: runsRepository as RagIndexingRunsRepository,
+      runsRepository,
     });
 
     await expect(service.execute(RUN_ID)).resolves.toBeNull();

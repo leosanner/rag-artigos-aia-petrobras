@@ -16,10 +16,25 @@ import type {
   ProcessIndexingRunHandler,
 } from "./ports";
 
+type ProcessIndexingRunsRepository = Pick<
+  RagIndexingRunsRepository,
+  | "markProcessing"
+  | "createRunItem"
+  | "markRunItemProcessed"
+  | "markRunItemFailed"
+  | "completeRun"
+  | "failRun"
+>;
+
+type ProcessDocumentChunksRepository = Pick<
+  DocumentChunksRepository,
+  "hasChunksForConfig" | "replaceDocumentChunks"
+>;
+
 export type ProcessIndexingRunDeps = {
-  runsRepository: RagIndexingRunsRepository;
+  runsRepository: ProcessIndexingRunsRepository;
   documentsRepository: IndexingDocumentsRepository;
-  chunksRepository: DocumentChunksRepository;
+  chunksRepository: ProcessDocumentChunksRepository;
   chunker: TextChunker;
   embeddingProvider: EmbeddingProvider;
   chunkingVersion?: string;
@@ -31,9 +46,9 @@ const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-large";
 const DEFAULT_EMBEDDING_DIMENSIONS = 3072;
 
 export class ProcessIndexingRun implements ProcessIndexingRunHandler {
-  private readonly runsRepository: RagIndexingRunsRepository;
+  private readonly runsRepository: ProcessIndexingRunsRepository;
   private readonly documentsRepository: IndexingDocumentsRepository;
-  private readonly chunksRepository: DocumentChunksRepository;
+  private readonly chunksRepository: ProcessDocumentChunksRepository;
   private readonly chunker: TextChunker;
   private readonly embeddingProvider: EmbeddingProvider;
   private readonly chunkingVersion: string;

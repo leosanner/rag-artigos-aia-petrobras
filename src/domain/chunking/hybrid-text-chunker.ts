@@ -84,7 +84,7 @@ export class HybridTextChunker implements TextChunker {
         continue;
       }
 
-      const candidate = `${current}\n\n${paragraph}`;
+      const candidate: string = `${current}\n\n${paragraph}`;
       if (estimateTokens(candidate) <= this.config.maxEstimatedTokens) {
         current = candidate;
         continue;

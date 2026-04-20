@@ -19,13 +19,18 @@ export type StartIndexingRunResult =
     }
   | { kind: "conflict"; activeRunId: string | null };
 
+type StartIndexingRunsRepository = Pick<
+  RagIndexingRunsRepository,
+  "createQueuedRun"
+>;
+
 export type StartIndexingRunDeps = {
-  runsRepository: RagIndexingRunsRepository;
+  runsRepository: StartIndexingRunsRepository;
   eventPublisher: IndexingEventPublisher;
 };
 
 export class StartIndexingRun {
-  private readonly runsRepository: RagIndexingRunsRepository;
+  private readonly runsRepository: StartIndexingRunsRepository;
   private readonly eventPublisher: IndexingEventPublisher;
 
   constructor(deps: StartIndexingRunDeps) {

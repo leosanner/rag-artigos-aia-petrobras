@@ -43,7 +43,7 @@ describe("StartIndexingRun", () => {
       publishIndexingRequested: vi.fn().mockResolvedValue(undefined),
     };
     const service = new StartIndexingRun({
-      runsRepository: runsRepository as RagIndexingRunsRepository,
+      runsRepository,
       eventPublisher,
     });
 
@@ -76,7 +76,7 @@ describe("StartIndexingRun", () => {
       publishIndexingRequested: vi.fn().mockResolvedValue(undefined),
     };
     const service = new StartIndexingRun({
-      runsRepository: runsRepository as RagIndexingRunsRepository,
+      runsRepository,
       eventPublisher,
     });
 

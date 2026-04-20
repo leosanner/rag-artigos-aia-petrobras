@@ -39,12 +39,17 @@ export type IndexingRunDetailDto = {
   items: IndexingRunItemDto[];
 };
 
+type GetIndexingRunRepository = Pick<
+  RagIndexingRunsRepository,
+  "getRunWithItems"
+>;
+
 export type GetIndexingRunDeps = {
-  runsRepository: RagIndexingRunsRepository;
+  runsRepository: GetIndexingRunRepository;
 };
 
 export class GetIndexingRun {
-  private readonly runsRepository: RagIndexingRunsRepository;
+  private readonly runsRepository: GetIndexingRunRepository;
 
   constructor(deps: GetIndexingRunDeps) {
     this.runsRepository = deps.runsRepository;
