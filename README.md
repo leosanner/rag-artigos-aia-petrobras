@@ -160,6 +160,7 @@ O Postgres local usa `pgvector/pgvector:pg17` e fica disponível em
 - `.specs/features/F-01-document-ingestion/spec.md` - contrato ativo da Fase 1 de ingestão documental.
 - `.specs/features/F-01-document-ingestion/*.md` - blocos pequenos de execução da F-01.
 - `.specs/features/F-0X-document-ingestion/spec.md` - especificação histórica de ingestão, depreciada.
+- `docs/m1-data-foundation-and-ingestion.md` - English overview of what M1 delivered, the technologies used, and the basic ingestion flow.
 - `docs/local-ingestion.md` - quick guide for configuring and testing local ingestion with Google Drive and Inngest.
 - `phase1_pipeline_rules.md` - regras operacionais da pipeline da Fase 1.
 
