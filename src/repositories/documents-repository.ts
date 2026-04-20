@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import * as schema from "@/db/schema";
@@ -36,6 +36,24 @@ export class DocumentsRepository {
       .limit(1);
 
     return existing !== undefined;
+  }
+
+  async listProcessedForIndexing(): Promise<Document[]> {
+    return this.db
+      .select()
+      .from(documents)
+      .where(eq(documents.status, "processed"))
+      .orderBy(asc(documents.title), asc(documents.id));
+  }
+
+  async findByIdForIndexing(documentId: string): Promise<Document | null> {
+    const [document] = await this.db
+      .select()
+      .from(documents)
+      .where(eq(documents.id, documentId))
+      .limit(1);
+
+    return document ?? null;
   }
 
   async createPendingDocument(
