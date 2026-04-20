@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -213,7 +212,8 @@ describe("DocumentChunksRepository", () => {
     expect(chunks[0]?.content).toBe("stable chunk");
   });
 
-  it("removes chunks when a force rebuild starts from an empty replacement", async () => {
+  it("deletes only chunks for the selected document and active configuration", async () => {
+    await insertProcessedDocument(db, OTHER_DOCUMENT_ID);
     await repository.replaceDocumentChunks({
       documentId: DOCUMENT_ID,
       documentPipelineVersion: pipelineVersion,
@@ -230,16 +230,48 @@ describe("DocumentChunksRepository", () => {
         },
       ],
     });
+    await repository.replaceDocumentChunks({
+      documentId: DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: "other-model",
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "other model chunk",
+          contentHash: "other-model-hash",
+          estimatedTokens: 2,
+          embedding: vector(0.2),
+        },
+      ],
+    });
+    await repository.replaceDocumentChunks({
+      documentId: OTHER_DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "other document chunk",
+          contentHash: "other-document-hash",
+          estimatedTokens: 2,
+          embedding: vector(0.3),
+        },
+      ],
+    });
 
     await repository.deleteDocumentChunksForConfig(DOCUMENT_ID, {
       chunkingVersion: CHUNKING_VERSION,
       embeddingModel: EMBEDDING_MODEL,
     });
 
-    const chunks = await db
-      .select()
-      .from(documentChunks)
-      .where(eq(documentChunks.documentId, DOCUMENT_ID));
-    expect(chunks).toHaveLength(0);
+    const chunks = await db.select().from(documentChunks);
+    expect(chunks.map((chunk) => chunk.content).sort()).toEqual([
+      "other document chunk",
+      "other model chunk",
+    ]);
   });
 });
