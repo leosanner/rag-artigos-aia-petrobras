@@ -9,6 +9,7 @@ const baseEnv = {
   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY:
     "-----BEGIN PRIVATE KEY-----\\nabc123\\n-----END PRIVATE KEY-----\\n",
   INGESTION_SYNC_SECRET: "server-configured-secret",
+  OPENAI_API_KEY: "test-openai-api-key",
 };
 
 describe("parseServerEnv", () => {

@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { documents, ragIndexingRuns } from "@/db/schema";
+import { pipelineVersion } from "@/domain/documents/pipeline-version";
 import { createTestDatabase, resetTestDatabase } from "@/test/db";
 
 import {
@@ -19,7 +20,7 @@ async function insertProcessedDocument(db: TestDatabase): Promise<void> {
     title: "document.pdf",
     driveFileId: "drive-document",
     fileHash: "hash-document",
-    pipelineVersion: "f01-1.0.0",
+    pipelineVersion,
     status: "processed",
     rawText: "raw text",
     refinedText: "refined text",

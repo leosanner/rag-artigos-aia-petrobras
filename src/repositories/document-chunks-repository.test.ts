@@ -3,6 +3,7 @@ import type { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { documentChunks, documents } from "@/db/schema";
+import { pipelineVersion } from "@/domain/documents/pipeline-version";
 import { createTestDatabase, resetTestDatabase } from "@/test/db";
 
 import { DocumentChunksRepository } from "./document-chunks-repository";
@@ -28,7 +29,7 @@ async function insertProcessedDocument(
     title: `${id}.pdf`,
     driveFileId: `drive-${id}`,
     fileHash: `hash-${id}`,
-    pipelineVersion: "f01-1.0.0",
+    pipelineVersion,
     status: "processed",
     rawText: "raw text",
     refinedText: "refined text for indexing",
@@ -59,7 +60,7 @@ describe("DocumentChunksRepository", () => {
   it("persists retrieval-ready chunks with 3072-dimension pgvector embeddings", async () => {
     await repository.replaceDocumentChunks({
       documentId: DOCUMENT_ID,
-      documentPipelineVersion: "f01-1.0.0",
+      documentPipelineVersion: pipelineVersion,
       chunkingVersion: CHUNKING_VERSION,
       embeddingModel: EMBEDDING_MODEL,
       embeddingDimensions: EMBEDDING_DIMENSIONS,
@@ -98,7 +99,7 @@ describe("DocumentChunksRepository", () => {
     await insertProcessedDocument(db, OTHER_DOCUMENT_ID);
     await repository.replaceDocumentChunks({
       documentId: DOCUMENT_ID,
-      documentPipelineVersion: "f01-1.0.0",
+      documentPipelineVersion: pipelineVersion,
       chunkingVersion: CHUNKING_VERSION,
       embeddingModel: EMBEDDING_MODEL,
       embeddingDimensions: EMBEDDING_DIMENSIONS,
@@ -114,7 +115,7 @@ describe("DocumentChunksRepository", () => {
     });
     await repository.replaceDocumentChunks({
       documentId: DOCUMENT_ID,
-      documentPipelineVersion: "f01-1.0.0",
+      documentPipelineVersion: pipelineVersion,
       chunkingVersion: CHUNKING_VERSION,
       embeddingModel: "other-model",
       embeddingDimensions: EMBEDDING_DIMENSIONS,
@@ -130,7 +131,7 @@ describe("DocumentChunksRepository", () => {
     });
     await repository.replaceDocumentChunks({
       documentId: OTHER_DOCUMENT_ID,
-      documentPipelineVersion: "f01-1.0.0",
+      documentPipelineVersion: pipelineVersion,
       chunkingVersion: CHUNKING_VERSION,
       embeddingModel: EMBEDDING_MODEL,
       embeddingDimensions: EMBEDDING_DIMENSIONS,
@@ -147,7 +148,7 @@ describe("DocumentChunksRepository", () => {
 
     await repository.replaceDocumentChunks({
       documentId: DOCUMENT_ID,
-      documentPipelineVersion: "f01-1.0.0",
+      documentPipelineVersion: pipelineVersion,
       chunkingVersion: CHUNKING_VERSION,
       embeddingModel: EMBEDDING_MODEL,
       embeddingDimensions: EMBEDDING_DIMENSIONS,
@@ -173,7 +174,7 @@ describe("DocumentChunksRepository", () => {
   it("does not delete existing chunks when replacement insertion fails", async () => {
     await repository.replaceDocumentChunks({
       documentId: DOCUMENT_ID,
-      documentPipelineVersion: "f01-1.0.0",
+      documentPipelineVersion: pipelineVersion,
       chunkingVersion: CHUNKING_VERSION,
       embeddingModel: EMBEDDING_MODEL,
       embeddingDimensions: EMBEDDING_DIMENSIONS,
@@ -191,7 +192,7 @@ describe("DocumentChunksRepository", () => {
     await expect(
       repository.replaceDocumentChunks({
         documentId: DOCUMENT_ID,
-        documentPipelineVersion: "f01-1.0.0",
+        documentPipelineVersion: pipelineVersion,
         chunkingVersion: CHUNKING_VERSION,
         embeddingModel: EMBEDDING_MODEL,
         embeddingDimensions: EMBEDDING_DIMENSIONS,
@@ -215,7 +216,7 @@ describe("DocumentChunksRepository", () => {
   it("removes chunks when a force rebuild starts from an empty replacement", async () => {
     await repository.replaceDocumentChunks({
       documentId: DOCUMENT_ID,
-      documentPipelineVersion: "f01-1.0.0",
+      documentPipelineVersion: pipelineVersion,
       chunkingVersion: CHUNKING_VERSION,
       embeddingModel: EMBEDDING_MODEL,
       embeddingDimensions: EMBEDDING_DIMENSIONS,

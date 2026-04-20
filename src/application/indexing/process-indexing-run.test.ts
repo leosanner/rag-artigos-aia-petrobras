@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Document, RagIndexingRun, RagIndexingRunItem } from "@/db/schema";
 import type { ChunkedText } from "@/domain/chunking/hybrid-text-chunker";
+import { pipelineVersion } from "@/domain/documents/pipeline-version";
 import type { DocumentChunksRepository } from "@/repositories/document-chunks-repository";
 import type { RagIndexingRunsRepository } from "@/repositories/rag-indexing-runs-repository";
 
@@ -45,7 +46,7 @@ function buildDocument(overrides: Partial<Document> = {}): Document {
     driveFileId: "drive-a",
     origin: "google_drive",
     fileHash: "hash-a",
-    pipelineVersion: "f01-1.0.0",
+    pipelineVersion,
     status: "processed",
     doi: null,
     authors: null,
