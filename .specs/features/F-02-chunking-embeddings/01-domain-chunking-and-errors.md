@@ -39,17 +39,17 @@ and return.
 
 ## Functional Requirements
 
-- [ ] RF-B01-01: `estimateTokens(text)` deterministically counts word/number/symbol units with no external dependency.
-- [ ] RF-B01-02: `HybridTextChunker.chunk({ refinedText })` rejects empty or whitespace-only input.
-- [ ] RF-B01-03: The chunker normalizes whitespace without semantic rewriting.
-- [ ] RF-B01-04: Paragraph boundaries are preserved when paragraphs fit within the max estimated token limit.
-- [ ] RF-B01-05: Long paragraphs are split deterministically without exceeding `maxEstimatedTokens`.
-- [ ] RF-B01-06: Adjacent chunks include deterministic overlap up to `overlapEstimatedTokens`.
-- [ ] RF-B01-07: Every output chunk has `chunkIndex`, `content`, and `estimatedTokens`.
-- [ ] RF-B01-08: `chunkIndex` starts at 0 and increments by 1 without gaps.
-- [ ] RF-B01-09: The same input/config produces byte-for-byte equal output across calls.
-- [ ] RF-B01-10: `IndexingErrorCode` is a closed union safe for persistence and API responses.
-- [ ] RF-B01-11: `toSafeIndexingErrorCode(err)` returns the explicit code for known indexing errors and `"unknown_error"` for every other input.
+- [x] RF-B01-01: `estimateTokens(text)` deterministically counts word/number/symbol units with no external dependency.
+- [x] RF-B01-02: `HybridTextChunker.chunk({ refinedText })` rejects empty or whitespace-only input.
+- [x] RF-B01-03: The chunker normalizes whitespace without semantic rewriting.
+- [x] RF-B01-04: Paragraph boundaries are preserved when paragraphs fit within the max estimated token limit.
+- [x] RF-B01-05: Long paragraphs are split deterministically without exceeding `maxEstimatedTokens`.
+- [x] RF-B01-06: Adjacent chunks include deterministic overlap up to `overlapEstimatedTokens`.
+- [x] RF-B01-07: Every output chunk has `chunkIndex`, `content`, and `estimatedTokens`.
+- [x] RF-B01-08: `chunkIndex` starts at 0 and increments by 1 without gaps.
+- [x] RF-B01-09: The same input/config produces byte-for-byte equal output across calls.
+- [x] RF-B01-10: `IndexingErrorCode` is a closed union safe for persistence and API responses.
+- [x] RF-B01-11: `toSafeIndexingErrorCode(err)` returns the explicit code for known indexing errors and `"unknown_error"` for every other input.
 
 ## Module Contracts
 

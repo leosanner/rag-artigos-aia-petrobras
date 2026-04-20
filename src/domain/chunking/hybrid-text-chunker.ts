@@ -31,9 +31,10 @@ export class ChunkingError extends Error {
   }
 }
 
+const ESTIMATED_TOKEN_PATTERN = /[\p{L}\p{N}]+|[/:+()[\]{}<>=%&*-]/gu;
+
 export function estimateTokens(text: string): number {
-  const matches = text.match(/[\p{L}\p{N}]+|[/:+()[\]{}<>=%&*-]/gu);
-  return matches?.length ?? 0;
+  return findEstimatedTokenSpans(text).length;
 }
 
 export class HybridTextChunker implements TextChunker {
@@ -90,13 +91,16 @@ export class HybridTextChunker implements TextChunker {
         continue;
       }
 
+      const maxOverlapTokens = Math.min(
+        this.config.overlapEstimatedTokens,
+        this.config.maxEstimatedTokens - paragraphTokens,
+      );
       const overlap = takeTrailingEstimatedTokens(
         current,
-        this.config.overlapEstimatedTokens,
+        maxOverlapTokens,
       );
       flushCurrent();
-      current =
-        overlap.length > 0 ? `${overlap}\n\n${paragraph}` : paragraph;
+      current = overlap.length > 0 ? `${overlap}\n\n${paragraph}` : paragraph;
     }
 
     flushCurrent();
@@ -124,17 +128,18 @@ function splitParagraphs(text: string): string[] {
 }
 
 function splitLongText(text: string, config: ChunkingConfig): string[] {
-  const tokens = tokenizeForSplitting(text);
+  const tokenSpans = findEstimatedTokenSpans(text);
   const chunks: string[] = [];
   const step = config.maxEstimatedTokens - config.overlapEstimatedTokens;
 
-  for (let start = 0; start < tokens.length; start += step) {
-    const slice = tokens.slice(start, start + config.maxEstimatedTokens);
-    if (slice.length === 0) {
+  for (let start = 0; start < tokenSpans.length; start += step) {
+    const end = Math.min(start + config.maxEstimatedTokens, tokenSpans.length);
+    const chunk = sliceEstimatedTokenRange(text, tokenSpans, start, end);
+    if (chunk.length === 0) {
       break;
     }
-    chunks.push(slice.join(" "));
-    if (start + config.maxEstimatedTokens >= tokens.length) {
+    chunks.push(chunk);
+    if (end >= tokenSpans.length) {
       break;
     }
   }
@@ -146,12 +151,40 @@ function takeTrailingEstimatedTokens(text: string, count: number): string {
   if (count === 0) {
     return "";
   }
-  const tokens = tokenizeForSplitting(text);
-  return tokens.slice(Math.max(tokens.length - count, 0)).join(" ");
+  const tokenSpans = findEstimatedTokenSpans(text);
+  const start = Math.max(tokenSpans.length - count, 0);
+  return sliceEstimatedTokenRange(text, tokenSpans, start, tokenSpans.length);
 }
 
-function tokenizeForSplitting(text: string): string[] {
-  return text.match(/[\p{L}\p{N}]+|[/:+()[\]{}<>=%&*-]/gu) ?? [];
+type EstimatedTokenSpan = {
+  start: number;
+  end: number;
+};
+
+function findEstimatedTokenSpans(text: string): EstimatedTokenSpan[] {
+  return Array.from(text.matchAll(ESTIMATED_TOKEN_PATTERN), (match) => ({
+    start: match.index,
+    end: match.index + match[0].length,
+  }));
+}
+
+function sliceEstimatedTokenRange(
+  text: string,
+  tokenSpans: EstimatedTokenSpan[],
+  start: number,
+  end: number,
+): string {
+  if (start >= end) {
+    return "";
+  }
+
+  const firstToken = tokenSpans[start];
+  const nextToken = tokenSpans[end];
+  if (!firstToken) {
+    return "";
+  }
+
+  return text.slice(firstToken.start, nextToken?.start ?? text.length).trim();
 }
 
 function assertPositiveInteger(value: number, fieldName: string): void {
