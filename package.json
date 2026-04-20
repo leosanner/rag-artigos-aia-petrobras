@@ -19,7 +19,9 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.53",
     "@neondatabase/serverless": "^0.10.4",
+    "ai": "^6.0.168",
     "drizzle-orm": "^0.38.4",
     "googleapis": "^171.4.0",
     "inngest": "^4.2.4",

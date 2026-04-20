@@ -19,6 +19,10 @@ const envSchema = z
     INNGEST_DEV: optionalNonEmptyString,
     INNGEST_EVENT_KEY: optionalNonEmptyString,
     INNGEST_SIGNING_KEY: optionalNonEmptyString,
+    OPENAI_API_KEY: optionalNonEmptyString,
+    RAG_EMBEDDING_MODEL: optionalNonEmptyString.transform(
+      (value) => value ?? "text-embedding-3-large",
+    ),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== "test" && !env.INGESTION_SYNC_SECRET) {
@@ -26,6 +30,14 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ["INGESTION_SYNC_SECRET"],
         message: "INGESTION_SYNC_SECRET is required unless NODE_ENV=test",
+      });
+    }
+
+    if (env.NODE_ENV !== "test" && !env.OPENAI_API_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["OPENAI_API_KEY"],
+        message: "OPENAI_API_KEY is required unless NODE_ENV=test",
       });
     }
 
@@ -70,6 +82,8 @@ const testEnvDefaults = {
     "-----BEGIN PRIVATE KEY-----\\ntest\\n-----END PRIVATE KEY-----\\n",
   INGESTION_SYNC_SECRET: "test-ingestion-sync-secret",
   INNGEST_DEV: "1",
+  OPENAI_API_KEY: "test-openai-api-key",
+  RAG_EMBEDDING_MODEL: "text-embedding-3-large",
 };
 
 export const env = parseServerEnv(
