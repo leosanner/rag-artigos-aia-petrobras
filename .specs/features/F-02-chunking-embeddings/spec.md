@@ -29,6 +29,18 @@ This feature implements the roadmap item "Chunking + Embeddings (Phase 2)" in `.
 
 During M2 planning, four local PDF assets in `assets/pdfs/` were extracted with `unpdf` to estimate embedding cost. The sample contained about 74,602 estimated tokens; extrapolating to 31 articles gave about 578,166 tokens, or roughly US$0.075 with `text-embedding-3-large` at the official price of US$0.13 per 1M tokens. The low absolute cost supports prioritizing retrieval quality for the DEMO.
 
+## Implementation Blocks
+
+The feature should be implemented in the same small-block style used by F-01.
+Read this overview first, then open only the block document needed for the
+current task:
+
+- [01 - Domain: Chunking and Safe Errors](01-domain-chunking-and-errors.md): deterministic hybrid chunking, token estimation, and safe indexing error codes.
+- [02 - Persistence: Chunks and Indexing Runs](02-persistence-chunks-and-indexing-runs.md): pgvector schema, indexing-run schema, repositories, migrations, and real Postgres tests.
+- [03 - Application, Embeddings, and Inngest](03-application-embedding-and-inngest.md): start/get/process services, OpenAI embedding adapter through the Vercel AI SDK, env validation, and Inngest wiring.
+- [04 - Interface: API and Page](04-interface-api-and-page.md): indexing API routes, Zod request/response schemas, bearer auth, and Portuguese `/indexacao` page.
+- [05 - Integration and Review](05-integration-and-review.md): end-to-end validation, full verification, spec sync, and review handoff.
+
 ## Business Rules
 
 - RN-01: F-02 indexes only documents with `status = "processed"`.

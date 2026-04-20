@@ -2,6 +2,26 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(rag): split F-02 into implementation blocks
+
+Date: 2026-04-20
+
+Changed:
+
+- Added F-02 block documents mirroring the F-01 implementation style: domain chunking/errors, persistence, application/embeddings/Inngest, interface/API/page, and integration/review.
+- Updated the F-02 parent spec to link to the new block documents as the implementation map.
+- Replaced the earlier generic F-02 checkpoint note with decision-complete block contracts for smaller follow-up implementation work.
+
+Files:
+
+- `.specs/features/F-02-chunking-embeddings/spec.md`
+- `.specs/features/F-02-chunking-embeddings/01-domain-chunking-and-errors.md`
+- `.specs/features/F-02-chunking-embeddings/02-persistence-chunks-and-indexing-runs.md`
+- `.specs/features/F-02-chunking-embeddings/03-application-embedding-and-inngest.md`
+- `.specs/features/F-02-chunking-embeddings/04-interface-api-and-page.md`
+- `.specs/features/F-02-chunking-embeddings/05-integration-and-review.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(rag): add M2 feature contracts
 
 Date: 2026-04-20
