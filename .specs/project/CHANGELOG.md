@@ -2,6 +2,29 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(rag): add M2 feature contracts
+
+Date: 2026-04-20
+
+Changed:
+
+- Added `F-02 / Chunking and Embeddings` as the contract for manual async indexing, hybrid chunking, OpenAI embeddings through the Vercel AI SDK, and pgvector persistence.
+- Added `F-03 / Global RAG` as the contract for corpus-wide `POST /api/rag/ask`, top-k retrieval, Portuguese generated answers, inline citations, and structured source metadata.
+- Added `F-04 / Focused RAG` as the contract for document-scoped retrieval, selectable indexed documents, and `/consulta` focused mode.
+- Recorded `AD-011` to close the M2 planning decisions: 3-spec split, manual Inngest indexing, 900/150 chunking, `text-embedding-3-large`, top-k 6, API-only answer persistence for M2, and focused RAG as an extension of the global flow.
+- Updated architecture/guidance docs so chunking and embedding choices are no longer listed as open decisions for M2.
+
+Files:
+
+- `.specs/features/F-02-chunking-embeddings/spec.md`
+- `.specs/features/F-03-global-rag/spec.md`
+- `.specs/features/F-04-focused-rag/spec.md`
+- `.specs/project/STATE.md`
+- `.specs/project/ARCHITECTURE.md`
+- `.specs/project/CHANGELOG.md`
+- `CLAUDE.md`
+- `README.md`
+
 ## (unreleased) - feat(ingestion): complete F-01 processing orchestration
 
 Date: 2026-04-19

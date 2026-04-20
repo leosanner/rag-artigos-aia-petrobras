@@ -71,4 +71,4 @@ Repository (persistence isolation), Strategy (swap extractor/refiner/chunker/emb
 
 ## Open decisions (unresolved — do not lock in without discussion)
 
-Chunking strategy; embedding and LLM models; definitive project name; agents framework final choice (deferred to M4). F-01 resolves the document-ingestion choices for PDF extraction (`unpdf`), text refinement (deterministic), trigger (`/ingestion` + `POST /api/ingestion/sync`), and background processing (Inngest). See [.specs/project/STATE.md](.specs/project/STATE.md) §Todos.
+Definitive project name; concrete deployment value for `RAG_GENERATION_MODEL`; agents framework final choice (deferred to M4). F-01 resolves the document-ingestion choices for PDF extraction (`unpdf`), text refinement (deterministic), trigger (`/ingestion` + `POST /api/ingestion/sync`), and background processing (Inngest). M2 resolves base RAG planning choices in `F-02`, `F-03`, and `F-04`, including hybrid chunking, `text-embedding-3-large`, manual async indexing, global RAG, and focused RAG. See [.specs/project/STATE.md](.specs/project/STATE.md) §Todos.

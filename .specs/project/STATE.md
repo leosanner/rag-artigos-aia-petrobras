@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-04-19
-**Current Work:** `F-01 / Document Ingestion` is implementation-complete and ready for independent review
+**Last Updated:** 2026-04-20
+**Current Work:** M2 feature contracts are prepared as `F-02 / Chunking and Embeddings`, `F-03 / Global RAG`, and `F-04 / Focused RAG`
 
 ---
 
 ## Recent Decisions
+
+### AD-011: M2 Base RAG is split into three spec-first contracts (2026-04-20)
+
+**Decision:** M2 is implemented as three sequential feature contracts: `F-02 / Chunking and Embeddings`, `F-03 / Global RAG`, and `F-04 / Focused RAG`. F-02 uses manual operator-triggered indexing, asynchronous Inngest execution, hybrid paragraph-aware chunking with 900 estimated tokens and 150 estimated-token overlap, and `text-embedding-3-large` with 3072-dimension pgvector storage. F-03 adds a single `POST /api/rag/ask` route for global questions, top-k 6 cosine retrieval, Portuguese answers, inline citation markers plus structured source lists, and clear insufficient-evidence responses. F-04 extends the same route and `/consulta` page with focused document selection and strict document-scoped retrieval. M2 does not persist questions/answers or full observability traces; those remain M3.
+**Reason:** Splitting the milestone keeps TDD and independent review manageable while preserving a coherent RAG path from indexing to global and focused answers. Manual indexing gives the DEMO operator control over provider spend and avoids coupling F-01 ingestion completion to indexing. The local cost simulation over `assets/pdfs/art1.pdf` through `art4.pdf` estimated about 578k embedding tokens for 31 articles, making `text-embedding-3-large` a low absolute-cost choice for better retrieval quality.
+**Trade-off:** F-02 introduces pgvector schema and provider integration before the user-facing RAG UI is available. Reusing `INGESTION_SYNC_SECRET` for the indexing start action avoids config churn but keeps the secret name ingestion-specific until a later auth/config cleanup.
+**Impact:** `.specs/features/F-02-chunking-embeddings/spec.md`, `.specs/features/F-03-global-rag/spec.md`, and `.specs/features/F-04-focused-rag/spec.md` are the implementation contracts for M2. Chunking strategy and embedding model are no longer open architecture decisions for the M2 DEMO. The concrete generation model value is environment configuration through `RAG_GENERATION_MODEL`, behind the Vercel AI SDK/OpenAI provider boundary.
 
 ### AD-010: F-01 Block 05 completes processing orchestration with per-item isolation (2026-04-19)
 
@@ -115,6 +122,10 @@ _None for now._
 - [x] ~~Decide PDF-extraction library~~ — resolved by AD-006 (`unpdf`)
 - [x] ~~Define concrete text-refinement strategy~~ — resolved in `F-01` as deterministic refinement without LLM calls
 - [x] ~~Break `F-01 / Document Ingestion` into small implementation blocks and execute with TDD~~ — completed by AD-010
+- [x] ~~Define M2 feature contracts and close base RAG planning decisions~~ — resolved by AD-011
+- [ ] Implement `F-02 / Chunking and Embeddings` with TDD against its spec
+- [ ] Implement `F-03 / Global RAG` with TDD against its spec
+- [ ] Implement `F-04 / Focused RAG` with TDD against its spec
 - [ ] Choose a definitive project name (current placeholder: "AIA Insight")
 - [ ] M4 PoC: compare **Mastra** vs **Vercel AI SDK alone** on one pilot task from `starter.md` §3.6 — criteria: Next.js integration, observability out of the box, maintenance cost (AD-003)
 

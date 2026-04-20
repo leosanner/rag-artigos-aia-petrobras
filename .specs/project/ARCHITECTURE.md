@@ -161,7 +161,7 @@ The original PDF remains in Google Drive. Postgres stores the governed metadata 
 4. Embeddings are generated for each chunk.
 5. Embeddings are persisted in Postgres using `pgvector`.
 
-Chunking strategy is still open and should be decided before Phase 2 implementation.
+The M2 DEMO chunking decision is recorded in `STATE.md` AD-011 and `.specs/features/F-02-chunking-embeddings/spec.md`: hybrid paragraph-aware chunking with 900 estimated tokens and 150 estimated-token overlap.
 
 ### Phase 3 and 4: RAG
 
@@ -367,13 +367,7 @@ Business logic should not be merged without tests. Infrastructure glue may be co
 
 These decisions are intentionally left open:
 
-- Text refinement strategy.
-- Chunking strategy.
-- Embedding model.
-- LLM provider and model.
-- Ingestion trigger: endpoint, CLI, cron, queue, or combination.
-- Background-job provider, if needed.
-- Maximum PDF size.
+- Concrete production value for `RAG_GENERATION_MODEL`; M2 fixes the provider boundary and keeps the model configurable by environment.
 - Original PDF caching strategy.
 - Observability storage schema.
 - Agents framework: narrowed to Mastra (preferred) vs Vercel AI SDK alone — to be closed by the M4 PoC.
