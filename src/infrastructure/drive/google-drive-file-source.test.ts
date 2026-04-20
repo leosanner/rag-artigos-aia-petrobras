@@ -42,6 +42,7 @@ describe("GoogleDriveFileSource", () => {
       orderBy: "createdTime,name",
       pageSize: 100,
       spaces: "drive",
+      corpora: "allDrives",
       includeItemsFromAllDrives: true,
       supportsAllDrives: true,
     });

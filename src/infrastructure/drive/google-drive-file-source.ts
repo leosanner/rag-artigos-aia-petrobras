@@ -100,6 +100,7 @@ export class GoogleDriveFileSource implements DriveFileSource {
         orderBy: "createdTime,name",
         pageSize: this.pageSize,
         spaces: "drive",
+        corpora: "allDrives",
         includeItemsFromAllDrives: true,
         supportsAllDrives: true,
         ...(pageToken ? { pageToken } : {}),
