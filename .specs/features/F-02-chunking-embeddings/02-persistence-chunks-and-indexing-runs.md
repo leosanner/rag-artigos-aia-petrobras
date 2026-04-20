@@ -39,21 +39,21 @@ indexing runs, indexing run items, and repositories that isolate Drizzle access.
 
 ## Functional Requirements
 
-- [ ] RF-B02-01: Schema exports `documentChunks` with governance metadata and `vector(3072)`.
-- [ ] RF-B02-02: Schema exports `ragIndexingRuns` with statuses `queued`, `processing`, `completed`, `failed`.
-- [ ] RF-B02-03: Schema exports `ragIndexingRunItems` with statuses `processing`, `processed`, `failed`.
-- [ ] RF-B02-04: Migration creates enums, tables, constraints, indexes, and foreign keys.
-- [ ] RF-B02-05: `DocumentChunksRepository.hasChunksForConfig(documentId, config)` returns whether a document is already indexed for the active config.
-- [ ] RF-B02-06: `DocumentChunksRepository.replaceDocumentChunks(input)` atomically replaces chunks for one document/config.
-- [ ] RF-B02-07: Replacement rollback preserves previous chunks if inserting new chunks fails.
-- [ ] RF-B02-08: `DocumentChunksRepository.deleteDocumentChunksForConfig(documentId, config)` removes only the selected document/config.
-- [ ] RF-B02-09: `RagIndexingRunsRepository.createQueuedRun(input)` persists `documentId`, `force`, zero counts, and `queued` status.
-- [ ] RF-B02-10: `RagIndexingRunsRepository.createQueuedRun(input)` raises typed conflict on active-run unique violation.
-- [ ] RF-B02-11: Run lifecycle methods mark processing, completed, and failed with safe counts/errors.
-- [ ] RF-B02-12: Item lifecycle methods create processing items and mark them `processed` or `failed`.
-- [ ] RF-B02-13: `getRunWithItems(runId)` returns a run plus ordered items.
-- [ ] RF-B02-14: `DocumentsRepository.listProcessedForIndexing()` returns only `processed` documents in deterministic order.
-- [ ] RF-B02-15: `DocumentsRepository.findByIdForIndexing(documentId)` returns the target document or null without mutating it.
+- [x] RF-B02-01: Schema exports `documentChunks` with governance metadata and `vector(3072)`.
+- [x] RF-B02-02: Schema exports `ragIndexingRuns` with statuses `queued`, `processing`, `completed`, `failed`.
+- [x] RF-B02-03: Schema exports `ragIndexingRunItems` with statuses `processing`, `processed`, `failed`.
+- [x] RF-B02-04: Migration creates enums, tables, constraints, indexes, and foreign keys.
+- [x] RF-B02-05: `DocumentChunksRepository.hasChunksForConfig(documentId, config)` returns whether a document is already indexed for the active config.
+- [x] RF-B02-06: `DocumentChunksRepository.replaceDocumentChunks(input)` atomically replaces chunks for one document/config.
+- [x] RF-B02-07: Replacement rollback preserves previous chunks if inserting new chunks fails.
+- [x] RF-B02-08: `DocumentChunksRepository.deleteDocumentChunksForConfig(documentId, config)` removes only the selected document/config.
+- [x] RF-B02-09: `RagIndexingRunsRepository.createQueuedRun(input)` persists `documentId`, `force`, zero counts, and `queued` status.
+- [x] RF-B02-10: `RagIndexingRunsRepository.createQueuedRun(input)` raises typed conflict on active-run unique violation.
+- [x] RF-B02-11: Run lifecycle methods mark processing, completed, and failed with safe counts/errors.
+- [x] RF-B02-12: Item lifecycle methods create processing items and mark them `processed` or `failed`.
+- [x] RF-B02-13: `getRunWithItems(runId)` returns a run plus ordered items.
+- [x] RF-B02-14: `DocumentsRepository.listProcessedForIndexing()` returns only `processed` documents in deterministic order.
+- [x] RF-B02-15: `DocumentsRepository.findByIdForIndexing(documentId)` returns the target document or null without mutating it.
 
 ## Key Modules
 
