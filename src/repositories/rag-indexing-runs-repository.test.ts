@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { documents, ragIndexingRuns } from "@/db/schema";
+import { documents, ragIndexingRunItems, ragIndexingRuns } from "@/db/schema";
 import { pipelineVersion } from "@/domain/documents/pipeline-version";
 import { createTestDatabase, resetTestDatabase } from "@/test/db";
 
@@ -149,20 +149,49 @@ describe("RagIndexingRunsRepository", () => {
       documentId: DOCUMENT_ID,
       force: true,
     });
-    const first = await repository.createRunItem({
-      runId: run.id,
-      documentId: DOCUMENT_ID,
-      title: "a.pdf",
-    });
-    const second = await repository.createRunItem({
-      runId: run.id,
-      documentId: DOCUMENT_ID,
-      title: "b.pdf",
-    });
+    const sameCreatedAt = new Date("2026-01-01T00:00:00.000Z");
+    const laterCreatedAt = new Date("2026-01-01T00:00:01.000Z");
+    const lowId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const highId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const laterId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
+    await db.insert(ragIndexingRunItems).values([
+      {
+        id: highId,
+        runId: run.id,
+        documentId: DOCUMENT_ID,
+        title: "b.pdf",
+        status: "processing",
+        createdAt: sameCreatedAt,
+        updatedAt: sameCreatedAt,
+      },
+      {
+        id: lowId,
+        runId: run.id,
+        documentId: DOCUMENT_ID,
+        title: "a.pdf",
+        status: "processing",
+        createdAt: sameCreatedAt,
+        updatedAt: sameCreatedAt,
+      },
+      {
+        id: laterId,
+        runId: run.id,
+        documentId: DOCUMENT_ID,
+        title: "c.pdf",
+        status: "processing",
+        createdAt: laterCreatedAt,
+        updatedAt: laterCreatedAt,
+      },
+    ]);
 
     const details = await repository.getRunWithItems(run.id);
 
     expect(details?.run.id).toBe(run.id);
-    expect(details?.items.map((item) => item.id)).toEqual([first.id, second.id]);
+    expect(details?.items.map((item) => item.id)).toEqual([
+      lowId,
+      highId,
+      laterId,
+    ]);
   });
 });

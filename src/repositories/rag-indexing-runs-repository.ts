@@ -256,7 +256,7 @@ export class RagIndexingRunsRepository {
       .select()
       .from(ragIndexingRunItems)
       .where(eq(ragIndexingRunItems.runId, runId))
-      .orderBy(asc(ragIndexingRunItems.createdAt));
+      .orderBy(asc(ragIndexingRunItems.createdAt), asc(ragIndexingRunItems.id));
 
     return { run, items };
   }
