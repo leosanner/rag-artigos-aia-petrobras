@@ -5,7 +5,7 @@ import {
   RAG_SOURCE_EXCERPT_PREVIEW_LENGTH,
   truncateExcerptPreview,
 } from "./constants";
-import ConsultaPage from "./page";
+import QueryPage from "./page";
 
 const LONG_EXCERPT = `${"A".repeat(RAG_SOURCE_EXCERPT_PREVIEW_LENGTH)} trecho extra para truncar`;
 
@@ -68,7 +68,7 @@ function clickSubmit(): void {
   fireEvent.click(screen.getByRole("button", { name: /consultar base/i }));
 }
 
-describe("/consulta page", () => {
+describe("/query page", () => {
   const fetchMock = vi.fn<
     (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
   >();
@@ -84,7 +84,7 @@ describe("/consulta page", () => {
   });
 
   it("renders PT-BR copy and stays global-only", () => {
-    render(<ConsultaPage />);
+    render(<QueryPage />);
 
     expect(
       screen.getByRole("heading", { name: /consulta na base/i }),
@@ -95,7 +95,7 @@ describe("/consulta page", () => {
   });
 
   it("keeps submit disabled for whitespace-only questions", () => {
-    render(<ConsultaPage />);
+    render(<QueryPage />);
 
     typeQuestion("   ");
 
@@ -111,7 +111,7 @@ describe("/consulta page", () => {
         }),
     );
 
-    render(<ConsultaPage />);
+    render(<QueryPage />);
     typeQuestion(`   ${SUCCESS_RESPONSE.answer}   `);
 
     await act(async () => {
@@ -144,7 +144,7 @@ describe("/consulta page", () => {
   it("renders the answer, numbered sources, and the technical summary without promptVersion", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(SUCCESS_RESPONSE));
 
-    render(<ConsultaPage />);
+    render(<QueryPage />);
     typeQuestion("Quais tecnicas aparecem com mais frequencia?");
 
     await act(async () => {
@@ -163,7 +163,7 @@ describe("/consulta page", () => {
   it("truncates long excerpts only in the rendered preview", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(SUCCESS_RESPONSE));
 
-    render(<ConsultaPage />);
+    render(<QueryPage />);
     typeQuestion("Explique o contexto.");
 
     await act(async () => {
@@ -187,7 +187,7 @@ describe("/consulta page", () => {
       }),
     );
 
-    render(<ConsultaPage />);
+    render(<QueryPage />);
     typeQuestion("Existe evidencia suficiente?");
 
     await act(async () => {
@@ -207,7 +207,7 @@ describe("/consulta page", () => {
       jsonResponse({ error: "invalid_request" }, { status: 400 }),
     );
 
-    render(<ConsultaPage />);
+    render(<QueryPage />);
     typeQuestion("Pergunta invalida");
 
     await act(async () => {
@@ -234,7 +234,7 @@ describe("/consulta page", () => {
         ),
       );
 
-      render(<ConsultaPage />);
+      render(<QueryPage />);
       typeQuestion("Pergunta valida");
 
       await act(async () => {
@@ -252,7 +252,7 @@ describe("/consulta page", () => {
   it("shows the same safe technical message for network failures and malformed success bodies", async () => {
     fetchMock.mockRejectedValueOnce(new Error("network down"));
 
-    const { unmount } = render(<ConsultaPage />);
+    const { unmount } = render(<QueryPage />);
     typeQuestion("Pergunta valida");
 
     await act(async () => {
@@ -268,7 +268,7 @@ describe("/consulta page", () => {
     unmount();
     fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
 
-    render(<ConsultaPage />);
+    render(<QueryPage />);
     typeQuestion("Pergunta valida de novo");
 
     await act(async () => {

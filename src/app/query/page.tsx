@@ -16,16 +16,16 @@ import {
   truncateExcerptPreview,
 } from "./constants";
 
-type ConsultaState =
+type QueryPageState =
   | { kind: "idle" }
   | { kind: "submitting" }
   | { kind: "success"; response: RagAskSuccessResponse }
   | { kind: "invalid_request" }
   | { kind: "technical_error" };
 
-export default function ConsultaPage() {
+export default function QueryPage() {
   const [question, setQuestion] = useState("");
-  const [state, setState] = useState<ConsultaState>({ kind: "idle" });
+  const [state, setState] = useState<QueryPageState>({ kind: "idle" });
 
   const trimmedQuestion = question.trim();
   const isSubmitting = state.kind === "submitting";
@@ -73,13 +73,21 @@ export default function ConsultaPage() {
 
     if (response.status === 400) {
       const parsed = ragInvalidRequestResponseSchema.safeParse(raw);
-      setState(parsed.success ? { kind: "invalid_request" } : { kind: "technical_error" });
+      setState(
+        parsed.success
+          ? { kind: "invalid_request" }
+          : { kind: "technical_error" },
+      );
       return;
     }
 
     if (response.status === 502 || response.status === 503) {
       const parsed = ragGenerationErrorResponseSchema.safeParse(raw);
-      setState(parsed.success ? { kind: "technical_error" } : { kind: "technical_error" });
+      setState(
+        parsed.success
+          ? { kind: "technical_error" }
+          : { kind: "technical_error" },
+      );
       return;
     }
 
@@ -103,13 +111,13 @@ export default function ConsultaPage() {
 
       <form onSubmit={onSubmit} style={{ marginTop: "1.5rem" }}>
         <label
-          htmlFor="consulta-question"
+          htmlFor="query-question"
           style={{ display: "block", fontWeight: 600 }}
         >
           Pergunta
         </label>
         <textarea
-          id="consulta-question"
+          id="query-question"
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           rows={6}
