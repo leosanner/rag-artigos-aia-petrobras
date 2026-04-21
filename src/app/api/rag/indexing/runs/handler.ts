@@ -16,6 +16,7 @@ export type IndexingRunStartHandlerDeps = {
 };
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
+const MALFORMED_JSON = Symbol("malformed-json");
 
 export function createIndexingRunStartHandler(
   deps: IndexingRunStartHandlerDeps,
@@ -33,8 +34,19 @@ export function createIndexingRunStartHandler(
       });
     }
 
-    const raw = await request.json().catch(() => null);
-    const parsed = indexingStartRequestSchema.safeParse(raw ?? {});
+    const raw = await request.json().catch(() => MALFORMED_JSON);
+
+    if (raw === MALFORMED_JSON) {
+      const body = indexingInvalidRequestResponseSchema.parse({
+        error: "invalid_request",
+      });
+      return NextResponse.json(body, {
+        status: 400,
+        headers: NO_STORE_HEADERS,
+      });
+    }
+
+    const parsed = indexingStartRequestSchema.safeParse(raw);
 
     if (!parsed.success) {
       const body = indexingInvalidRequestResponseSchema.parse({

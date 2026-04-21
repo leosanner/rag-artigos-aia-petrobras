@@ -28,6 +28,20 @@ function post(body: unknown, headers: Record<string, string> = {}): Request {
   });
 }
 
+function malformedJson(
+  body: string,
+  headers: Record<string, string> = {},
+): Request {
+  return new Request("http://localhost/api/rag/indexing/runs", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...headers,
+    },
+    body,
+  });
+}
+
 describe("POST /api/rag/indexing/runs handler", () => {
   it("returns 202 with queued metadata and forwards validated options", async () => {
     const startRun = buildStartRun({
@@ -60,6 +74,35 @@ describe("POST /api/rag/indexing/runs handler", () => {
     expect(startRun.execute).toHaveBeenCalledWith({
       documentId: DOCUMENT_ID,
       force: true,
+    });
+  });
+
+  it("accepts an empty JSON object and defaults force to false", async () => {
+    const startRun = buildStartRun({
+      kind: "queued",
+      runId: RUN_ID,
+      status: "queued",
+      documentId: null,
+      force: false,
+    });
+    const handler = createIndexingRunStartHandler({
+      startRun,
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      post({}, { Authorization: `Bearer ${VALID_SECRET}` }),
+    );
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      runId: RUN_ID,
+      status: "queued",
+      documentId: null,
+      force: false,
+    });
+    expect(startRun.execute).toHaveBeenCalledWith({
+      force: false,
     });
   });
 
@@ -105,6 +148,28 @@ describe("POST /api/rag/indexing/runs handler", () => {
         { documentId: "not-a-uuid", force: "yes" },
         { Authorization: `Bearer ${VALID_SECRET}` },
       ),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "invalid_request" });
+    expect(startRun.execute).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for malformed JSON bodies", async () => {
+    const startRun = buildStartRun({
+      kind: "queued",
+      runId: RUN_ID,
+      status: "queued",
+      documentId: null,
+      force: false,
+    });
+    const handler = createIndexingRunStartHandler({
+      startRun,
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      malformedJson("{", { Authorization: `Bearer ${VALID_SECRET}` }),
     );
 
     expect(response.status).toBe(400);
