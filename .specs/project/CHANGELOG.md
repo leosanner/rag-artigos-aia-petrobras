@@ -2,6 +2,24 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(rag): close F-02 verification and spec sync
+
+Date: 2026-04-21
+
+Changed:
+
+- Expanded `F-02` Block 05 into the final closeout contract, including block-scoped rules, integration/verification acceptance criteria, the verification record, and the independent review handoff.
+- Synced the parent `F-02 / Chunking and Embeddings` spec to the implemented behavior: run-item status now explicitly uses `processing | processed | failed`, the system flow matches the real skip/force and targeted-document behavior, and all feature RF checkboxes are marked complete.
+- Synced `F-02` Block 03 from a planned contract to an implemented contract by marking its RFs complete and updating the stale env-test note.
+- Recorded the current build-verification prerequisite that non-test builds require a non-empty `OPENAI_API_KEY`, and noted that plain `pnpm build` still fails with the workspace's current `.env.local` configuration, which omits that key.
+
+Files:
+
+- `.specs/features/F-02-chunking-embeddings/spec.md`
+- `.specs/features/F-02-chunking-embeddings/03-application-embedding-and-inngest.md`
+- `.specs/features/F-02-chunking-embeddings/05-integration-and-review.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(rag): split F-02 into implementation blocks
 
 Date: 2026-04-20

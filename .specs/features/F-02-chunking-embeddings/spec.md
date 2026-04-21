@@ -61,22 +61,22 @@ current task:
 
 ## Functional Requirements
 
-- [ ] RF-01: The database schema defines persistent chunks with pgvector embeddings and the metadata required for traceable retrieval.
-- [ ] RF-02: The database schema defines indexing runs and indexing run items with queued/processing/completed/failed state.
-- [ ] RF-03: The hybrid chunker produces stable, non-empty chunks from `refined_text`, preserving paragraph boundaries when possible and applying 900/150 estimated token limits.
-- [ ] RF-04: The chunker preserves deterministic `chunk_index` ordering for the same input.
-- [ ] RF-05: The embedding provider port can embed multiple chunk texts and validate 3072-dimension vectors.
-- [ ] RF-06: The OpenAI embedding adapter uses the Vercel AI SDK provider boundary and reads `OPENAI_API_KEY` plus the active embedding model from server env/config.
-- [ ] RF-07: `POST /api/rag/indexing/runs` creates a queued indexing run when no active run exists and returns immediately with run metadata.
-- [ ] RF-08: `POST /api/rag/indexing/runs` returns 401 without creating a run when the bearer secret is missing or wrong.
-- [ ] RF-09: `POST /api/rag/indexing/runs` returns 409 with the active run id when another indexing run is queued or processing.
-- [ ] RF-10: The Inngest indexing function selects processed documents in deterministic order and skips documents already indexed for the active chunking/embedding configuration unless `force = true`.
-- [ ] RF-11: The indexing service can index all eligible processed documents or a single requested `documentId`.
-- [ ] RF-12: If `force = true`, the indexing service rebuilds existing chunks for the selected scope.
-- [ ] RF-13: Per-document extraction from `refined_text`, chunking, embedding, and persistence failures are recorded on the indexing item and do not stop the run.
-- [ ] RF-14: `GET /api/rag/indexing/runs/:id` returns aggregate counts and item-level statuses for polling.
-- [ ] RF-15: `/indexing` lets the operator enter the shared secret, start an indexing run, optionally enable force rebuild, and poll run progress in Portuguese.
-- [ ] RF-16: API responses are validated with Zod and never include provider stack traces, API keys, database URLs, or raw embedding-provider errors.
+- [x] RF-01: The database schema defines persistent chunks with pgvector embeddings and the metadata required for traceable retrieval.
+- [x] RF-02: The database schema defines indexing runs with `queued | processing | completed | failed` state and indexing run items with `processing | processed | failed` state.
+- [x] RF-03: The hybrid chunker produces stable, non-empty chunks from `refined_text`, preserving paragraph boundaries when possible and applying 900/150 estimated token limits.
+- [x] RF-04: The chunker preserves deterministic `chunk_index` ordering for the same input.
+- [x] RF-05: The embedding provider port can embed multiple chunk texts and validate 3072-dimension vectors.
+- [x] RF-06: The OpenAI embedding adapter uses the Vercel AI SDK provider boundary and reads `OPENAI_API_KEY` plus the active embedding model from server env/config.
+- [x] RF-07: `POST /api/rag/indexing/runs` creates a queued indexing run when no active run exists and returns immediately with run metadata.
+- [x] RF-08: `POST /api/rag/indexing/runs` returns 401 without creating a run when the bearer secret is missing or wrong.
+- [x] RF-09: `POST /api/rag/indexing/runs` returns 409 with the active run id when another indexing run is queued or processing.
+- [x] RF-10: The Inngest indexing function selects processed documents in deterministic order and skips documents already indexed for the active chunking/embedding configuration unless `force = true`.
+- [x] RF-11: The indexing service can index all eligible processed documents or a single requested `documentId`.
+- [x] RF-12: If `force = true`, the indexing service rebuilds existing chunks for the selected scope.
+- [x] RF-13: Per-document extraction from `refined_text`, chunking, embedding, and persistence failures are recorded on the indexing item and do not stop the run.
+- [x] RF-14: `GET /api/rag/indexing/runs/:id` returns aggregate counts and item-level statuses for polling.
+- [x] RF-15: `/indexing` lets the operator enter the shared secret, start an indexing run, optionally enable force rebuild, and poll run progress in Portuguese.
+- [x] RF-16: API responses are validated with Zod and never include provider stack traces, API keys, database URLs, or raw embedding-provider errors.
 
 ## System Flow
 
@@ -89,16 +89,16 @@ current task:
 7. The route returns 202 with `{ runId, status: "queued", force, documentId }`.
 8. The `/indexing` page polls `GET /api/rag/indexing/runs/:id`.
 9. The Inngest function receives `rag/indexing.requested` and calls `ProcessIndexingRun`.
-10. `ProcessIndexingRun` marks the run `processing`, loads the persisted run options, and selects processed documents with non-empty `refined_text`.
-11. If `documentId` is set, the selected scope is exactly that processed document; if it is not processed, the run completes with a failed item or safe run-level failure.
-12. If `force = false`, documents already indexed for the active chunking version and embedding model are counted as skipped.
-13. If `force = true`, existing chunks for the selected document scope and active configuration are deleted before new chunks are persisted.
-14. For each selected document, the service creates an indexing-run item and chunks `refined_text` with the hybrid chunker.
-15. The embedding provider embeds the chunk texts in batches behind an `EmbeddingProvider` interface.
+10. `ProcessIndexingRun` marks the run `processing`, loads the persisted run options, and selects processed documents in deterministic order. Blank `refined_text` is not prefiltered; it is handled as a per-item failure.
+11. If `documentId` is set, the selected scope is exactly that document when it exists. A missing document fails the run with `document_not_indexable`; a targeted `pending` or `failed` document creates a failed item and the run still completes safely.
+12. If `force = false`, documents already indexed for the active chunking version and embedding model are counted only in `skippedCount` and do not create run-item rows.
+13. If `force = true`, selected documents are rebuilt through the same per-document replacement path used for first-time indexing.
+14. For each non-skipped selected document, the service creates an indexing-run item, validates that `refined_text` is non-empty, and chunks `refined_text` with the hybrid chunker.
+15. The embedding provider embeds the chunk texts behind an `EmbeddingProvider` interface and validates the returned embedding count and dimensions before persistence.
 16. The chunk repository persists chunk rows and embeddings atomically per document so a provider or database failure does not leave partial retrieval-ready chunks for that document.
 17. On per-document success, the run item is marked `processed`; on failure, it is marked `failed` with a safe error code.
-18. After all selected documents finish, the run stores aggregate counts and becomes `completed`, even when some items failed.
-19. If an unrecoverable run-level failure occurs before item isolation is possible, the run becomes `failed` with a safe `last_error`.
+18. After all selected documents finish, the run stores aggregate counts and becomes `completed`, with `selectedCount = processedCount + failedCount + skippedCount`.
+19. If an unrecoverable run-level failure occurs before the per-item loop can finish, the run becomes `failed` with a safe `last_error`.
 
 ## Invariants / Non-negotiables
 
@@ -120,7 +120,7 @@ current task:
 |-------|------------|-------|
 | `document_chunks` | `id`, `document_id`, `chunk_index`, `content`, `content_hash`, `estimated_tokens`, `document_pipeline_version`, `chunking_version`, `embedding_model`, `embedding_dimensions`, `embedding`, `created_at`, `updated_at` | New retrieval-ready chunk table. `embedding` is pgvector with 3072 dimensions. |
 | `rag_indexing_runs` | `id`, `status`, `document_id`, `force`, `selected_count`, `processed_count`, `failed_count`, `skipped_count`, `last_error`, `created_at`, `started_at`, `finished_at`, `updated_at` | New async indexing-run table. `document_id` is nullable for whole-corpus indexing. |
-| `rag_indexing_run_items` | `id`, `run_id`, `document_id`, `status`, `chunk_count`, `last_error`, `created_at`, `updated_at` | Per-document result rows for operator inspection. |
+| `rag_indexing_run_items` | `id`, `run_id`, `document_id`, `status`, `chunk_count`, `last_error`, `created_at`, `updated_at` | Per-document result rows for operator inspection. `status` is `processing`, `processed`, or `failed`. |
 | `documents` | existing `id`, `title`, `pipeline_version`, `status`, `refined_text` | Read-only source table for F-02, except no source document fields are mutated. |
 
 ### Endpoints / Interfaces (if applicable)
@@ -168,7 +168,7 @@ current task:
 9. `GET /api/rag/indexing/runs/:id` returns a Zod-validated response with no credentials or raw provider errors.
 10. `/indexing` can start a run and display terminal status without requiring SQL or API tooling.
 11. Repository tests verify pgvector persistence using a real test Postgres database.
-12. `pnpm lint`, `pnpm typecheck`, and `pnpm test` pass after implementation.
+12. `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `OPENAI_API_KEY=<non-empty> pnpm build` pass after implementation.
 
 ## Decisions
 

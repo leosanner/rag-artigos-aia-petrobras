@@ -2,9 +2,10 @@
 
 ## Goal
 
-Implement the indexing orchestration and provider boundaries: start/get/process
-application services, OpenAI embeddings through the Vercel AI SDK, and the
-Inngest event/function used for asynchronous processing.
+Close the application/provider boundary for F-02: `StartIndexingRun`,
+`GetIndexingRun`, and `ProcessIndexingRun` are implemented, OpenAI embeddings
+flow through the Vercel AI SDK boundary, and the indexing Inngest event/function
+is wired into `/api/inngest`.
 
 ## Scope
 
@@ -43,22 +44,22 @@ Inngest event/function used for asynchronous processing.
 
 ## Functional Requirements
 
-- [ ] RF-B03-01: `StartIndexingRun.execute(input)` creates a queued run with `{ documentId?, force }`.
-- [ ] RF-B03-02: `StartIndexingRun.execute(input)` publishes `rag/indexing.requested` with `{ runId }`.
-- [ ] RF-B03-03: `StartIndexingRun.execute(input)` returns `{ kind: "conflict", activeRunId }` when the repository reports an active run.
-- [ ] RF-B03-04: `GetIndexingRun.execute(runId)` maps persisted runs/items to safe DTOs and normalizes unknown stored errors to `unknown_error`.
-- [ ] RF-B03-05: `ProcessIndexingRun.execute(runId)` selects documents according to run scope and persisted `force`.
-- [ ] RF-B03-06: The service calls the chunker with `refinedText` only.
-- [ ] RF-B03-07: The service calls `EmbeddingProvider.embedMany(chunkContents)`.
-- [ ] RF-B03-08: Dimension mismatch fails the item and does not persist chunks.
-- [ ] RF-B03-09: Provider failures fail only the affected item.
-- [ ] RF-B03-10: Successful documents persist chunks and mark item `processed` with `chunkCount`.
-- [ ] RF-B03-11: Final run counts satisfy `selectedCount = processedCount + failedCount + skippedCount`.
-- [ ] RF-B03-12: The OpenAI adapter uses `embedMany` with `openai.embedding(activeModel)`.
-- [ ] RF-B03-13: Env parser requires `OPENAI_API_KEY` outside tests and defaults `RAG_EMBEDDING_MODEL` to `text-embedding-3-large`.
-- [ ] RF-B03-14: Inngest publisher validates UUID run ids before sending.
-- [ ] RF-B03-15: Inngest function validates event data before calling `ProcessIndexingRun.execute(runId)`.
-- [ ] RF-B03-16: `/api/inngest` registers both F-01 ingestion and F-02 indexing functions.
+- [x] RF-B03-01: `StartIndexingRun.execute(input)` creates a queued run with `{ documentId?, force }`.
+- [x] RF-B03-02: `StartIndexingRun.execute(input)` publishes `rag/indexing.requested` with `{ runId }`.
+- [x] RF-B03-03: `StartIndexingRun.execute(input)` returns `{ kind: "conflict", activeRunId }` when the repository reports an active run.
+- [x] RF-B03-04: `GetIndexingRun.execute(runId)` maps persisted runs/items to safe DTOs and normalizes unknown stored errors to `unknown_error`.
+- [x] RF-B03-05: `ProcessIndexingRun.execute(runId)` selects documents according to run scope and persisted `force`.
+- [x] RF-B03-06: The service calls the chunker with `refinedText` only.
+- [x] RF-B03-07: The service calls `EmbeddingProvider.embedMany(chunkContents)`.
+- [x] RF-B03-08: Dimension mismatch fails the item and does not persist chunks.
+- [x] RF-B03-09: Provider failures fail only the affected item.
+- [x] RF-B03-10: Successful documents persist chunks and mark item `processed` with `chunkCount`.
+- [x] RF-B03-11: Final run counts satisfy `selectedCount = processedCount + failedCount + skippedCount`.
+- [x] RF-B03-12: The OpenAI adapter uses `embedMany` with `openai.embedding(activeModel)`.
+- [x] RF-B03-13: Env parser requires `OPENAI_API_KEY` outside tests and defaults `RAG_EMBEDDING_MODEL` to `text-embedding-3-large`.
+- [x] RF-B03-14: Inngest publisher validates UUID run ids before sending.
+- [x] RF-B03-15: Inngest function validates event data before calling `ProcessIndexingRun.execute(runId)`.
+- [x] RF-B03-16: `/api/inngest` registers both F-01 ingestion and F-02 indexing functions.
 
 ## Key Modules
 
@@ -81,7 +82,7 @@ Inngest event/function used for asynchronous processing.
 - `src/infrastructure/ai/openai-embedding-provider.test.ts`
 - `src/infrastructure/indexing/inngest.test.ts`
 - `src/app/api/inngest/route.test.ts`
-- Add env tests for OpenAI/RAG embedding variables.
+- `src/env/server.test.ts`
 
 ## Done When
 
