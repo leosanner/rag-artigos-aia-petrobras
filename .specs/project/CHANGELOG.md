@@ -2,6 +2,32 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(rag): split F-03 into implementation blocks
+
+Date: 2026-04-21
+
+Changed:
+
+- Added F-03 block documents mirroring the F-02 execution style: pure domain
+  rules for context/citations, repository retrieval behavior, application and
+  provider boundaries, interface/API/page behavior, and closeout/review.
+- Updated the parent `F-03 / Global RAG` spec to link to the new block
+  documents as the implementation map.
+- Tightened the F-03 contract around active-config retrieval, backend citation
+  validation, sanitized `400`/`502`/`503` responses, and the rule that
+  `sources[].excerpt` carries the full chunk text while `/consulta` truncates
+  visually only.
+
+Files:
+
+- `.specs/features/F-03-global-rag/spec.md`
+- `.specs/features/F-03-global-rag/01-domain-context-citations-and-answer-rules.md`
+- `.specs/features/F-03-global-rag/02-persistence-global-retrieval.md`
+- `.specs/features/F-03-global-rag/03-application-retrieval-and-generation.md`
+- `.specs/features/F-03-global-rag/04-interface-api-and-page.md`
+- `.specs/features/F-03-global-rag/05-integration-and-review.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(rag): close F-02 verification and spec sync
 
 Date: 2026-04-21
