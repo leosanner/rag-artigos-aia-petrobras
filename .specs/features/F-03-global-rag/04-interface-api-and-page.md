@@ -3,7 +3,7 @@
 ## Goal
 
 Expose the global RAG workflow through validated API routes and a minimal
-Portuguese `/consulta` page while keeping retrieval and generation business
+Portuguese `/query` page while keeping retrieval and generation business
 logic in the application layer.
 
 ## Scope
@@ -13,7 +13,7 @@ logic in the application layer.
 - Zod request and response schemas for the global ask API.
 - `POST /api/rag/ask` route handler and wiring.
 - Safe HTTP status mapping for invalid request and generation failures.
-- Portuguese `/consulta` page with one global question form, loading states,
+- Portuguese `/query` page with one global question form, loading states,
   answer rendering, and numbered sources.
 - UI-only excerpt truncation in the page component.
 - Handler and page tests.
@@ -40,10 +40,10 @@ logic in the application layer.
 - RN-B04-06: All API responses are Zod-validated before serialization.
 - RN-B04-07: API responses and UI must not expose `OPENAI_API_KEY`,
   `DATABASE_URL`, raw provider details, stack traces, or prompt internals.
-- RN-B04-08: `/consulta` copy is PT-BR by default.
-- RN-B04-09: `/consulta` is global-only in F-03 and does not render any
+- RN-B04-08: `/query` copy is PT-BR by default.
+- RN-B04-09: `/query` is global-only in F-03 and does not render any
   focused-mode selector.
-- RN-B04-10: `/consulta` truncates excerpts visually in the rendered component
+- RN-B04-10: `/query` truncates excerpts visually in the rendered component
   only; the API payload remains unchanged.
 
 ## Functional Requirements
@@ -60,15 +60,15 @@ logic in the application layer.
   typed application result.
 - [ ] RF-B04-06: Route files compose production dependencies only; handler
   files remain dependency-injectable for tests.
-- [ ] RF-B04-07: `/consulta` renders a Portuguese question form and submit
+- [ ] RF-B04-07: `/query` renders a Portuguese question form and submit
   button for global mode.
-- [ ] RF-B04-08: `/consulta` shows a loading state while the ask request is in
+- [ ] RF-B04-08: `/query` shows a loading state while the ask request is in
   flight.
-- [ ] RF-B04-09: On `200`, `/consulta` renders the answer and numbered sources.
-- [ ] RF-B04-10: `/consulta` truncates rendered excerpts visually without
+- [ ] RF-B04-09: On `200`, `/query` renders the answer and numbered sources.
+- [ ] RF-B04-10: `/query` truncates rendered excerpts visually without
   mutating the underlying response payload.
-- [ ] RF-B04-11: On `400`, `/consulta` shows a safe validation error message.
-- [ ] RF-B04-12: On `502` or `503`, `/consulta` shows a safe technical failure
+- [ ] RF-B04-11: On `400`, `/query` shows a safe validation error message.
+- [ ] RF-B04-12: On `502` or `503`, `/query` shows a safe technical failure
   message without rendering raw provider details.
 
 ## Key Modules
@@ -76,13 +76,13 @@ logic in the application layer.
 - `src/application/rag/schemas.ts`
 - `src/app/api/rag/ask/handler.ts`
 - `src/app/api/rag/ask/route.ts`
-- `src/app/consulta/page.tsx`
-- `src/app/consulta/constants.ts`
+- `src/app/query/page.tsx`
+- `src/app/query/constants.ts`
 
 ## Tests First
 
 - `src/app/api/rag/ask/handler.test.ts`
-- `src/app/consulta/page.test.tsx`
+- `src/app/query/page.test.tsx`
 
 API tests must prove status mapping and Zod validation. Page tests must prove
 global-only rendering, loading states, answer rendering, source rendering, and

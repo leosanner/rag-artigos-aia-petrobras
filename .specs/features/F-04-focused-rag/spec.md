@@ -4,7 +4,7 @@
 
 **In scope:**
 - Extend the F-03 RAG API to support questions scoped to one selected document.
-- Add document selection to `/consulta`.
+- Add document selection to `/query`.
 - Add a read endpoint for documents that are processed and indexed enough to be selectable.
 - Apply a `documentId` filter during retrieval for focused mode.
 - Reuse F-03 answer generation, context assembly, citation style, refusal behavior, and response metadata.
@@ -43,14 +43,14 @@ Focused RAG should be an extension of the base RAG flow, not a parallel pipeline
 - [ ] RF-05: Focused retrieval applies a strict `documentId` filter at the database query layer.
 - [ ] RF-06: A focused request for an unknown, non-processed, or unindexed document returns a safe 404 or 422 response and skips generation.
 - [ ] RF-07: Focused responses return the same response shape as F-03, with `mode: "focused"` and `documentId` metadata.
-- [ ] RF-08: `/consulta` adds a mode selector and document selector in Portuguese.
-- [ ] RF-09: `/consulta` disables focused submission until a selectable document is chosen.
+- [ ] RF-08: `/query` adds a mode selector and document selector in Portuguese.
+- [ ] RF-09: `/query` disables focused submission until a selectable document is chosen.
 - [ ] RF-10: Existing global mode continues to work without requiring a document selection.
 - [ ] RF-11: Focused source lists contain only chunks from the selected document.
 
 ## System Flow
 
-1. The operator opens `/consulta`.
+1. The operator opens `/query`.
 2. The page loads `GET /api/rag/documents` to populate the focused-mode document selector.
 3. In global mode, the page behaves as implemented by F-03.
 4. In focused mode, the operator selects one document and submits a question.
@@ -90,7 +90,7 @@ Focused RAG should be an extension of the base RAG flow, not a parallel pipeline
 |--------|-------------------|-------------|
 | `GET` | `/api/rag/documents` | Returns processed and indexed documents available for focused RAG. |
 | `POST` | `/api/rag/ask` | Extends F-03 route with `{ question, mode: "focused", documentId }`. |
-| `GET` | `/consulta` | Extends the F-03 page with global/focused mode selection and a document picker. |
+| `GET` | `/query` | Extends the F-03 page with global/focused mode selection and a document picker. |
 | Function | `ListRagDocuments.execute()` | Application service for selector data. |
 | Function | `AnswerQuestion.execute(input)` | Existing F-03 application service extended with focused mode. |
 
@@ -100,7 +100,7 @@ Focused RAG should be an extension of the base RAG flow, not a parallel pipeline
 - `src/repositories/document-chunks-repository.ts` - adds document-filtered vector search and selectable-document queries.
 - `src/app/api/rag/documents/*` - selectable document route handler.
 - `src/app/api/rag/ask/*` - extends ask route tests and schema handling.
-- `src/app/consulta/page.tsx` - adds focused mode UI.
+- `src/app/query/page.tsx` - adds focused mode UI.
 
 ## Dependencies
 
@@ -117,8 +117,8 @@ Focused RAG should be an extension of the base RAG flow, not a parallel pipeline
 4. Focused vector search returns only chunks from the selected document.
 5. A focused request for a processed but unindexed document returns a safe client error and does not call generation.
 6. A focused request with valid indexed chunks returns the same cited answer response shape as global mode.
-7. `/consulta` allows switching between global and focused modes without losing the global workflow.
-8. `/consulta` prevents focused submission until a document is selected.
+7. `/query` allows switching between global and focused modes without losing the global workflow.
+8. `/query` prevents focused submission until a document is selected.
 9. Regression tests prove F-03 global requests still work after focused mode is added.
 10. `pnpm lint`, `pnpm typecheck`, and `pnpm test` pass after implementation.
 

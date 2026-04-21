@@ -11,7 +11,7 @@ spec sync, changelog sync, and the required independent-review handoff.
 **In scope:**
 
 - Final closeout of F-03 as an implemented vertical: retrieval, query
-  embedding, generation, ask route, and `/consulta`.
+  embedding, generation, ask route, and `/query`.
 - End-to-end verification using real Postgres for retrieval and fake providers
   where business-logic proof is enough.
 - Final verification using `pnpm lint`, `pnpm typecheck`, `pnpm test`, and a
@@ -57,7 +57,7 @@ spec sync, changelog sync, and the required independent-review handoff.
 - [ ] RF-B05-04: Route and UI tests prove `generation_failed` maps to `502`,
   `generation_unavailable` maps to `503`, and technical error bodies contain no
   `sources`.
-- [ ] RF-B05-05: UI tests prove `/consulta` renders answers plus numbered
+- [ ] RF-B05-05: UI tests prove `/query` renders answers plus numbered
   sources and only truncates excerpts visually.
 - [ ] RF-B05-06: The parent `spec.md` and all F-03 block docs are synced to the
   implemented behavior before the feature is considered complete.

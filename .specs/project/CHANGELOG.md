@@ -2,6 +2,29 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(rag): rename consulta page route to query
+
+Date: 2026-04-21
+
+Changed:
+
+- Renamed the public Global/Focused RAG page route from `/consulta` to
+  `/query`, while keeping the page copy in PT-BR.
+- Synced the current `F-03` and `F-04` feature contracts so future work on the
+  shared RAG page targets the English route segment.
+
+Files:
+
+- `.specs/features/F-03-global-rag/spec.md`
+- `.specs/features/F-03-global-rag/01-domain-context-citations-and-answer-rules.md`
+- `.specs/features/F-03-global-rag/02-persistence-global-retrieval.md`
+- `.specs/features/F-03-global-rag/03-application-retrieval-and-generation.md`
+- `.specs/features/F-03-global-rag/04-interface-api-and-page.md`
+- `.specs/features/F-03-global-rag/05-integration-and-review.md`
+- `.specs/features/F-04-focused-rag/spec.md`
+- `.specs/project/STATE.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(rag): split F-03 into implementation blocks
 
 Date: 2026-04-21
@@ -15,7 +38,7 @@ Changed:
   documents as the implementation map.
 - Tightened the F-03 contract around active-config retrieval, backend citation
   validation, sanitized `400`/`502`/`503` responses, and the rule that
-  `sources[].excerpt` carries the full chunk text while `/consulta` truncates
+  `sources[].excerpt` carries the full chunk text while `/query` truncates
   visually only.
 
 Files:

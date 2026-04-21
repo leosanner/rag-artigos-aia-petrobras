@@ -23,7 +23,7 @@ and citations.
 - Schema changes or new migrations.
 - Context assembly, citation validation, or answer generation.
 - Query embedding and application orchestration.
-- API routes, Zod schemas, and `/consulta`.
+- API routes, Zod schemas, and `/query`.
 - Focused retrieval; that belongs to F-04.
 
 ## Business Rules

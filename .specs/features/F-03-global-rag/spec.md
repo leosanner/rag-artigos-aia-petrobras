@@ -12,7 +12,7 @@
 - Portuguese answers by default, with inline citation markers like `[1]` and a structured source list.
 - Clear refusal when retrieved context does not contain enough evidence to answer.
 - Safe sanitized `400`, `502`, and `503` API responses for invalid requests and generation failures.
-- A Portuguese `/consulta` page for global questions and cited answers.
+- A Portuguese `/query` page for global questions and cited answers.
 - Tests for retrieval, context assembly, citation validation, generation prompt behavior, API validation, and UI behavior using fake providers where possible.
 
 **Out of scope:**
@@ -44,7 +44,7 @@ for the current task:
 - [01 - Domain: Context, Citations, and Answer Rules](01-domain-context-citations-and-answer-rules.md): pure logic for source numbering, prompt context assembly, citation parsing/validation, insufficient-evidence answers, and safe generation failure classification.
 - [02 - Persistence: Global Retrieval](02-persistence-global-retrieval.md): repository/query additions for active-config pgvector search and traceable retrieval metadata.
 - [03 - Application: Retrieval and Generation](03-application-retrieval-and-generation.md): `AnswerQuestion`, query embedding, retrieval orchestration, prompt versioning, OpenAI/Vercel AI SDK generation adapter, and env validation.
-- [04 - Interface: API and Page](04-interface-api-and-page.md): `POST /api/rag/ask`, Zod request/response schemas, safe HTTP status mapping, and the Portuguese `/consulta` page.
+- [04 - Interface: API and Page](04-interface-api-and-page.md): `POST /api/rag/ask`, Zod request/response schemas, safe HTTP status mapping, and the Portuguese `/query` page.
 - [05 - Integration and Review](05-integration-and-review.md): end-to-end verification, spec sync, changelog sync, and independent-review handoff.
 
 ## Business Rules
@@ -117,9 +117,9 @@ for the current task:
 - [ ] RF-13: Error responses are limited to sanitized `invalid_request`,
   `generation_failed`, and `generation_unavailable` shapes and never include
   `sources`.
-- [ ] RF-14: `/consulta` lets the operator submit a global question and
+- [ ] RF-14: `/query` lets the operator submit a global question and
   displays the answer plus cited source list in Portuguese.
-- [ ] RF-15: `/consulta` truncates excerpts visually in the UI only; the API
+- [ ] RF-15: `/query` truncates excerpts visually in the UI only; the API
   contract still returns the full chunk text in `sources[].excerpt`.
 - [ ] RF-16: API responses never include API keys, database URLs, raw provider
   stack traces, or hidden prompt internals beyond stable prompt/model version
@@ -127,7 +127,7 @@ for the current task:
 
 ## System Flow
 
-1. The operator opens `/consulta`.
+1. The operator opens `/query`.
 2. The page displays a Portuguese question form in global mode.
 3. The page submits `POST /api/rag/ask` with `{ question, mode: "global" }`.
 4. The route validates the request body and delegates to `AnswerQuestion`.
@@ -155,7 +155,7 @@ for the current task:
     `generation_failed` or `generation_unavailable`.
 15. On success, `AnswerQuestion` returns a Zod-validated response with the
     answer, source list, and metadata.
-16. `/consulta` renders the answer and the numbered sources, truncating
+16. `/query` renders the answer and the numbered sources, truncating
     excerpts only in the component view.
 
 ## Invariants / Non-negotiables
@@ -192,7 +192,7 @@ for the current task:
 
 | Method | Route / Signature | Description |
 |--------|-------------------|-------------|
-| `GET` | `/consulta` | Portuguese global RAG page. F-04 later extends it with focused mode. |
+| `GET` | `/query` | Portuguese global RAG page. F-04 later extends it with focused mode. |
 | `POST` | `/api/rag/ask` | Accepts `{ question, mode: "global" }`; returns `200` success, `400 invalid_request`, `502 generation_failed`, or `503 generation_unavailable`. |
 | Function | `AnswerQuestion.execute(input)` | Application service orchestrating retrieval, context assembly, citation validation, and generation. |
 | Function | `RetrieveChunks.search(input)` | Retrieval service for question embedding plus active-config vector search. |
@@ -210,7 +210,7 @@ for the current task:
 - `src/infrastructure/ai/openai-generation-provider.ts` - Vercel AI SDK/OpenAI
   generation adapter.
 - `src/app/api/rag/ask/*` - route handler factory and Next.js route.
-- `src/app/consulta/page.tsx` - Portuguese global query UI.
+- `src/app/query/page.tsx` - Portuguese global query UI.
 
 ## Dependencies
 
@@ -240,7 +240,7 @@ for the current task:
    the API returns `502` with `{ error: "generation_failed" }`.
 7. If the generation provider is unavailable, the API returns `503` with
    `{ error: "generation_unavailable" }` and no `sources`.
-8. The `/consulta` page can submit a question, render an answer, render
+8. The `/query` page can submit a question, render an answer, render
    numbered sources, and visually truncate excerpts without changing the API
    payload.
 9. Responses contain no `OPENAI_API_KEY`, `DATABASE_URL`, raw stack traces,
@@ -256,7 +256,7 @@ for the current task:
 | Decision | Alternatives considered | Rationale |
 |----------|-------------------------|-----------|
 | One `/api/rag/ask` route with `mode` | Separate `/global` and `/focused` routes; server action only | One route keeps the API contract stable when F-04 adds focused mode. |
-| `/consulta` as the single RAG page | Separate pages; API-first only | A single Portuguese operator surface is better for the DEMO and can grow from global to focused mode. |
+| `/query` as the single RAG page | Separate pages; API-first only | A single Portuguese operator surface is better for the DEMO and can grow from global to focused mode. |
 | Split F-03 into 5 implementation blocks | Keep one large spec only; split into more than 5 blocks | Matching the F-02 execution style keeps the implementation and review slices small without scattering the contract. |
 | Top-k 6 | 4 or 10 chunks | Six chunks balances coverage and context size for article-level questions. |
 | Active-config retrieval only | Search every indexed chunk; filter only by embedding model | Mixing old and current indexing configurations would make answers harder to audit and regress during reindexing. |

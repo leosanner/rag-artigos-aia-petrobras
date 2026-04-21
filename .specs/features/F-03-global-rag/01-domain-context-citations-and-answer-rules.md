@@ -25,7 +25,7 @@ rules, and the closed safe error catalog for generation failures.
 
 - pgvector queries, repository SQL, and Postgres tests.
 - Query embedding and generation provider adapters.
-- Zod API schemas, route handlers, and `/consulta`.
+- Zod API schemas, route handlers, and `/query`.
 - Focused retrieval, M3 observability, streaming, and agents.
 
 ## Applicable Parent Rules
