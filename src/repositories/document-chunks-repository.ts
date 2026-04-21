@@ -1,8 +1,10 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { cosineDistance } from "drizzle-orm/sql/functions/vector";
 
 import * as schema from "@/db/schema";
-import { documentChunks, type DocumentChunk } from "@/db/schema";
+import { documentChunks, documents, type DocumentChunk } from "@/db/schema";
+import type { RetrievedChunkMatch } from "@/domain/rag";
 
 type DatabaseClient = NodePgDatabase<typeof schema>;
 
@@ -24,6 +26,11 @@ export type ReplaceDocumentChunksInput = ChunkConfiguration & {
   documentPipelineVersion: string;
   embeddingDimensions: number;
   chunks: ReplaceDocumentChunk[];
+};
+
+export type SearchGlobalChunksInput = ChunkConfiguration & {
+  queryEmbedding: number[];
+  topK: number;
 };
 
 export class DocumentChunksRepository {
@@ -48,6 +55,43 @@ export class DocumentChunksRepository {
       .from(documentChunks)
       .where(eq(documentChunks.documentId, documentId))
       .orderBy(asc(documentChunks.chunkIndex));
+  }
+
+  async searchGlobal(
+    input: SearchGlobalChunksInput,
+  ): Promise<RetrievedChunkMatch[]> {
+    const distance = cosineDistance(
+      documentChunks.embedding,
+      input.queryEmbedding,
+    );
+
+    return this.db
+      .select({
+        chunkId: documentChunks.id,
+        documentId: documentChunks.documentId,
+        documentTitle: documents.title,
+        chunkIndex: documentChunks.chunkIndex,
+        excerpt: documentChunks.content,
+        score: sql<number>`1 - (${distance})`,
+        documentPipelineVersion: documents.pipelineVersion,
+        chunkingVersion: documentChunks.chunkingVersion,
+        embeddingModel: documentChunks.embeddingModel,
+      })
+      .from(documentChunks)
+      .innerJoin(documents, eq(documentChunks.documentId, documents.id))
+      .where(
+        and(
+          eq(documents.status, "processed"),
+          eq(documentChunks.chunkingVersion, input.chunkingVersion),
+          eq(documentChunks.embeddingModel, input.embeddingModel),
+        ),
+      )
+      .orderBy(
+        distance,
+        asc(documentChunks.documentId),
+        asc(documentChunks.chunkIndex),
+      )
+      .limit(input.topK);
   }
 
   async deleteDocumentChunksForConfig(
