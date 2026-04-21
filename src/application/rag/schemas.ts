@@ -7,7 +7,9 @@ export const globalRagAskInputSchema = z
     question: z.string().trim().min(1),
     mode: z.literal("global"),
   })
-  .strip();
+  .strict();
+
+export const ragAskRequestSchema = globalRagAskInputSchema;
 
 export type GlobalRagAskInput = z.infer<typeof globalRagAskInputSchema>;
 
@@ -49,7 +51,21 @@ export const ragAnsweredResponseSchema = z
   })
   .strip();
 
+export const ragAskSuccessResponseSchema = ragAnsweredResponseSchema;
+
 export type RagAnsweredResponse = z.infer<typeof ragAnsweredResponseSchema>;
+
+export type RagAskSuccessResponse = z.infer<typeof ragAskSuccessResponseSchema>;
+
+export const ragInvalidRequestResponseSchema = z
+  .object({
+    error: z.literal("invalid_request"),
+  })
+  .strip();
+
+export type RagInvalidRequestResponse = z.infer<
+  typeof ragInvalidRequestResponseSchema
+>;
 
 export const ragGenerationErrorCodeSchema = z.enum([
   "generation_failed",
@@ -66,9 +82,42 @@ export const ragGenerationErrorResponseSchema = z
   })
   .strip();
 
+export const ragGenerationFailedResponseSchema = z
+  .object({
+    error: z.literal("generation_failed"),
+  })
+  .strip();
+
+export const ragGenerationUnavailableResponseSchema = z
+  .object({
+    error: z.literal("generation_unavailable"),
+  })
+  .strip();
+
 export type RagGenerationErrorResponse = z.infer<
   typeof ragGenerationErrorResponseSchema
 >;
+
+export type RagGenerationFailedResponse = z.infer<
+  typeof ragGenerationFailedResponseSchema
+>;
+
+export type RagGenerationUnavailableResponse = z.infer<
+  typeof ragGenerationUnavailableResponseSchema
+>;
+
+export const ragAskErrorResponseSchema = z.union([
+  ragInvalidRequestResponseSchema,
+  ragGenerationErrorResponseSchema,
+]);
+
+export const ragAskResponseSchema = z.union([
+  ragAskSuccessResponseSchema,
+  ragAskErrorResponseSchema,
+]);
+
+export type RagAskErrorResponse = z.infer<typeof ragAskErrorResponseSchema>;
+export type RagAskResponse = z.infer<typeof ragAskResponseSchema>;
 
 export const answerQuestionAnsweredResultSchema = z
   .object({
