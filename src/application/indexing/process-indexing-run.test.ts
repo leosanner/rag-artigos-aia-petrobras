@@ -12,6 +12,7 @@ import type { EmbeddingProvider, IndexingDocumentsRepository } from "./ports";
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const DOC_A_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const DOC_B_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const MISSING_DOCUMENT_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const EMBEDDING_DIMENSIONS = 3072;
 
 function vector(value: number): number[] {
@@ -91,6 +92,9 @@ function buildDeps(overrides: {
   hasChunks?: (documentId: string) => boolean;
   embedMany?: EmbeddingProvider["embedMany"];
   chunk?: (input: { refinedText: string }) => ChunkedText[];
+  replaceDocumentChunks?: DocumentChunksRepository["replaceDocumentChunks"];
+  listProcessedForIndexing?: IndexingDocumentsRepository["listProcessedForIndexing"];
+  findByIdForIndexing?: IndexingDocumentsRepository["findByIdForIndexing"];
 } = {}) {
   const docs = overrides.documents ?? [buildDocument({ id: DOC_A_ID })];
   const run = buildRun(overrides.run);
@@ -111,19 +115,23 @@ function buildDeps(overrides: {
   } satisfies Partial<RagIndexingRunsRepository>;
 
   const documentsRepository = {
-    listProcessedForIndexing: vi.fn(async () =>
-      docs.filter((doc) => doc.status === "processed"),
-    ),
-    findByIdForIndexing: vi.fn(async (documentId: string) =>
-      docs.find((doc) => doc.id === documentId) ?? null,
-    ),
+    listProcessedForIndexing:
+      overrides.listProcessedForIndexing ??
+      vi.fn(async () => docs.filter((doc) => doc.status === "processed")),
+    findByIdForIndexing:
+      overrides.findByIdForIndexing ??
+      vi.fn(async (documentId: string) =>
+        docs.find((doc) => doc.id === documentId) ?? null,
+      ),
   } satisfies IndexingDocumentsRepository;
 
   const chunksRepository = {
     hasChunksForConfig: vi.fn(async (documentId: string) =>
       overrides.hasChunks?.(documentId) ?? false,
     ),
-    replaceDocumentChunks: vi.fn().mockResolvedValue(undefined),
+    replaceDocumentChunks:
+      overrides.replaceDocumentChunks ??
+      vi.fn().mockResolvedValue(undefined),
   } satisfies Partial<DocumentChunksRepository>;
 
   const chunker = {
@@ -159,6 +167,81 @@ function buildDeps(overrides: {
 }
 
 describe("ProcessIndexingRun", () => {
+  it("fails the run with unknown_error when selecting documents throws after markProcessing", async () => {
+    const listProcessedForIndexing = vi
+      .fn()
+      .mockRejectedValue(new Error("database detail"));
+    const { service, runsRepository, chunker, embeddingProvider, chunksRepository } =
+      buildDeps({
+        listProcessedForIndexing,
+      });
+
+    await service.execute(RUN_ID);
+
+    expect(listProcessedForIndexing).toHaveBeenCalledOnce();
+    expect(runsRepository.failRun).toHaveBeenCalledWith(
+      RUN_ID,
+      "unknown_error",
+    );
+    expect(runsRepository.createRunItem).not.toHaveBeenCalled();
+    expect(runsRepository.completeRun).not.toHaveBeenCalled();
+    expect(chunker.chunk).not.toHaveBeenCalled();
+    expect(embeddingProvider.embedMany).not.toHaveBeenCalled();
+    expect(chunksRepository.replaceDocumentChunks).not.toHaveBeenCalled();
+  });
+
+  it("fails the run safely when the targeted document does not exist", async () => {
+    const { service, runsRepository, chunker, embeddingProvider, chunksRepository } =
+      buildDeps({
+        run: { documentId: MISSING_DOCUMENT_ID },
+        documents: [],
+      });
+
+    await service.execute(RUN_ID);
+
+    expect(runsRepository.failRun).toHaveBeenCalledWith(
+      RUN_ID,
+      "document_not_indexable",
+    );
+    expect(runsRepository.createRunItem).not.toHaveBeenCalled();
+    expect(runsRepository.completeRun).not.toHaveBeenCalled();
+    expect(chunker.chunk).not.toHaveBeenCalled();
+    expect(embeddingProvider.embedMany).not.toHaveBeenCalled();
+    expect(chunksRepository.replaceDocumentChunks).not.toHaveBeenCalled();
+  });
+
+  it("fails the run with unknown_error when an unexpected pre-item error happens mid-run", async () => {
+    let hasChunksCalls = 0;
+    const { service, runsRepository, chunksRepository } = buildDeps({
+      documents: [
+        buildDocument({ id: DOC_A_ID }),
+        buildDocument({ id: DOC_B_ID, title: "doc-b.pdf" }),
+      ],
+      hasChunks: () => {
+        hasChunksCalls += 1;
+        if (hasChunksCalls === 2) {
+          throw new Error("database detail");
+        }
+
+        return false;
+      },
+    });
+
+    await service.execute(RUN_ID);
+
+    expect(runsRepository.markRunItemProcessed).toHaveBeenCalledWith(
+      `item-${DOC_A_ID}`,
+      { chunkCount: 1 },
+    );
+    expect(runsRepository.createRunItem).toHaveBeenCalledTimes(1);
+    expect(chunksRepository.replaceDocumentChunks).toHaveBeenCalledTimes(1);
+    expect(runsRepository.failRun).toHaveBeenCalledWith(
+      RUN_ID,
+      "unknown_error",
+    );
+    expect(runsRepository.completeRun).not.toHaveBeenCalled();
+  });
+
   it("selects only processed documents in repository order and never reads raw_text", async () => {
     const docs = [
       buildDocument({ id: DOC_A_ID, refinedText: "alpha refined", rawText: "alpha raw" }),
@@ -251,6 +334,41 @@ describe("ProcessIndexingRun", () => {
     });
   });
 
+  it.each(["pending", "failed"] as const)(
+    "fails a targeted %s document safely without chunking it",
+    async (status) => {
+      const { service, runsRepository, documentsRepository, chunker, embeddingProvider, chunksRepository } =
+        buildDeps({
+          run: { documentId: DOC_A_ID },
+          documents: [
+            buildDocument({
+              id: DOC_A_ID,
+              status,
+            }),
+          ],
+        });
+
+      await service.execute(RUN_ID);
+
+      expect(documentsRepository.findByIdForIndexing).toHaveBeenCalledWith(
+        DOC_A_ID,
+      );
+      expect(runsRepository.markRunItemFailed).toHaveBeenCalledWith(
+        `item-${DOC_A_ID}`,
+        { errorCode: "document_not_indexable" },
+      );
+      expect(runsRepository.completeRun).toHaveBeenCalledWith(RUN_ID, {
+        selectedCount: 1,
+        processedCount: 0,
+        failedCount: 1,
+        skippedCount: 0,
+      });
+      expect(chunker.chunk).not.toHaveBeenCalled();
+      expect(embeddingProvider.embedMany).not.toHaveBeenCalled();
+      expect(chunksRepository.replaceDocumentChunks).not.toHaveBeenCalled();
+    },
+  );
+
   it("fails only the affected item when the embedding provider fails", async () => {
     const { service, runsRepository } = buildDeps({
       documents: [
@@ -295,5 +413,50 @@ describe("ProcessIndexingRun", () => {
       `item-${DOC_A_ID}`,
       { errorCode: "embedding_dimensions_mismatch" },
     );
+  });
+
+  it("fails the item safely when chunking throws", async () => {
+    const { service, runsRepository, chunker, embeddingProvider, chunksRepository } =
+      buildDeps({
+        chunk: () => {
+          throw new Error("unexpected chunker detail");
+        },
+      });
+
+    await service.execute(RUN_ID);
+
+    expect(chunker.chunk).toHaveBeenCalledOnce();
+    expect(runsRepository.markRunItemFailed).toHaveBeenCalledWith(
+      `item-${DOC_A_ID}`,
+      { errorCode: "chunking_failed" },
+    );
+    expect(embeddingProvider.embedMany).not.toHaveBeenCalled();
+    expect(chunksRepository.replaceDocumentChunks).not.toHaveBeenCalled();
+  });
+
+  it("fails the item safely when persistence throws", async () => {
+    const replaceDocumentChunks = vi
+      .fn()
+      .mockRejectedValue(new Error("database detail"));
+    const { service, runsRepository, embeddingProvider, chunksRepository } =
+      buildDeps({
+        replaceDocumentChunks,
+      });
+
+    await service.execute(RUN_ID);
+
+    expect(embeddingProvider.embedMany).toHaveBeenCalledOnce();
+    expect(chunksRepository.replaceDocumentChunks).toHaveBeenCalledOnce();
+    expect(runsRepository.markRunItemFailed).toHaveBeenCalledWith(
+      `item-${DOC_A_ID}`,
+      { errorCode: "persistence_failed" },
+    );
+    expect(runsRepository.markRunItemProcessed).not.toHaveBeenCalled();
+    expect(runsRepository.completeRun).toHaveBeenCalledWith(RUN_ID, {
+      selectedCount: 1,
+      processedCount: 0,
+      failedCount: 1,
+      skippedCount: 0,
+    });
   });
 });

@@ -45,6 +45,18 @@ describe("parseServerEnv", () => {
     ).toThrow(/INGESTION_SYNC_SECRET/);
   });
 
+  it("rejects missing OPENAI_API_KEY outside tests", () => {
+    expect(() =>
+      parseServerEnv({
+        ...baseEnv,
+        OPENAI_API_KEY: undefined,
+        NODE_ENV: "production",
+        INNGEST_EVENT_KEY: "event-key",
+        INNGEST_SIGNING_KEY: "signing-key",
+      }),
+    ).toThrow(/OPENAI_API_KEY/);
+  });
+
   it("allows tests to omit real Inngest credentials", () => {
     expect(() =>
       parseServerEnv({
@@ -75,5 +87,17 @@ describe("parseServerEnv", () => {
 
     expect(env.INNGEST_EVENT_KEY).toBe("event-key");
     expect(env.INNGEST_SIGNING_KEY).toBe("signing-key");
+  });
+
+  it("defaults RAG_EMBEDDING_MODEL to text-embedding-3-large", () => {
+    const env = parseServerEnv({
+      ...baseEnv,
+      RAG_EMBEDDING_MODEL: undefined,
+      NODE_ENV: "production",
+      INNGEST_EVENT_KEY: "event-key",
+      INNGEST_SIGNING_KEY: "signing-key",
+    });
+
+    expect(env.RAG_EMBEDDING_MODEL).toBe("text-embedding-3-large");
   });
 });

@@ -6,7 +6,7 @@ import {
   type ChunkedText,
   type TextChunker,
 } from "@/domain/chunking/hybrid-text-chunker";
-import { IndexingError } from "@/domain/indexing/errors";
+import { IndexingError, toSafeIndexingErrorCode } from "@/domain/indexing/errors";
 import type { DocumentChunksRepository } from "@/repositories/document-chunks-repository";
 import type { RagIndexingRunsRepository } from "@/repositories/rag-indexing-runs-repository";
 
@@ -70,109 +70,113 @@ export class ProcessIndexingRun implements ProcessIndexingRunHandler {
 
   async execute(runId: string): Promise<void> {
     const run = await this.runsRepository.markProcessing(runId);
-    const documents = await this.selectDocuments(run.documentId);
+    try {
+      const documents = await this.selectDocuments(run.documentId);
 
-    if (documents === null) {
-      await this.runsRepository.failRun(runId, "document_not_indexable");
-      return;
-    }
+      if (documents === null) {
+        await this.runsRepository.failRun(runId, "document_not_indexable");
+        return;
+      }
 
-    let processedCount = 0;
-    let failedCount = 0;
-    let skippedCount = 0;
+      let processedCount = 0;
+      let failedCount = 0;
+      let skippedCount = 0;
 
-    for (const document of documents) {
-      if (document.status !== "processed") {
+      for (const document of documents) {
+        if (document.status !== "processed") {
+          const item = await this.runsRepository.createRunItem({
+            runId,
+            documentId: document.id,
+            title: document.title,
+          });
+          await this.runsRepository.markRunItemFailed(item.id, {
+            errorCode: "document_not_indexable",
+          });
+          failedCount += 1;
+          continue;
+        }
+
+        if (!run.force) {
+          const alreadyIndexed = await this.chunksRepository.hasChunksForConfig(
+            document.id,
+            {
+              chunkingVersion: this.chunkingVersion,
+              embeddingModel: this.embeddingModel,
+            },
+          );
+          if (alreadyIndexed) {
+            skippedCount += 1;
+            continue;
+          }
+        }
+
         const item = await this.runsRepository.createRunItem({
           runId,
           documentId: document.id,
           title: document.title,
         });
-        await this.runsRepository.markRunItemFailed(item.id, {
-          errorCode: "document_not_indexable",
-        });
-        failedCount += 1;
-        continue;
-      }
 
-      if (!run.force) {
-        const alreadyIndexed = await this.chunksRepository.hasChunksForConfig(
-          document.id,
-          {
-            chunkingVersion: this.chunkingVersion,
-            embeddingModel: this.embeddingModel,
-          },
-        );
-        if (alreadyIndexed) {
-          skippedCount += 1;
+        if (!document.refinedText || document.refinedText.trim().length === 0) {
+          await this.runsRepository.markRunItemFailed(item.id, {
+            errorCode: "refined_text_empty",
+          });
+          failedCount += 1;
           continue;
         }
+
+        let chunks: ChunkedText[];
+        try {
+          chunks = this.chunker.chunk({ refinedText: document.refinedText });
+        } catch {
+          await this.runsRepository.markRunItemFailed(item.id, {
+            errorCode: "chunking_failed",
+          });
+          failedCount += 1;
+          continue;
+        }
+
+        let embeddings: number[][];
+        try {
+          embeddings = await this.embeddingProvider.embedMany(
+            chunks.map((chunk) => chunk.content),
+          );
+          this.assertEmbeddingShape(chunks, embeddings);
+        } catch (error) {
+          await this.runsRepository.markRunItemFailed(item.id, {
+            errorCode:
+              error instanceof IndexingError
+                ? error.code
+                : "embedding_failed",
+          });
+          failedCount += 1;
+          continue;
+        }
+
+        try {
+          await this.persistDocumentChunks(document, chunks, embeddings);
+        } catch {
+          await this.runsRepository.markRunItemFailed(item.id, {
+            errorCode: "persistence_failed",
+          });
+          failedCount += 1;
+          continue;
+        }
+
+        await this.runsRepository.markRunItemProcessed(item.id, {
+          chunkCount: chunks.length,
+        });
+        processedCount += 1;
       }
 
-      const item = await this.runsRepository.createRunItem({
-        runId,
-        documentId: document.id,
-        title: document.title,
+      await this.runsRepository.completeRun(runId, {
+        selectedCount: documents.length,
+        processedCount,
+        failedCount,
+        skippedCount,
       });
-
-      if (!document.refinedText || document.refinedText.trim().length === 0) {
-        await this.runsRepository.markRunItemFailed(item.id, {
-          errorCode: "refined_text_empty",
-        });
-        failedCount += 1;
-        continue;
-      }
-
-      let chunks: ChunkedText[];
-      try {
-        chunks = this.chunker.chunk({ refinedText: document.refinedText });
-      } catch {
-        await this.runsRepository.markRunItemFailed(item.id, {
-          errorCode: "chunking_failed",
-        });
-        failedCount += 1;
-        continue;
-      }
-
-      let embeddings: number[][];
-      try {
-        embeddings = await this.embeddingProvider.embedMany(
-          chunks.map((chunk) => chunk.content),
-        );
-        this.assertEmbeddingShape(chunks, embeddings);
-      } catch (error) {
-        await this.runsRepository.markRunItemFailed(item.id, {
-          errorCode:
-            error instanceof IndexingError
-              ? error.code
-              : "embedding_failed",
-        });
-        failedCount += 1;
-        continue;
-      }
-
-      try {
-        await this.persistDocumentChunks(document, chunks, embeddings);
-      } catch {
-        await this.runsRepository.markRunItemFailed(item.id, {
-          errorCode: "persistence_failed",
-        });
-        failedCount += 1;
-        continue;
-      }
-
-      await this.runsRepository.markRunItemProcessed(item.id, {
-        chunkCount: chunks.length,
-      });
-      processedCount += 1;
+    } catch (error) {
+      await this.runsRepository.failRun(runId, toSafeIndexingErrorCode(error));
     }
-
-    await this.runsRepository.completeRun(runId, {
-      selectedCount: documents.length,
-      processedCount,
-      failedCount,
-      skippedCount,
-    });
   }
 
   private async selectDocuments(

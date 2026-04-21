@@ -52,4 +52,19 @@ describe("createProcessIndexingRunFunction", () => {
     );
     expect(execute).toHaveBeenCalledWith(RUN_ID);
   });
+
+  it("rejects invalid event payloads before calling the process handler", async () => {
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const createFunction = vi.fn((_options, handler) => handler);
+
+    const fn = createProcessIndexingRunFunction(
+      { execute },
+      { createFunction },
+    );
+
+    await expect(
+      fn({ event: { data: { runId: "not-a-uuid" } } }),
+    ).rejects.toThrow();
+    expect(execute).not.toHaveBeenCalled();
+  });
 });
