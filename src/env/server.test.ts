@@ -10,6 +10,7 @@ const baseEnv = {
     "-----BEGIN PRIVATE KEY-----\\nabc123\\n-----END PRIVATE KEY-----\\n",
   INGESTION_SYNC_SECRET: "server-configured-secret",
   OPENAI_API_KEY: "test-openai-api-key",
+  RAG_GENERATION_MODEL: "gpt-4.1-mini",
 };
 
 describe("parseServerEnv", () => {
@@ -57,6 +58,18 @@ describe("parseServerEnv", () => {
     ).toThrow(/OPENAI_API_KEY/);
   });
 
+  it("rejects missing RAG_GENERATION_MODEL outside tests", () => {
+    expect(() =>
+      parseServerEnv({
+        ...baseEnv,
+        RAG_GENERATION_MODEL: undefined,
+        NODE_ENV: "production",
+        INNGEST_EVENT_KEY: "event-key",
+        INNGEST_SIGNING_KEY: "signing-key",
+      }),
+    ).toThrow(/RAG_GENERATION_MODEL/);
+  });
+
   it("allows tests to omit real Inngest credentials", () => {
     expect(() =>
       parseServerEnv({
@@ -99,5 +112,15 @@ describe("parseServerEnv", () => {
     });
 
     expect(env.RAG_EMBEDDING_MODEL).toBe("text-embedding-3-large");
+  });
+
+  it("defaults RAG_GENERATION_MODEL in tests", () => {
+    const env = parseServerEnv({
+      ...baseEnv,
+      RAG_GENERATION_MODEL: undefined,
+      NODE_ENV: "test",
+    });
+
+    expect(env.RAG_GENERATION_MODEL).toBe("test-rag-generation-model");
   });
 });

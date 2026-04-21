@@ -23,6 +23,7 @@ const envSchema = z
     RAG_EMBEDDING_MODEL: optionalNonEmptyString.transform(
       (value) => value ?? "text-embedding-3-large",
     ),
+    RAG_GENERATION_MODEL: optionalNonEmptyString,
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== "test" && !env.INGESTION_SYNC_SECRET) {
@@ -38,6 +39,14 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ["OPENAI_API_KEY"],
         message: "OPENAI_API_KEY is required unless NODE_ENV=test",
+      });
+    }
+
+    if (env.NODE_ENV !== "test" && !env.RAG_GENERATION_MODEL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["RAG_GENERATION_MODEL"],
+        message: "RAG_GENERATION_MODEL is required unless NODE_ENV=test",
       });
     }
 
@@ -65,7 +74,11 @@ const envSchema = z
           "INNGEST_SIGNING_KEY is required unless NODE_ENV=test or INNGEST_DEV is set",
       });
     }
-  });
+  })
+  .transform((env) => ({
+    ...env,
+    RAG_GENERATION_MODEL: env.RAG_GENERATION_MODEL ?? "test-rag-generation-model",
+  }));
 
 export type ServerEnv = z.infer<typeof envSchema>;
 
@@ -84,6 +97,7 @@ const testEnvDefaults = {
   INNGEST_DEV: "1",
   OPENAI_API_KEY: "test-openai-api-key",
   RAG_EMBEDDING_MODEL: "text-embedding-3-large",
+  RAG_GENERATION_MODEL: "test-rag-generation-model",
 };
 
 export const env = parseServerEnv(

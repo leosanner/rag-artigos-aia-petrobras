@@ -37,6 +37,29 @@ describe("OpenAiEmbeddingProvider", () => {
     });
   });
 
+  it("embeds a single question through the same configured model and dimensions contract", async () => {
+    const model = { provider: "openai", modelId: MODEL };
+    const modelFactory = vi.fn().mockReturnValue(model);
+    const embedMany = vi.fn().mockResolvedValue({
+      embeddings: [vector(0.3)],
+    });
+    const provider = new OpenAiEmbeddingProvider({
+      model: MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      modelFactory,
+      embedMany,
+    });
+
+    await expect(provider.embedQuestion("what does the paper say?")).resolves.toEqual(
+      vector(0.3),
+    );
+    expect(modelFactory).toHaveBeenCalledWith(MODEL);
+    expect(embedMany).toHaveBeenCalledWith({
+      model,
+      values: ["what does the paper say?"],
+    });
+  });
+
   it("fails with a safe adapter error when any returned vector has the wrong dimension", async () => {
     const provider = new OpenAiEmbeddingProvider({
       model: MODEL,

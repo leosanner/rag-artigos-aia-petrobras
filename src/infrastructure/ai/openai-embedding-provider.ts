@@ -2,6 +2,7 @@ import { openai } from "@ai-sdk/openai";
 import { embedMany as aiEmbedMany } from "ai";
 
 import type { EmbeddingProvider } from "@/application/indexing/ports";
+import type { QuestionEmbeddingProvider } from "@/application/rag/ports";
 import { IndexingError, type IndexingErrorCode } from "@/domain/indexing/errors";
 import type { ServerEnv } from "@/env/server";
 
@@ -31,7 +32,9 @@ export type OpenAiEmbeddingProviderDeps = {
   embedMany?: EmbedManyFn;
 };
 
-export class OpenAiEmbeddingProvider implements EmbeddingProvider {
+export class OpenAiEmbeddingProvider
+  implements EmbeddingProvider, QuestionEmbeddingProvider
+{
   private readonly model: string;
   private readonly embeddingDimensions: number;
   private readonly modelFactory: ModelFactory;
@@ -64,6 +67,17 @@ export class OpenAiEmbeddingProvider implements EmbeddingProvider {
     }
 
     return embeddings;
+  }
+
+  async embedQuestion(question: string): Promise<number[]> {
+    const embeddings = await this.embedMany([question]);
+    const [embedding] = embeddings;
+
+    if (embedding === undefined) {
+      throw new EmbeddingProviderError("embedding_dimensions_mismatch");
+    }
+
+    return embedding;
   }
 }
 
