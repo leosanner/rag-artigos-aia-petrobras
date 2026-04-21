@@ -9,7 +9,7 @@
 - Persistence of chunks and 3072-dimension embeddings in Postgres/pgvector.
 - Idempotent indexing: skip already indexed documents by default, and rebuild selected documents when `force = true`.
 - Async indexing orchestration through Inngest, with persisted indexing-run and per-document item state.
-- A Portuguese operator page at `/indexacao` to start an indexing run and inspect progress.
+- A Portuguese operator page at `/indexing` to start an indexing run and inspect progress.
 - Tests for chunking rules, repositories, embedding adapter boundaries, indexing orchestration, API contracts, and pgvector persistence.
 
 **Out of scope:**
@@ -38,7 +38,7 @@ current task:
 - [01 - Domain: Chunking and Safe Errors](01-domain-chunking-and-errors.md): deterministic hybrid chunking, token estimation, and safe indexing error codes.
 - [02 - Persistence: Chunks and Indexing Runs](02-persistence-chunks-and-indexing-runs.md): pgvector schema, indexing-run schema, repositories, migrations, and real Postgres tests.
 - [03 - Application, Embeddings, and Inngest](03-application-embedding-and-inngest.md): start/get/process services, OpenAI embedding adapter through the Vercel AI SDK, env validation, and Inngest wiring.
-- [04 - Interface: API and Page](04-interface-api-and-page.md): indexing API routes, Zod request/response schemas, bearer auth, and Portuguese `/indexacao` page.
+- [04 - Interface: API and Page](04-interface-api-and-page.md): indexing API routes, Zod request/response schemas, bearer auth, and Portuguese `/indexing` page.
 - [05 - Integration and Review](05-integration-and-review.md): end-to-end validation, full verification, spec sync, and review handoff.
 
 ## Business Rules
@@ -75,19 +75,19 @@ current task:
 - [ ] RF-12: If `force = true`, the indexing service rebuilds existing chunks for the selected scope.
 - [ ] RF-13: Per-document extraction from `refined_text`, chunking, embedding, and persistence failures are recorded on the indexing item and do not stop the run.
 - [ ] RF-14: `GET /api/rag/indexing/runs/:id` returns aggregate counts and item-level statuses for polling.
-- [ ] RF-15: `/indexacao` lets the operator enter the shared secret, start an indexing run, optionally enable force rebuild, and poll run progress in Portuguese.
+- [ ] RF-15: `/indexing` lets the operator enter the shared secret, start an indexing run, optionally enable force rebuild, and poll run progress in Portuguese.
 - [ ] RF-16: API responses are validated with Zod and never include provider stack traces, API keys, database URLs, or raw embedding-provider errors.
 
 ## System Flow
 
-1. The operator opens `/indexacao`.
+1. The operator opens `/indexing`.
 2. The page lets the operator provide the existing shared operator secret, choose default skip mode or `force = true`, and optionally target one document.
 3. The page calls `POST /api/rag/indexing/runs` with `Authorization: Bearer <secret>` and body `{ documentId?: string, force?: boolean }`.
 4. The route validates the request body, validates the bearer secret against `INGESTION_SYNC_SECRET`, and delegates to `StartIndexingRun`.
 5. `StartIndexingRun` checks for an active indexing run. If one exists, it returns a conflict result with the active run id.
 6. If no active run exists, `StartIndexingRun` creates a queued indexing run and publishes Inngest event `rag/indexing.requested` with `{ runId }`.
 7. The route returns 202 with `{ runId, status: "queued", force, documentId }`.
-8. The `/indexacao` page polls `GET /api/rag/indexing/runs/:id`.
+8. The `/indexing` page polls `GET /api/rag/indexing/runs/:id`.
 9. The Inngest function receives `rag/indexing.requested` and calls `ProcessIndexingRun`.
 10. `ProcessIndexingRun` marks the run `processing`, loads the persisted run options, and selects processed documents with non-empty `refined_text`.
 11. If `documentId` is set, the selected scope is exactly that processed document; if it is not processed, the run completes with a failed item or safe run-level failure.
@@ -127,7 +127,7 @@ current task:
 
 | Method | Route / Signature | Description |
 |--------|-------------------|-------------|
-| `GET` | `/indexacao` | Portuguese operator page for manual indexing and run polling. |
+| `GET` | `/indexing` | Portuguese operator page for manual indexing and run polling. |
 | `POST` | `/api/rag/indexing/runs` | Requires bearer secret, creates a queued indexing run, and publishes `rag/indexing.requested`. |
 | `GET` | `/api/rag/indexing/runs/:id` | Returns indexing-run detail with aggregate counts and per-document items. |
 | `GET/POST/PUT` | `/api/inngest` | Existing Inngest serve route extended with the indexing function. |
@@ -146,7 +146,7 @@ current task:
 - `src/infrastructure/ai/openai-embedding-provider.ts` - Vercel AI SDK/OpenAI embedding adapter.
 - `src/app/api/rag/indexing/runs/*` - indexing start and polling API route handlers.
 - `src/app/ingestion/page.tsx` - unchanged; ingestion remains separate from indexing.
-- `src/app/indexacao/page.tsx` - Portuguese operator indexing page.
+- `src/app/indexing/page.tsx` - Portuguese operator indexing page.
 
 ## Dependencies
 
@@ -166,7 +166,7 @@ current task:
 7. `POST /api/rag/indexing/runs` returns 401 when the bearer secret is missing or wrong and does not create or enqueue a run.
 8. `POST /api/rag/indexing/runs` returns 409 when another indexing run is queued or processing.
 9. `GET /api/rag/indexing/runs/:id` returns a Zod-validated response with no credentials or raw provider errors.
-10. `/indexacao` can start a run and display terminal status without requiring SQL or API tooling.
+10. `/indexing` can start a run and display terminal status without requiring SQL or API tooling.
 11. Repository tests verify pgvector persistence using a real test Postgres database.
 12. `pnpm lint`, `pnpm typecheck`, and `pnpm test` pass after implementation.
 

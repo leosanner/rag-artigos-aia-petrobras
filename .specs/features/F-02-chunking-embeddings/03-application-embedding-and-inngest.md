@@ -21,7 +21,7 @@ Inngest event/function used for asynchronous processing.
 
 **Out of scope:**
 
-- HTTP route handlers and `/indexacao` page (Block 04).
+- HTTP route handlers and `/indexing` page (Block 04).
 - Schema/repository implementation (Block 02), except using their public APIs.
 - Retrieval, answer generation, citations, observability, cost tracking, and agents.
 - Real OpenAI calls in automated tests.

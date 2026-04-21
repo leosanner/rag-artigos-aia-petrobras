@@ -3,7 +3,7 @@
 ## Goal
 
 Close F-02 as a coherent vertical: schema, chunking, embeddings, run
-orchestration, Inngest, API, and `/indexacao` all work together, and the feature
+orchestration, Inngest, API, and `/indexing` all work together, and the feature
 is ready for independent review.
 
 ## Scope
@@ -33,7 +33,7 @@ is ready for independent review.
 - RN-B05-05: Dimension mismatch leaves no partial retrieval-ready chunks.
 - RN-B05-06: One failed document does not stop other documents.
 - RN-B05-07: API responses never leak secrets or raw provider errors.
-- RN-B05-08: `/indexacao` lets the operator complete the manual workflow without SQL/API tooling.
+- RN-B05-08: `/indexing` lets the operator complete the manual workflow without SQL/API tooling.
 
 ## Integration Scenarios
 

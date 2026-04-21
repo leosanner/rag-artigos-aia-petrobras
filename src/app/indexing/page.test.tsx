@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import IndexacaoPage from "./page";
+import IndexingPage from "./page";
 import { INDEXING_POLL_INTERVAL_MS } from "./constants";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
@@ -26,7 +26,7 @@ function clickStart(): void {
   fireEvent.click(screen.getByRole("button", { name: /iniciar indexacao/i }));
 }
 
-describe("/indexacao page", () => {
+describe("/indexing page", () => {
   const fetchMock = vi.fn<
     (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
   >();
@@ -44,7 +44,7 @@ describe("/indexacao page", () => {
   });
 
   it("renders Portuguese operator copy and keeps Start disabled until a secret is typed", () => {
-    render(<IndexacaoPage />);
+    render(<IndexingPage />);
 
     expect(screen.getByText(/indexacao de documentos/i)).toBeInTheDocument();
     const button = screen.getByRole("button", { name: /iniciar indexacao/i });
@@ -66,7 +66,7 @@ describe("/indexacao page", () => {
         { status: 202 },
       ),
     );
-    render(<IndexacaoPage />);
+    render(<IndexingPage />);
     typeSecret(SECRET);
     fireEvent.change(screen.getByLabelText(/documento especifico/i), {
       target: { value: DOCUMENT_ID },
@@ -127,7 +127,7 @@ describe("/indexacao page", () => {
         }),
       );
 
-    render(<IndexacaoPage />);
+    render(<IndexingPage />);
     typeSecret(SECRET);
     await act(async () => {
       clickStart();
@@ -162,23 +162,23 @@ describe("/indexacao page", () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ error: "unauthorized" }, { status: 401 }),
     );
-    sessionStorage.setItem("indexacao:secret", SECRET);
+    sessionStorage.setItem("indexing:secret", SECRET);
 
-    render(<IndexacaoPage />);
+    render(<IndexingPage />);
 
     await act(async () => {
       clickStart();
     });
 
     expect(screen.getByText(/segredo foi recusado/i)).toBeInTheDocument();
-    expect(sessionStorage.getItem("indexacao:secret")).toBeNull();
+    expect(sessionStorage.getItem("indexing:secret")).toBeNull();
   });
 
   it("shows the active run id when the API returns 409", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ activeRunId: ACTIVE_RUN_ID }, { status: 409 }),
     );
-    render(<IndexacaoPage />);
+    render(<IndexingPage />);
     typeSecret(SECRET);
 
     await act(async () => {
@@ -189,6 +189,53 @@ describe("/indexacao page", () => {
     expect(screen.getByText(ACTIVE_RUN_ID)).toBeInTheDocument();
   });
 
+  it("starts polling the active run after the conflict CTA is clicked", async () => {
+    vi.useFakeTimers();
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({ activeRunId: ACTIVE_RUN_ID }, { status: 409 }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: ACTIVE_RUN_ID,
+          status: "processing",
+          documentId: null,
+          force: false,
+          selectedCount: 1,
+          processedCount: 0,
+          failedCount: 0,
+          skippedCount: 0,
+          lastError: null,
+          items: [],
+        }),
+      );
+
+    render(<IndexingPage />);
+    typeSecret(SECRET);
+
+    await act(async () => {
+      clickStart();
+    });
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /acompanhar execucao ativa/i }),
+      );
+    });
+
+    expect(screen.getByText(ACTIVE_RUN_ID)).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(INDEXING_POLL_INTERVAL_MS);
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/rag/indexing/runs/${ACTIVE_RUN_ID}`,
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(screen.getByText(/status:\s*processing/i)).toBeInTheDocument();
+  });
+
   it("does not render the secret outside the password input", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
@@ -196,7 +243,7 @@ describe("/indexacao page", () => {
         { status: 202 },
       ),
     );
-    render(<IndexacaoPage />);
+    render(<IndexingPage />);
     typeSecret(SECRET);
 
     await act(async () => {

@@ -11,7 +11,7 @@ import {
 
 import { INDEXING_POLL_INTERVAL_MS } from "./constants";
 
-const SECRET_STORAGE_KEY = "indexacao:secret";
+const SECRET_STORAGE_KEY = "indexing:secret";
 
 type StartState =
   | { kind: "idle" }
@@ -26,7 +26,7 @@ function isTerminalStatus(status: IndexingRunDetailResponse["status"]): boolean 
   return status === "completed" || status === "failed";
 }
 
-export default function IndexacaoPage() {
+export default function IndexingPage() {
   const [secret, setSecret] = useState("");
   const [documentId, setDocumentId] = useState("");
   const [force, setForce] = useState(false);

@@ -22,7 +22,7 @@ and return.
 
 - Drizzle schema, pgvector, migrations, repositories, and Postgres tests.
 - OpenAI/Vercel AI SDK adapters.
-- Inngest, route handlers, Zod API schemas, `/indexacao`.
+- Inngest, route handlers, Zod API schemas, `/indexing`.
 - Retrieval, generation, citations, observability, and agents.
 
 ## Applicable Parent Rules
