@@ -17,6 +17,7 @@ import {
   RAG_UNAUTHORIZED_MESSAGE,
   truncateExcerptPreview,
 } from "./constants";
+import styles from "./page.module.css";
 
 const SECRET_STORAGE_KEY = "query:secret";
 
@@ -125,12 +126,8 @@ export default function QueryPage() {
     }
 
     if (response.status === 502 || response.status === 503) {
-      const parsed = ragGenerationErrorResponseSchema.safeParse(raw);
-      setState(
-        parsed.success
-          ? { kind: "technical_error" }
-          : { kind: "technical_error" },
-      );
+      ragGenerationErrorResponseSchema.safeParse(raw);
+      setState({ kind: "technical_error" });
       return;
     }
 
@@ -138,125 +135,200 @@ export default function QueryPage() {
   }
 
   return (
-    <main
-      style={{
-        fontFamily: "system-ui, sans-serif",
-        maxWidth: 820,
-        margin: "2rem auto",
-        padding: "0 1rem 3rem",
-      }}
-    >
-      <h1>Consulta na base documental</h1>
-      <p>
-        Faça uma pergunta global sobre os documentos indexados e receba uma
-        resposta com citacoes inline e fontes numeradas.
-      </p>
-      <p>
-        Apenas usuarios com o secret podem consultar a base. O valor fica
-        salvo somente nesta aba do navegador.
-      </p>
+    <main className={styles.page}>
+      <div className={styles.container}>
+        <header className={styles.header}>
+          <div>
+            <h1 className={styles.title}>
+              Consulta na base{" "}
+              <span className={styles.titleAccent}>documental</span>
+            </h1>
+            <p className={styles.lede}>
+              Faça uma pergunta global sobre os documentos indexados e receba
+              uma resposta com citações inline e fontes numeradas. Apenas
+              usuários com o secret podem consultar a base — o valor fica salvo
+              somente nesta aba do navegador.
+            </p>
+          </div>
 
-      <form onSubmit={onSubmit} style={{ marginTop: "1.5rem" }}>
-        <label
-          htmlFor="query-secret"
-          style={{ display: "block", fontWeight: 600 }}
-        >
-          Secret de consulta
-        </label>
-        <input
-          id="query-secret"
-          type="password"
-          autoComplete="off"
-          value={secret}
-          onChange={(event) => updateSecret(event.target.value)}
-          style={{ width: "100%", padding: "0.75rem", marginTop: "0.25rem" }}
-        />
+          <aside className={styles.sysStamp} aria-hidden="true">
+            <span>SYS / STATUS</span>
+            <span>retrieval :: hybrid-v1</span>
+            <span>embedding :: 3-large</span>
+            <span>mode :: global-only</span>
+          </aside>
+        </header>
 
-        <label
-          htmlFor="query-question"
-          style={{ display: "block", fontWeight: 600, marginTop: "1rem" }}
-        >
-          Pergunta
-        </label>
-        <textarea
-          id="query-question"
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
-          rows={6}
-          placeholder="Ex.: Quais tecnicas aparecem com mais frequencia nos estudos?"
-          style={{
-            width: "100%",
-            padding: "0.75rem",
-            marginTop: "0.25rem",
-            resize: "vertical",
-          }}
-        />
-        <div
-          style={{
-            marginTop: "0.75rem",
-            display: "flex",
-            gap: "0.5rem",
-            flexWrap: "wrap",
-          }}
-        >
-          <button type="submit" disabled={!canSubmit}>
-            {isSubmitting ? "Consultando..." : "Consultar base"}
-          </button>
-          <button
-            type="button"
-            onClick={clearSecret}
-            disabled={trimmedSecret.length === 0}
+        <form onSubmit={onSubmit} className={styles.form}>
+          <div className={`${styles.field} ${styles.fieldSecret}`}>
+            <label htmlFor="query-secret" className={styles.label}>
+              <span>Secret de consulta</span>
+              <span className={styles.labelIndex}>[ 01 ]</span>
+            </label>
+            <input
+              id="query-secret"
+              type="password"
+              autoComplete="off"
+              value={secret}
+              onChange={(event) => updateSecret(event.target.value)}
+              className={styles.input}
+              placeholder="• • • • • • • •"
+            />
+          </div>
+
+          <div className={`${styles.field} ${styles.fieldQuestion}`}>
+            <label htmlFor="query-question" className={styles.label}>
+              <span>Pergunta</span>
+              <span className={styles.labelIndex}>[ 02 ]</span>
+            </label>
+            <textarea
+              id="query-question"
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              rows={6}
+              placeholder="Ex.: Quais tecnicas aparecem com mais frequencia nos estudos?"
+              className={styles.textarea}
+            />
+          </div>
+
+          <div className={styles.actions}>
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              className={`${styles.btn} ${
+                isSubmitting ? styles.btnLoading : styles.btnPrimary
+              }`}
+            >
+              {isSubmitting ? "Consultando..." : "Consultar base"}
+            </button>
+            <button
+              type="button"
+              onClick={clearSecret}
+              disabled={trimmedSecret.length === 0}
+              className={`${styles.btn} ${styles.btnSecondary}`}
+            >
+              Limpar secret
+            </button>
+          </div>
+        </form>
+
+        {state.kind === "invalid_request" ? (
+          <div
+            role="alert"
+            className={`${styles.alert} ${styles.alertInvalid}`}
           >
-            Limpar secret
-          </button>
-        </div>
-      </form>
+            <span className={styles.alertBadge}>400</span>
+            <p style={{ margin: 0 }}>{RAG_INVALID_REQUEST_MESSAGE}</p>
+          </div>
+        ) : null}
 
-      {state.kind === "invalid_request" ? (
-        <p role="alert">{RAG_INVALID_REQUEST_MESSAGE}</p>
-      ) : null}
+        {state.kind === "unauthorized" ? (
+          <div
+            role="alert"
+            className={`${styles.alert} ${styles.alertUnauthorized}`}
+          >
+            <span className={styles.alertBadge}>401</span>
+            <p style={{ margin: 0 }}>{RAG_UNAUTHORIZED_MESSAGE}</p>
+          </div>
+        ) : null}
 
-      {state.kind === "unauthorized" ? (
-        <p role="alert">{RAG_UNAUTHORIZED_MESSAGE}</p>
-      ) : null}
+        {state.kind === "technical_error" ? (
+          <div
+            role="alert"
+            className={`${styles.alert} ${styles.alertTechnical}`}
+          >
+            <span className={styles.alertBadge}>ERR</span>
+            <p style={{ margin: 0 }}>{RAG_TECHNICAL_ERROR_MESSAGE}</p>
+          </div>
+        ) : null}
 
-      {state.kind === "technical_error" ? (
-        <p role="alert">{RAG_TECHNICAL_ERROR_MESSAGE}</p>
-      ) : null}
+        {successResponse ? (
+          <section className={styles.result}>
+            <article className={styles.resultBlock}>
+              <header className={styles.blockHeader}>
+                <span className={styles.blockIndex}>[ 01 ] Resposta</span>
+                <span className={styles.blockMeta}>
+                  mode :: {successResponse.metadata.mode}
+                </span>
+              </header>
+              <div className={styles.blockBody}>
+                <h2 className={styles.answerHeadline}>
+                  Síntese gerada com citações inline.
+                </h2>
+                <p className={styles.answerText}>{successResponse.answer}</p>
+              </div>
+            </article>
 
-      {successResponse ? (
-        <section style={{ marginTop: "2rem" }}>
-          <h2>Resposta</h2>
-          <p style={{ whiteSpace: "pre-wrap" }}>{successResponse.answer}</p>
+            <article
+              className={`${styles.resultBlock} ${styles.metaBlockAccent}`}
+            >
+              <header className={styles.blockHeader}>
+                <span className={styles.blockIndex}>[ 02 ] Resumo tecnico</span>
+                <span className={styles.blockMeta}>governance // xai</span>
+              </header>
+              <div className={styles.metaGrid}>
+                <div className={styles.metaItem}>
+                  <span className={styles.metaKey}>{"// retrieval"}</span>
+                  <p className={styles.metaValue}>
+                    Top-k: {successResponse.metadata.topK}
+                  </p>
+                </div>
+                <div className={styles.metaItem}>
+                  <span className={styles.metaKey}>{"// generation"}</span>
+                  <p className={styles.metaValue}>
+                    Modelo de geracao: {successResponse.metadata.generationModel}
+                  </p>
+                </div>
+                <div className={styles.metaItem}>
+                  <span className={styles.metaKey}>{"// embedding"}</span>
+                  <p className={styles.metaValue}>
+                    Modelo de embedding: {successResponse.metadata.embeddingModel}
+                  </p>
+                </div>
+              </div>
+            </article>
 
-          <section style={{ marginTop: "1.5rem" }}>
-            <h2>Resumo tecnico</h2>
-            <p>Top-k: {successResponse.metadata.topK}</p>
-            <p>Modelo de geracao: {successResponse.metadata.generationModel}</p>
-            <p>Modelo de embedding: {successResponse.metadata.embeddingModel}</p>
+            <article
+              className={`${styles.resultBlock} ${styles.sourcesBlockAccent}`}
+            >
+              <header className={styles.blockHeader}>
+                <span className={styles.blockIndex}>[ 03 ] Fontes</span>
+                <span className={styles.blockMeta}>
+                  n = {successResponse.sources.length}
+                </span>
+              </header>
+              <div className={styles.blockBody}>
+                {successResponse.sources.length === 0 ? (
+                  <p className={styles.emptySources}>
+                    {RAG_EMPTY_SOURCES_MESSAGE}
+                  </p>
+                ) : (
+                  <ol className={styles.sources}>
+                    {successResponse.sources.map((source) => (
+                      <li key={source.chunkId} className={styles.sourceCard}>
+                        <div
+                          className={styles.sourceNumber}
+                          aria-hidden="true"
+                        >
+                          {source.sourceNumber}
+                        </div>
+                        <div>
+                          <p className={styles.sourceTitle}>
+                            {source.sourceNumber}. {source.documentTitle}
+                          </p>
+                          <p className={styles.sourceExcerpt}>
+                            {truncateExcerptPreview(source.excerpt)}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            </article>
           </section>
-
-          <section style={{ marginTop: "1.5rem" }}>
-            <h2>Fontes</h2>
-            {successResponse.sources.length === 0 ? (
-              <p>{RAG_EMPTY_SOURCES_MESSAGE}</p>
-            ) : (
-              <ol style={{ paddingLeft: "1.5rem" }}>
-                {successResponse.sources.map((source) => (
-                  <li key={source.chunkId} style={{ marginBottom: "1rem" }}>
-                    <p style={{ marginBottom: "0.5rem", fontWeight: 700 }}>
-                      {source.sourceNumber}. {source.documentTitle}
-                    </p>
-                    <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>
-                      {truncateExcerptPreview(source.excerpt)}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
-        </section>
-      ) : null}
+        ) : null}
+      </div>
     </main>
   );
 }
