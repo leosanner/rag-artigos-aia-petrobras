@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isAuthorizedIngestionSyncRequest } from "@/application/ingestion/authorize-ingestion-sync";
 import type { AnswerQuestion } from "@/application/rag/answer-question";
 import {
   answerQuestionResultSchema,
@@ -8,10 +9,12 @@ import {
   ragGenerationFailedResponseSchema,
   ragGenerationUnavailableResponseSchema,
   ragInvalidRequestResponseSchema,
+  ragUnauthorizedResponseSchema,
 } from "@/application/rag/schemas";
 
 export type RagAskHandlerDeps = {
   answerQuestion: Pick<AnswerQuestion, "execute">;
+  secret: string;
 };
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
@@ -19,6 +22,12 @@ const MALFORMED_JSON = Symbol("malformed-json");
 
 export function createRagAskHandler(deps: RagAskHandlerDeps) {
   return async function POST(request: Request): Promise<Response> {
+    const authorization = request.headers.get("authorization");
+
+    if (!isAuthorizedIngestionSyncRequest(authorization, deps.secret)) {
+      return unauthorizedResponse();
+    }
+
     const raw = await request.json().catch(() => MALFORMED_JSON);
 
     if (raw === MALFORMED_JSON) {
@@ -79,6 +88,17 @@ function invalidRequestResponse(): Response {
 
   return NextResponse.json(body, {
     status: 400,
+    headers: NO_STORE_HEADERS,
+  });
+}
+
+function unauthorizedResponse(): Response {
+  const body = ragUnauthorizedResponseSchema.parse({
+    error: "unauthorized",
+  });
+
+  return NextResponse.json(body, {
+    status: 401,
     headers: NO_STORE_HEADERS,
   });
 }

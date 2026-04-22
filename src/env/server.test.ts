@@ -10,6 +10,7 @@ const baseEnv = {
     "-----BEGIN PRIVATE KEY-----\\nabc123\\n-----END PRIVATE KEY-----\\n",
   INGESTION_SYNC_SECRET: "server-configured-secret",
   OPENAI_API_KEY: "test-openai-api-key",
+  RAG_QUERY_SECRET: "query-secret",
   RAG_GENERATION_MODEL: "gpt-4.1-mini",
 };
 
@@ -58,6 +59,18 @@ describe("parseServerEnv", () => {
     ).toThrow(/OPENAI_API_KEY/);
   });
 
+  it("rejects missing RAG_QUERY_SECRET outside tests", () => {
+    expect(() =>
+      parseServerEnv({
+        ...baseEnv,
+        NODE_ENV: "production",
+        RAG_QUERY_SECRET: undefined,
+        INNGEST_EVENT_KEY: "event-key",
+        INNGEST_SIGNING_KEY: "signing-key",
+      }),
+    ).toThrow(/RAG_QUERY_SECRET/);
+  });
+
   it("rejects missing RAG_GENERATION_MODEL outside tests", () => {
     expect(() =>
       parseServerEnv({
@@ -75,6 +88,7 @@ describe("parseServerEnv", () => {
       parseServerEnv({
         ...baseEnv,
         INGESTION_SYNC_SECRET: undefined,
+        RAG_QUERY_SECRET: undefined,
         NODE_ENV: "test",
       }),
     ).not.toThrow();

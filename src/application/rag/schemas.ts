@@ -67,6 +67,16 @@ export type RagInvalidRequestResponse = z.infer<
   typeof ragInvalidRequestResponseSchema
 >;
 
+export const ragUnauthorizedResponseSchema = z
+  .object({
+    error: z.literal("unauthorized"),
+  })
+  .strip();
+
+export type RagUnauthorizedResponse = z.infer<
+  typeof ragUnauthorizedResponseSchema
+>;
+
 export const ragGenerationErrorCodeSchema = z.enum([
   "generation_failed",
   "generation_unavailable",
@@ -108,6 +118,7 @@ export type RagGenerationUnavailableResponse = z.infer<
 
 export const ragAskErrorResponseSchema = z.union([
   ragInvalidRequestResponseSchema,
+  ragUnauthorizedResponseSchema,
   ragGenerationErrorResponseSchema,
 ]);
 

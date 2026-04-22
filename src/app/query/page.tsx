@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   ragAskSuccessResponseSchema,
   ragGenerationErrorResponseSchema,
   ragInvalidRequestResponseSchema,
+  ragUnauthorizedResponseSchema,
   type RagAskSuccessResponse,
 } from "@/application/rag/schemas";
 
@@ -13,29 +14,59 @@ import {
   RAG_EMPTY_SOURCES_MESSAGE,
   RAG_INVALID_REQUEST_MESSAGE,
   RAG_TECHNICAL_ERROR_MESSAGE,
+  RAG_UNAUTHORIZED_MESSAGE,
   truncateExcerptPreview,
 } from "./constants";
+
+const SECRET_STORAGE_KEY = "query:secret";
 
 type QueryPageState =
   | { kind: "idle" }
   | { kind: "submitting" }
   | { kind: "success"; response: RagAskSuccessResponse }
   | { kind: "invalid_request" }
+  | { kind: "unauthorized" }
   | { kind: "technical_error" };
 
 export default function QueryPage() {
   const [question, setQuestion] = useState("");
+  const [secret, setSecret] = useState("");
   const [state, setState] = useState<QueryPageState>({ kind: "idle" });
 
   const trimmedQuestion = question.trim();
+  const trimmedSecret = secret.trim();
   const isSubmitting = state.kind === "submitting";
-  const canSubmit = trimmedQuestion.length > 0 && !isSubmitting;
+  const canSubmit =
+    trimmedQuestion.length > 0 && trimmedSecret.length > 0 && !isSubmitting;
   const successResponse = state.kind === "success" ? state.response : null;
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem(SECRET_STORAGE_KEY);
+    if (stored) {
+      setSecret(stored);
+    }
+  }, []);
+
+  const updateSecret = useCallback((value: string) => {
+    setSecret(value);
+
+    if (value.length === 0) {
+      sessionStorage.removeItem(SECRET_STORAGE_KEY);
+      return;
+    }
+
+    sessionStorage.setItem(SECRET_STORAGE_KEY, value);
+  }, []);
+
+  const clearSecret = useCallback(() => {
+    sessionStorage.removeItem(SECRET_STORAGE_KEY);
+    setSecret("");
+  }, []);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (trimmedQuestion.length === 0) {
+    if (trimmedQuestion.length === 0 || trimmedSecret.length === 0) {
       return;
     }
 
@@ -47,6 +78,7 @@ export default function QueryPage() {
         method: "POST",
         cache: "no-store",
         headers: {
+          Authorization: `Bearer ${trimmedSecret}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -81,6 +113,17 @@ export default function QueryPage() {
       return;
     }
 
+    if (response.status === 401) {
+      const parsed = ragUnauthorizedResponseSchema.safeParse(raw);
+      clearSecret();
+      setState(
+        parsed.success
+          ? { kind: "unauthorized" }
+          : { kind: "technical_error" },
+      );
+      return;
+    }
+
     if (response.status === 502 || response.status === 503) {
       const parsed = ragGenerationErrorResponseSchema.safeParse(raw);
       setState(
@@ -108,11 +151,30 @@ export default function QueryPage() {
         Faça uma pergunta global sobre os documentos indexados e receba uma
         resposta com citacoes inline e fontes numeradas.
       </p>
+      <p>
+        Apenas usuarios com o secret podem consultar a base. O valor fica
+        salvo somente nesta aba do navegador.
+      </p>
 
       <form onSubmit={onSubmit} style={{ marginTop: "1.5rem" }}>
         <label
-          htmlFor="query-question"
+          htmlFor="query-secret"
           style={{ display: "block", fontWeight: 600 }}
+        >
+          Secret de consulta
+        </label>
+        <input
+          id="query-secret"
+          type="password"
+          autoComplete="off"
+          value={secret}
+          onChange={(event) => updateSecret(event.target.value)}
+          style={{ width: "100%", padding: "0.75rem", marginTop: "0.25rem" }}
+        />
+
+        <label
+          htmlFor="query-question"
+          style={{ display: "block", fontWeight: 600, marginTop: "1rem" }}
         >
           Pergunta
         </label>
@@ -129,15 +191,33 @@ export default function QueryPage() {
             resize: "vertical",
           }}
         />
-        <div style={{ marginTop: "0.75rem" }}>
+        <div
+          style={{
+            marginTop: "0.75rem",
+            display: "flex",
+            gap: "0.5rem",
+            flexWrap: "wrap",
+          }}
+        >
           <button type="submit" disabled={!canSubmit}>
             {isSubmitting ? "Consultando..." : "Consultar base"}
+          </button>
+          <button
+            type="button"
+            onClick={clearSecret}
+            disabled={trimmedSecret.length === 0}
+          >
+            Limpar secret
           </button>
         </div>
       </form>
 
       {state.kind === "invalid_request" ? (
         <p role="alert">{RAG_INVALID_REQUEST_MESSAGE}</p>
+      ) : null}
+
+      {state.kind === "unauthorized" ? (
+        <p role="alert">{RAG_UNAUTHORIZED_MESSAGE}</p>
       ) : null}
 
       {state.kind === "technical_error" ? (

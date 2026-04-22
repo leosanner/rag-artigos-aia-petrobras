@@ -28,4 +28,5 @@ const answerQuestion = new AnswerQuestion({
 
 export const POST = createRagAskHandler({
   answerQuestion,
+  secret: env.RAG_QUERY_SECRET ?? "",
 });

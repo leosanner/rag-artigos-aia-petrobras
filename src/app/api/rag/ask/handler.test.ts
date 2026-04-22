@@ -8,6 +8,7 @@ import { createRagAskHandler } from "./handler";
 const QUESTION = "Quais tecnicas aparecem com mais frequencia?";
 const CHUNK_ID = "11111111-1111-4111-8111-111111111111";
 const DOCUMENT_ID = "22222222-2222-4222-8222-222222222222";
+const VALID_SECRET = "query-secret-value";
 const OPENAI_API_KEY = "sk-test-super-secret";
 const DATABASE_URL = "postgres://user:password@localhost:5432/app";
 
@@ -54,32 +55,31 @@ function buildAnswerQuestion(
   };
 }
 
-function post(body: unknown): Request {
+function post(body: unknown, headers: HeadersInit = {}): Request {
   return new Request("http://localhost/api/rag/ask", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...headers,
     },
     body: JSON.stringify(body),
-  });
-}
-
-function malformedJson(body: string): Request {
-  return new Request("http://localhost/api/rag/ask", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body,
   });
 }
 
 describe("POST /api/rag/ask handler", () => {
   it("returns 200 with the validated success payload", async () => {
     const answerQuestion = buildAnswerQuestion(buildAnsweredResult());
-    const handler = createRagAskHandler({ answerQuestion });
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
 
-    const response = await handler(post({ question: QUESTION, mode: "global" }));
+    const response = await handler(
+      post(
+        { question: QUESTION, mode: "global" },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+    );
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
@@ -117,9 +117,21 @@ describe("POST /api/rag/ask handler", () => {
 
   it("returns 400 for malformed JSON without calling the service", async () => {
     const answerQuestion = buildAnswerQuestion(buildAnsweredResult());
-    const handler = createRagAskHandler({ answerQuestion });
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
 
-    const response = await handler(malformedJson("{"));
+    const response = await handler(
+      new Request("http://localhost/api/rag/ask", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${VALID_SECRET}`,
+          "Content-Type": "application/json",
+        },
+        body: "{",
+      }),
+    );
 
     expect(response.status).toBe(400);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
@@ -129,16 +141,28 @@ describe("POST /api/rag/ask handler", () => {
 
   it("returns 400 for invalid parsed bodies without calling the service", async () => {
     const answerQuestion = buildAnswerQuestion(buildAnsweredResult());
-    const handler = createRagAskHandler({ answerQuestion });
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
 
     const blankQuestion = await handler(
-      post({ question: "   ", mode: "global" }),
+      post(
+        { question: "   ", mode: "global" },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
     );
     const invalidShape = await handler(
-      post({ question: QUESTION, mode: "focused" }),
+      post(
+        { question: QUESTION, mode: "focused" },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
     );
     const extraField = await handler(
-      post({ question: QUESTION, mode: "global", ignored: true }),
+      post(
+        { question: QUESTION, mode: "global", ignored: true },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
     );
 
     expect(blankQuestion.status).toBe(400);
@@ -150,14 +174,45 @@ describe("POST /api/rag/ask handler", () => {
     expect(answerQuestion.execute).not.toHaveBeenCalled();
   });
 
+  it("returns 401 when the bearer secret is missing or wrong and never calls the service", async () => {
+    const answerQuestion = buildAnswerQuestion(buildAnsweredResult());
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
+
+    const missingSecret = await handler(post({ question: QUESTION, mode: "global" }));
+    const wrongSecret = await handler(
+      post(
+        { question: QUESTION, mode: "global" },
+        { Authorization: "Bearer wrong-secret" },
+      ),
+    );
+
+    expect(missingSecret.status).toBe(401);
+    expect(missingSecret.headers.get("Cache-Control")).toBe("no-store");
+    expect(await missingSecret.json()).toEqual({ error: "unauthorized" });
+    expect(wrongSecret.status).toBe(401);
+    expect(await wrongSecret.json()).toEqual({ error: "unauthorized" });
+    expect(answerQuestion.execute).not.toHaveBeenCalled();
+  });
+
   it("maps generation_failed to 502 without exposing sources", async () => {
     const answerQuestion = buildAnswerQuestion({
       kind: "error",
       error: "generation_failed",
     });
-    const handler = createRagAskHandler({ answerQuestion });
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
 
-    const response = await handler(post({ question: QUESTION, mode: "global" }));
+    const response = await handler(
+      post(
+        { question: QUESTION, mode: "global" },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+    );
     const body = JSON.parse(await response.clone().text()) as Record<string, unknown>;
 
     expect(response.status).toBe(502);
@@ -171,9 +226,17 @@ describe("POST /api/rag/ask handler", () => {
       kind: "error",
       error: "generation_unavailable",
     });
-    const handler = createRagAskHandler({ answerQuestion });
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
 
-    const response = await handler(post({ question: QUESTION, mode: "global" }));
+    const response = await handler(
+      post(
+        { question: QUESTION, mode: "global" },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+    );
     const body = JSON.parse(await response.clone().text()) as Record<string, unknown>;
 
     expect(response.status).toBe(503);
@@ -188,9 +251,17 @@ describe("POST /api/rag/ask handler", () => {
         `raw provider error OPENAI_API_KEY=${OPENAI_API_KEY} DATABASE_URL=${DATABASE_URL}`,
       );
     });
-    const handler = createRagAskHandler({ answerQuestion });
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
 
-    const response = await handler(post({ question: QUESTION, mode: "global" }));
+    const response = await handler(
+      post(
+        { question: QUESTION, mode: "global" },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+    );
     const bodyText = await response.clone().text();
 
     expect(response.status).toBe(503);
@@ -209,11 +280,38 @@ describe("POST /api/rag/ask handler", () => {
         sources: [],
       }),
     } as unknown as Pick<AnswerQuestion, "execute">;
-    const handler = createRagAskHandler({ answerQuestion });
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
 
-    const response = await handler(post({ question: QUESTION, mode: "global" }));
+    const response = await handler(
+      post(
+        { question: QUESTION, mode: "global" },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+    );
 
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({ error: "generation_failed" });
+  });
+
+  it("does not leak the configured query secret in any response body", async () => {
+    const answerQuestion = buildAnswerQuestion(buildAnsweredResult());
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      post(
+        { question: QUESTION, mode: "global" },
+        { Authorization: "Bearer wrong-secret" },
+      ),
+    );
+    const bodyText = await response.clone().text();
+
+    expect(response.status).toBe(401);
+    expect(bodyText).not.toContain(VALID_SECRET);
   });
 });

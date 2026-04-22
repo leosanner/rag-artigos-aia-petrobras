@@ -24,6 +24,7 @@ const envSchema = z
       (value) => value ?? "text-embedding-3-large",
     ),
     RAG_GENERATION_MODEL: optionalNonEmptyString,
+    RAG_QUERY_SECRET: optionalNonEmptyString,
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== "test" && !env.INGESTION_SYNC_SECRET) {
@@ -47,6 +48,14 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ["RAG_GENERATION_MODEL"],
         message: "RAG_GENERATION_MODEL is required unless NODE_ENV=test",
+      });
+    }
+
+    if (env.NODE_ENV !== "test" && !env.RAG_QUERY_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["RAG_QUERY_SECRET"],
+        message: "RAG_QUERY_SECRET is required unless NODE_ENV=test",
       });
     }
 
@@ -98,6 +107,7 @@ const testEnvDefaults = {
   OPENAI_API_KEY: "test-openai-api-key",
   RAG_EMBEDDING_MODEL: "text-embedding-3-large",
   RAG_GENERATION_MODEL: "test-rag-generation-model",
+  RAG_QUERY_SECRET: "test-rag-query-secret",
 };
 
 export const env = parseServerEnv(
