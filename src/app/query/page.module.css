@@ -3,6 +3,13 @@
    Palette: paper white / ink black / lime / electric blue / sulfur yellow
    ========================================================================= */
 
+.page p {
+  max-width: none;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
 .page {
   --ink: #0a0a0a;
   --paper: #fafaf7;
