@@ -88,30 +88,30 @@ needed for the current task:
 
 ## Functional Requirements
 
-- [ ] RF-01: `ragAskRequestSchema` accepts the new optional `retrieval` object
+- [x] RF-01: `ragAskRequestSchema` accepts the new optional `retrieval` object
   and rejects unknown retrieval fields.
-- [ ] RF-02: Invalid `topK` values outside `3..12` return
+- [x] RF-02: Invalid `topK` values outside `3..12` return
   `{ error: "invalid_request" }`.
-- [ ] RF-03: The application layer normalizes omitted retrieval settings to
+- [x] RF-03: The application layer normalizes omitted retrieval settings to
   `{ topK: 6, strategy: "standard" }`.
-- [ ] RF-04: Standard mode retrieves exactly `topK` chunks from the active
+- [x] RF-04: Standard mode retrieves exactly `topK` chunks from the active
   indexing configuration and does not run the diversification step.
-- [ ] RF-05: Explore mode retrieves `candidateTopK = min(24, topK * 3)`
+- [x] RF-05: Explore mode retrieves `candidateTopK = min(24, topK * 3)`
   candidates before downselection.
-- [ ] RF-06: Explore-mode downselection is deterministic and caps selection at
+- [x] RF-06: Explore-mode downselection is deterministic and caps selection at
   two chunks per document while alternative documents remain available.
-- [ ] RF-07: Success metadata includes the applied `topK`, applied `strategy`,
+- [x] RF-07: Success metadata includes the applied `topK`, applied `strategy`,
   and `candidateTopK`.
-- [ ] RF-08: The generation provider receives a prompt variant that requests
+- [x] RF-08: The generation provider receives a prompt variant that requests
   `2..4` cited perspectives when `strategy = "explore"`.
-- [ ] RF-09: `/query` exposes a PT-BR control for `topK`.
-- [ ] RF-10: `/query` exposes an explicit PT-BR explore action distinct from
+- [x] RF-09: `/query` exposes a PT-BR control for `topK`.
+- [x] RF-10: `/query` exposes an explicit PT-BR explore action distinct from
   the default standard submission path.
-- [ ] RF-11: The operator can rerun the same question in explore mode without
+- [x] RF-11: The operator can rerun the same question in explore mode without
   retyping the secret.
-- [ ] RF-12: Existing clients that send only `{ question, mode: "global" }`
+- [x] RF-12: Existing clients that send only `{ question, mode: "global" }`
   continue to work and receive the same default retrieval behavior.
-- [ ] RF-13: F-04 response bodies remain free of secrets, stack traces, raw
+- [x] RF-13: F-04 response bodies remain free of secrets, stack traces, raw
   prompts, and provider internals.
 
 ## System Flow

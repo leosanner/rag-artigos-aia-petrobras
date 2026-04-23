@@ -2,6 +2,32 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(rag): close F-04 verification and spec sync
+
+Date: 2026-04-23
+
+Changed:
+
+- Marked the F-04 parent spec complete now that retrieval controls, explore
+  diversification, prompt branching, API validation, and `/query` behavior are
+  all implemented and covered by the existing tests.
+- Synced F-04 Block 01 from planned requirements to implemented requirements
+  by flipping the domain RF checklist for retrieval normalization and
+  diversification.
+- Expanded F-04 Block 05 into the final closeout record with the exact local
+  verification commands and results, the review-packet diff basis, and the note
+  that no contract-changing project-doc updates were needed beyond bookkeeping.
+- Updated `.specs/project/STATE.md` to mark F-04 complete and move the current
+  `/query` work forward to F-05.
+
+Files:
+
+- `.specs/features/F-04-query-controls-and-explore/spec.md`
+- `.specs/features/F-04-query-controls-and-explore/01-domain-retrieval-settings-and-diversification.md`
+- `.specs/features/F-04-query-controls-and-explore/05-integration-and-review.md`
+- `.specs/project/STATE.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(query): renumber `/query` contracts to keep the sequence contiguous
 
 Date: 2026-04-22

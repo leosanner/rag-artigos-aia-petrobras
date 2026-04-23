@@ -40,26 +40,26 @@ downselection for explore mode.
 
 ## Functional Requirements
 
-- [ ] RF-B01-01: `normalizeRetrievalSettings(input)` returns
+- [x] RF-B01-01: `normalizeRetrievalSettings(input)` returns
   `{ topK: 6, strategy: "standard" }` when `retrieval` is omitted.
-- [ ] RF-B01-02: `normalizeRetrievalSettings(input)` preserves an explicit
+- [x] RF-B01-02: `normalizeRetrievalSettings(input)` preserves an explicit
   `topK` when provided and defaults only the omitted `strategy`.
-- [ ] RF-B01-03: `getCandidateTopK(settings)` returns `settings.topK` for
+- [x] RF-B01-03: `getCandidateTopK(settings)` returns `settings.topK` for
   standard mode and `min(24, settings.topK * 3)` for explore mode.
-- [ ] RF-B01-04: `selectDiversifiedMatches(input)` is deterministic for the
+- [x] RF-B01-04: `selectDiversifiedMatches(input)` is deterministic for the
   same score-ordered candidate list and `topK`.
-- [ ] RF-B01-05: `selectDiversifiedMatches(input)` never selects more than
+- [x] RF-B01-05: `selectDiversifiedMatches(input)` never selects more than
   `topK` matches.
-- [ ] RF-B01-06: `selectDiversifiedMatches(input)` enforces a cap of two
+- [x] RF-B01-06: `selectDiversifiedMatches(input)` enforces a cap of two
   chunks per document while at least one other document still has an unselected
   candidate.
-- [ ] RF-B01-07: When the diversity cap alone would leave the selection shorter
+- [x] RF-B01-07: When the diversity cap alone would leave the selection shorter
   than `topK`, `selectDiversifiedMatches(input)` backfills with the remaining
   highest-scoring candidates.
-- [ ] RF-B01-08: When candidate count is already `<= topK`,
+- [x] RF-B01-08: When candidate count is already `<= topK`,
   `selectDiversifiedMatches(input)` preserves retrieval order and returns the
   input matches unchanged.
-- [ ] RF-B01-09: Domain helpers do not inspect question text and do not infer
+- [x] RF-B01-09: Domain helpers do not inspect question text and do not infer
   explore mode from content.
 
 ## Module Contracts

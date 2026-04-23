@@ -1,7 +1,7 @@
 # State
 
-**Last Updated:** 2026-04-22
-**Current Work:** `/query` evolution contracts are prepared as `F-04 / Query Controls and Explore`, `F-05 / Answer Traceability`, and `F-06 / Conversational Query`; `F-07 / Focused RAG` is deferred until the shared query shell is rebased on those contracts
+**Last Updated:** 2026-04-23
+**Current Work:** `F-04 / Query Controls and Explore` is implemented and verified locally; `F-05 / Answer Traceability` is the next `/query` milestone, `F-06 / Conversational Query` follows it, and `F-07 / Focused RAG` remains deferred until the shared query shell is rebased on those contracts
 
 ---
 
@@ -144,7 +144,7 @@ _None for now._
 - [x] ~~Define concrete text-refinement strategy~~ — resolved in `F-01` as deterministic refinement without LLM calls
 - [x] ~~Break `F-01 / Document Ingestion` into small implementation blocks and execute with TDD~~ — completed by AD-010
 - [x] ~~Define M2 feature contracts and close base RAG planning decisions~~ — resolved by AD-011
-- [ ] Implement `F-04 / Query Controls and Explore` with TDD against its spec
+- [x] ~~Implement `F-04 / Query Controls and Explore` with TDD against its spec~~ — completed by the F-04 Block 05 closeout and local verification on 2026-04-23
 - [ ] Implement `F-05 / Answer Traceability` with TDD against its spec
 - [ ] Implement `F-06 / Conversational Query` with TDD against its spec
 - [ ] Rebase and implement `F-07 / Focused RAG` after the `/query` evolution contracts land
