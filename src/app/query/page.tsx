@@ -1,13 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   ragAskSuccessResponseSchema,
   ragGenerationErrorResponseSchema,
   ragInvalidRequestResponseSchema,
+  ragQueryRunDetailResponseSchema,
+  ragQueryRunSummariesResponseSchema,
   ragUnauthorizedResponseSchema,
+  type RagAnswerAudit,
+  type RagAnswerMetadata,
   type RagAskSuccessResponse,
+  type RagQueryRunDetailResponse,
+  type RagQueryRunSummaryResponse,
+  type RelatedTerm,
 } from "@/application/rag/schemas";
 import {
   RAG_RETRIEVAL_DEFAULT_TOP_K,
@@ -18,7 +25,13 @@ import {
 
 import {
   RAG_EMPTY_SOURCES_MESSAGE,
+  RAG_HISTORY_EMPTY_MESSAGE,
+  RAG_HISTORY_ERROR_MESSAGE,
+  RAG_HISTORY_IDLE_MESSAGE,
   RAG_INVALID_REQUEST_MESSAGE,
+  RAG_NO_GENERATION_AUDIT_MESSAGE,
+  RAG_RUN_DETAIL_ERROR_MESSAGE,
+  RAG_RUN_DETAIL_IDLE_MESSAGE,
   RAG_TECHNICAL_ERROR_MESSAGE,
   RAG_UNAUTHORIZED_MESSAGE,
   truncateExcerptPreview,
@@ -32,34 +45,72 @@ type QuerySubmissionStrategy = Extract<
   "standard" | "explore"
 >;
 
-type QueryPageState =
+type AskState =
   | { kind: "idle" }
   | { kind: "submitting"; strategy: QuerySubmissionStrategy }
-  | { kind: "success"; response: RagAskSuccessResponse }
   | { kind: "invalid_request" }
   | { kind: "unauthorized" }
   | { kind: "technical_error" };
+
+type CurrentAskResult = {
+  question: string;
+  response: RagAskSuccessResponse;
+};
+
+type LoadErrorKind = "unauthorized" | "technical";
+
+type RecentRunsState = {
+  status: "idle" | "loading" | "loaded" | "error";
+  runs: RagQueryRunSummaryResponse[];
+  error: LoadErrorKind | null;
+};
+
+type SelectedRunState = {
+  status: "idle" | "loading" | "loaded" | "error";
+  run: RagQueryRunDetailResponse | null;
+  runId: string | null;
+  error: LoadErrorKind | null;
+};
 
 export default function QueryPage() {
   const [question, setQuestion] = useState("");
   const [secret, setSecret] = useState("");
   const [topK, setTopK] = useState(RAG_RETRIEVAL_DEFAULT_TOP_K);
-  const [state, setState] = useState<QueryPageState>({ kind: "idle" });
+  const [askState, setAskState] = useState<AskState>({ kind: "idle" });
+  const [currentAskResult, setCurrentAskResult] = useState<CurrentAskResult | null>(
+    null,
+  );
+  const [recentRunsState, setRecentRunsState] = useState<RecentRunsState>({
+    status: "idle",
+    runs: [],
+    error: null,
+  });
+  const [selectedRunState, setSelectedRunState] = useState<SelectedRunState>({
+    status: "idle",
+    run: null,
+    runId: null,
+    error: null,
+  });
 
   const trimmedQuestion = question.trim();
   const trimmedSecret = secret.trim();
-  const isSubmitting = state.kind === "submitting";
+  const isSubmitting = askState.kind === "submitting";
   const canSubmit =
     trimmedQuestion.length > 0 && trimmedSecret.length > 0 && !isSubmitting;
-  const successResponse = state.kind === "success" ? state.response : null;
   const isStandardSubmitting =
-    state.kind === "submitting" && state.strategy === "standard";
+    askState.kind === "submitting" && askState.strategy === "standard";
   const isExploreSubmitting =
-    state.kind === "submitting" && state.strategy === "explore";
+    askState.kind === "submitting" && askState.strategy === "explore";
   const standardButtonLabel =
     isStandardSubmitting ? "Consultando..." : "Consultar base";
   const exploreButtonLabel =
     isExploreSubmitting ? "Explorando..." : "Explorar perspectivas";
+  const historyButtonLabel =
+    recentRunsState.status === "loading"
+      ? "Carregando historico..."
+      : recentRunsState.status === "idle"
+        ? "Carregar historico recente"
+        : "Atualizar historico";
 
   useEffect(() => {
     const stored = sessionStorage.getItem(SECRET_STORAGE_KEY);
@@ -68,7 +119,7 @@ export default function QueryPage() {
     }
   }, []);
 
-  const updateSecret = useCallback((value: string) => {
+  function updateSecret(value: string) {
     setSecret(value);
 
     if (value.length === 0) {
@@ -77,58 +128,61 @@ export default function QueryPage() {
     }
 
     sessionStorage.setItem(SECRET_STORAGE_KEY, value);
-  }, []);
+  }
 
-  const clearSecret = useCallback(() => {
+  function clearSecret() {
     sessionStorage.removeItem(SECRET_STORAGE_KEY);
     setSecret("");
-  }, []);
+  }
 
   async function submitQuestion(strategy: QuerySubmissionStrategy) {
     if (trimmedQuestion.length === 0 || trimmedSecret.length === 0) {
       return;
     }
 
-    setState({ kind: "submitting", strategy });
+    setAskState({ kind: "submitting", strategy });
 
-    let response: Response;
-    try {
-      response = await fetch("/api/rag/ask", {
-        method: "POST",
-        cache: "no-store",
-        headers: {
-          Authorization: `Bearer ${trimmedSecret}`,
-          "Content-Type": "application/json",
+    const response = await fetchJson("/api/rag/ask", {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${trimmedSecret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: trimmedQuestion,
+        mode: "global",
+        retrieval: {
+          topK,
+          strategy,
         },
-        body: JSON.stringify({
-          question: trimmedQuestion,
-          mode: "global",
-          retrieval: {
-            topK,
-            strategy,
-          },
-        }),
-      });
-    } catch {
-      setState({ kind: "technical_error" });
+      }),
+    });
+
+    if (response.kind === "network_error") {
+      setAskState({ kind: "technical_error" });
       return;
     }
 
-    const raw = await response.json().catch(() => null);
-
     if (response.status === 200) {
-      const parsed = ragAskSuccessResponseSchema.safeParse(raw);
-      setState(
-        parsed.success
-          ? { kind: "success", response: parsed.data }
-          : { kind: "technical_error" },
-      );
+      const parsed = ragAskSuccessResponseSchema.safeParse(response.body);
+
+      if (!parsed.success) {
+        setAskState({ kind: "technical_error" });
+        return;
+      }
+
+      setCurrentAskResult({
+        question: trimmedQuestion,
+        response: parsed.data,
+      });
+      setAskState({ kind: "idle" });
       return;
     }
 
     if (response.status === 400) {
-      const parsed = ragInvalidRequestResponseSchema.safeParse(raw);
-      setState(
+      const parsed = ragInvalidRequestResponseSchema.safeParse(response.body);
+      setAskState(
         parsed.success
           ? { kind: "invalid_request" }
           : { kind: "technical_error" },
@@ -137,23 +191,161 @@ export default function QueryPage() {
     }
 
     if (response.status === 401) {
-      const parsed = ragUnauthorizedResponseSchema.safeParse(raw);
+      const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
       clearSecret();
-      setState(
-        parsed.success
-          ? { kind: "unauthorized" }
-          : { kind: "technical_error" },
+      setAskState(
+        parsed.success ? { kind: "unauthorized" } : { kind: "technical_error" },
       );
       return;
     }
 
     if (response.status === 502 || response.status === 503) {
-      ragGenerationErrorResponseSchema.safeParse(raw);
-      setState({ kind: "technical_error" });
+      const parsed = ragGenerationErrorResponseSchema.safeParse(response.body);
+      setAskState(
+        parsed.success ? { kind: "technical_error" } : { kind: "technical_error" },
+      );
       return;
     }
 
-    setState({ kind: "technical_error" });
+    setAskState({ kind: "technical_error" });
+  }
+
+  async function loadRecentRuns() {
+    if (trimmedSecret.length === 0) {
+      return;
+    }
+
+    setRecentRunsState((current) => ({
+      ...current,
+      status: "loading",
+      error: null,
+    }));
+
+    const response = await fetchJson("/api/rag/query-runs", {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${trimmedSecret}`,
+      },
+    });
+
+    if (response.kind === "network_error") {
+      setRecentRunsState((current) => ({
+        ...current,
+        status: "error",
+        error: "technical",
+      }));
+      return;
+    }
+
+    if (response.status === 200) {
+      const parsed = ragQueryRunSummariesResponseSchema.safeParse(response.body);
+
+      if (!parsed.success) {
+        setRecentRunsState((current) => ({
+          ...current,
+          status: "error",
+          error: "technical",
+        }));
+        return;
+      }
+
+      setRecentRunsState({
+        status: "loaded",
+        runs: parsed.data,
+        error: null,
+      });
+      return;
+    }
+
+    if (response.status === 401) {
+      const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
+      clearSecret();
+      setRecentRunsState((current) => ({
+        ...current,
+        status: "error",
+        error: parsed.success ? "unauthorized" : "technical",
+      }));
+      return;
+    }
+
+    setRecentRunsState((current) => ({
+      ...current,
+      status: "error",
+      error: "technical",
+    }));
+  }
+
+  async function loadRunDetail(runId: string) {
+    if (trimmedSecret.length === 0) {
+      return;
+    }
+
+    setSelectedRunState({
+      status: "loading",
+      run: null,
+      runId,
+      error: null,
+    });
+
+    const response = await fetchJson(`/api/rag/query-runs/${runId}`, {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${trimmedSecret}`,
+      },
+    });
+
+    if (response.kind === "network_error") {
+      setSelectedRunState({
+        status: "error",
+        run: null,
+        runId,
+        error: "technical",
+      });
+      return;
+    }
+
+    if (response.status === 200) {
+      const parsed = ragQueryRunDetailResponseSchema.safeParse(response.body);
+
+      if (!parsed.success) {
+        setSelectedRunState({
+          status: "error",
+          run: null,
+          runId,
+          error: "technical",
+        });
+        return;
+      }
+
+      setSelectedRunState({
+        status: "loaded",
+        run: parsed.data,
+        runId,
+        error: null,
+      });
+      return;
+    }
+
+    if (response.status === 401) {
+      const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
+      clearSecret();
+      setSelectedRunState({
+        status: "error",
+        run: null,
+        runId,
+        error: parsed.success ? "unauthorized" : "technical",
+      });
+      return;
+    }
+
+    setSelectedRunState({
+      status: "error",
+      run: null,
+      runId,
+      error: "technical",
+    });
   }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -166,15 +358,16 @@ export default function QueryPage() {
       <div className={styles.container}>
         <header className={styles.header}>
           <div>
+            <p className={styles.eyebrow}>GLOBAL RAG / AUDIT</p>
             <h1 className={styles.title}>
               Consulta na base{" "}
               <span className={styles.titleAccent}>documental</span>
             </h1>
             <p className={styles.lede}>
               Faça uma pergunta global sobre os documentos indexados e receba
-              uma resposta com citações inline e fontes numeradas. Apenas
-              usuários com o secret podem consultar a base — o valor fica salvo
-              somente nesta aba do navegador.
+              uma resposta com citacoes inline, fontes numeradas e trilha de
+              auditoria. Apenas usuarios com o secret podem consultar ou ler o
+              historico persistido.
             </p>
           </div>
 
@@ -182,7 +375,7 @@ export default function QueryPage() {
             <span>SYS / STATUS</span>
             <span>retrieval :: hybrid-v1</span>
             <span>embedding :: 3-large</span>
-            <span>mode :: global-only</span>
+            <span>audit :: f05-enabled</span>
           </aside>
         </header>
 
@@ -273,136 +466,449 @@ export default function QueryPage() {
           </div>
         </form>
 
-        {state.kind === "invalid_request" ? (
-          <div
-            role="alert"
-            className={`${styles.alert} ${styles.alertInvalid}`}
-          >
-            <span className={styles.alertBadge}>400</span>
-            <p style={{ margin: 0 }}>{RAG_INVALID_REQUEST_MESSAGE}</p>
-          </div>
+        {askState.kind === "invalid_request" ? (
+          <StatusAlert kind="invalid" message={RAG_INVALID_REQUEST_MESSAGE} />
         ) : null}
 
-        {state.kind === "unauthorized" ? (
-          <div
-            role="alert"
-            className={`${styles.alert} ${styles.alertUnauthorized}`}
-          >
-            <span className={styles.alertBadge}>401</span>
-            <p style={{ margin: 0 }}>{RAG_UNAUTHORIZED_MESSAGE}</p>
-          </div>
+        {askState.kind === "unauthorized" ? (
+          <StatusAlert kind="unauthorized" message={RAG_UNAUTHORIZED_MESSAGE} />
         ) : null}
 
-        {state.kind === "technical_error" ? (
-          <div
-            role="alert"
-            className={`${styles.alert} ${styles.alertTechnical}`}
-          >
-            <span className={styles.alertBadge}>ERR</span>
-            <p style={{ margin: 0 }}>{RAG_TECHNICAL_ERROR_MESSAGE}</p>
-          </div>
+        {askState.kind === "technical_error" ? (
+          <StatusAlert kind="technical" message={RAG_TECHNICAL_ERROR_MESSAGE} />
         ) : null}
 
-        {successResponse ? (
+        {currentAskResult ? (
           <section className={styles.result}>
             <article className={styles.resultBlock}>
               <header className={styles.blockHeader}>
-                <span className={styles.blockIndex}>[ 01 ] Resposta</span>
+                <span className={styles.blockIndex}>[ 01 ] Resposta atual</span>
                 <span className={styles.blockMeta}>
-                  mode :: {successResponse.metadata.mode}
+                  trace :: {currentAskResult.response.traceId.slice(0, 8)}
                 </span>
               </header>
               <div className={styles.blockBody}>
+                <p className={styles.subHeadline}>Pergunta auditada</p>
+                <p className={styles.questionSnapshot}>
+                  {currentAskResult.question}
+                </p>
                 <h2 className={styles.answerHeadline}>
-                  Síntese gerada com citações inline.
+                  Sintese gerada com citacoes inline.
                 </h2>
-                <p className={styles.answerText}>{successResponse.answer}</p>
+                <p className={styles.answerText}>
+                  {currentAskResult.response.answer}
+                </p>
               </div>
             </article>
 
-            <article
-              className={`${styles.resultBlock} ${styles.metaBlockAccent}`}
-            >
-              <header className={styles.blockHeader}>
-                <span className={styles.blockIndex}>[ 02 ] Resumo tecnico</span>
-                <span className={styles.blockMeta}>governance // xai</span>
-              </header>
-              <div className={styles.metaGrid}>
-                <div className={styles.metaItem}>
-                  <span className={styles.metaKey}>{"// retrieval"}</span>
-                  <p className={styles.metaValue}>
-                    Top-k: {successResponse.metadata.topK}
-                  </p>
-                </div>
-                <div className={styles.metaItem}>
-                  <span className={styles.metaKey}>{"// strategy"}</span>
-                  <p className={styles.metaValue}>
-                    Estrategia: {successResponse.metadata.retrievalStrategy}
-                  </p>
-                </div>
-                <div className={styles.metaItem}>
-                  <span className={styles.metaKey}>{"// candidates"}</span>
-                  <p className={styles.metaValue}>
-                    Candidatos: {successResponse.metadata.candidateTopK}
-                  </p>
-                </div>
-                <div className={styles.metaItem}>
-                  <span className={styles.metaKey}>{"// generation"}</span>
-                  <p className={styles.metaValue}>
-                    Modelo de geracao: {successResponse.metadata.generationModel}
-                  </p>
-                </div>
-                <div className={styles.metaItem}>
-                  <span className={styles.metaKey}>{"// embedding"}</span>
-                  <p className={styles.metaValue}>
-                    Modelo de embedding: {successResponse.metadata.embeddingModel}
-                  </p>
-                </div>
-              </div>
-            </article>
+            <AuditSummaryBlock
+              blockIndex="[ 02 ] Auditoria atual"
+              metaLabel={`latency :: ${currentAskResult.response.audit.latencyMs} ms`}
+              traceId={currentAskResult.response.traceId}
+              question={currentAskResult.question}
+              metadata={currentAskResult.response.metadata}
+              audit={currentAskResult.response.audit}
+            />
 
-            <article
-              className={`${styles.resultBlock} ${styles.sourcesBlockAccent}`}
-            >
-              <header className={styles.blockHeader}>
-                <span className={styles.blockIndex}>[ 03 ] Fontes</span>
-                <span className={styles.blockMeta}>
-                  n = {successResponse.sources.length}
-                </span>
-              </header>
-              <div className={styles.blockBody}>
-                {successResponse.sources.length === 0 ? (
-                  <p className={styles.emptySources}>
-                    {RAG_EMPTY_SOURCES_MESSAGE}
-                  </p>
-                ) : (
-                  <ol className={styles.sources}>
-                    {successResponse.sources.map((source) => (
-                      <li key={source.chunkId} className={styles.sourceCard}>
-                        <div
-                          className={styles.sourceNumber}
-                          aria-hidden="true"
-                        >
-                          {source.sourceNumber}
-                        </div>
-                        <div>
-                          <p className={styles.sourceTitle}>
-                            {source.sourceNumber}. {source.documentTitle}
-                          </p>
-                          <p className={styles.sourceExcerpt}>
-                            {truncateExcerptPreview(source.excerpt)}
-                          </p>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </div>
-            </article>
+            <RelatedTermsBlock
+              blockIndex="[ 03 ] Termos relacionados"
+              terms={currentAskResult.response.relatedTerms}
+            />
+
+            <SourcesBlock
+              blockIndex="[ 04 ] Fontes da resposta atual"
+              sources={currentAskResult.response.sources}
+            />
           </section>
         ) : null}
+
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <div>
+              <h2 className={styles.panelTitle}>Historico recente</h2>
+              <p className={styles.panelCopy}>
+                O carregamento e manual. Nenhuma consulta adicional e feita
+                automaticamente apos o ask atual.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void loadRecentRuns();
+              }}
+              disabled={
+                trimmedSecret.length === 0 || recentRunsState.status === "loading"
+              }
+              className={`${styles.btn} ${styles.btnSecondary}`}
+            >
+              {historyButtonLabel}
+            </button>
+          </header>
+
+          {recentRunsState.error === "unauthorized" ? (
+            <StatusAlert kind="unauthorized" message={RAG_UNAUTHORIZED_MESSAGE} />
+          ) : null}
+
+          {recentRunsState.error === "technical" ? (
+            <StatusAlert kind="technical" message={RAG_HISTORY_ERROR_MESSAGE} />
+          ) : null}
+
+          {recentRunsState.status === "idle" ? (
+            <p className={styles.emptyPanel}>{RAG_HISTORY_IDLE_MESSAGE}</p>
+          ) : null}
+
+          {recentRunsState.status === "loading" && recentRunsState.runs.length === 0 ? (
+            <p className={styles.emptyPanel}>Carregando historico auditado...</p>
+          ) : null}
+
+          {recentRunsState.status !== "idle" &&
+          recentRunsState.runs.length === 0 &&
+          recentRunsState.status !== "loading" ? (
+            <p className={styles.emptyPanel}>{RAG_HISTORY_EMPTY_MESSAGE}</p>
+          ) : null}
+
+          {recentRunsState.runs.length > 0 ? (
+            <ol className={styles.historyList}>
+              {recentRunsState.runs.map((run) => {
+                const isSelected = selectedRunState.runId === run.id;
+                const isLoading =
+                  selectedRunState.status === "loading" &&
+                  selectedRunState.runId === run.id;
+
+                return (
+                  <li key={run.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void loadRunDetail(run.id);
+                      }}
+                      className={`${styles.historyButton} ${
+                        isSelected ? styles.historyButtonActive : ""
+                      }`}
+                    >
+                      <span className={styles.historyQuestion}>{run.question}</span>
+                      <span className={styles.historyMeta}>
+                        status :: {formatRunStatus(run.status)}
+                      </span>
+                      <span className={styles.historyMeta}>
+                        strategy :: {formatStrategy(run.retrievalStrategy)}
+                      </span>
+                      <span className={styles.historyMeta}>
+                        top-k :: {run.topK}
+                      </span>
+                      <span className={styles.historyMeta}>
+                        latency :: {run.latencyMs} ms
+                      </span>
+                      <span className={styles.historyMeta}>
+                        total :: {formatUsd(run.totalCostUsd)}
+                      </span>
+                      <span className={styles.historyMeta}>
+                        created :: {formatTimestamp(run.createdAt)}
+                      </span>
+                      {isLoading ? (
+                        <span className={styles.historyMeta}>abrindo...</span>
+                      ) : null}
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : null}
+        </section>
+
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <div>
+              <h2 className={styles.panelTitle}>Execucao selecionada</h2>
+              <p className={styles.panelCopy}>
+                Inspecione a trilha persistida sem reconstruir a resposta no
+                navegador.
+              </p>
+            </div>
+          </header>
+
+          {selectedRunState.error === "unauthorized" ? (
+            <StatusAlert kind="unauthorized" message={RAG_UNAUTHORIZED_MESSAGE} />
+          ) : null}
+
+          {selectedRunState.error === "technical" ? (
+            <StatusAlert kind="technical" message={RAG_RUN_DETAIL_ERROR_MESSAGE} />
+          ) : null}
+
+          {selectedRunState.status === "idle" ? (
+            <p className={styles.emptyPanel}>{RAG_RUN_DETAIL_IDLE_MESSAGE}</p>
+          ) : null}
+
+          {selectedRunState.status === "loading" ? (
+            <p className={styles.emptyPanel}>Carregando execucao persistida...</p>
+          ) : null}
+
+          {selectedRunState.run ? (
+            <section className={styles.result}>
+              <article className={styles.resultBlock}>
+                <header className={styles.blockHeader}>
+                  <span className={styles.blockIndex}>
+                    [ 01 ] Resposta persistida
+                  </span>
+                  <span className={styles.blockMeta}>
+                    status :: {formatRunStatus(selectedRunState.run.status)}
+                  </span>
+                </header>
+                <div className={styles.blockBody}>
+                  <p className={styles.subHeadline}>Pergunta persistida</p>
+                  <p className={styles.questionSnapshot}>
+                    {selectedRunState.run.question}
+                  </p>
+                  <h2 className={styles.answerHeadline}>
+                    Execucao auditada armazenada em banco.
+                  </h2>
+                  <p className={styles.answerText}>
+                    {selectedRunState.run.answer ??
+                      "Nenhuma resposta textual foi persistida para esta execucao."}
+                  </p>
+                </div>
+              </article>
+
+              <AuditSummaryBlock
+                blockIndex="[ 02 ] Auditoria persistida"
+                metaLabel={`created :: ${formatTimestamp(
+                  selectedRunState.run.createdAt,
+                )}`}
+                traceId={selectedRunState.run.id}
+                question={selectedRunState.run.question}
+                metadata={selectedRunState.run.metadata}
+                audit={selectedRunState.run.audit}
+                status={selectedRunState.run.status}
+                errorCode={selectedRunState.run.errorCode}
+                createdAt={selectedRunState.run.createdAt}
+              />
+
+              <RelatedTermsBlock
+                blockIndex="[ 03 ] Termos persistidos"
+                terms={selectedRunState.run.relatedTerms}
+              />
+
+              <SourcesBlock
+                blockIndex="[ 04 ] Fontes persistidas"
+                sources={selectedRunState.run.sources}
+                showCitationFlags
+              />
+            </section>
+          ) : null}
+        </section>
       </div>
     </main>
+  );
+}
+
+type StatusAlertProps = {
+  kind: "invalid" | "unauthorized" | "technical";
+  message: string;
+};
+
+function StatusAlert({ kind, message }: StatusAlertProps) {
+  const className =
+    kind === "invalid"
+      ? styles.alertInvalid
+      : kind === "unauthorized"
+        ? styles.alertUnauthorized
+        : styles.alertTechnical;
+  const badge = kind === "invalid" ? "400" : kind === "unauthorized" ? "401" : "ERR";
+
+  return (
+    <div role="alert" className={`${styles.alert} ${className}`}>
+      <span className={styles.alertBadge}>{badge}</span>
+      <p style={{ margin: 0 }}>{message}</p>
+    </div>
+  );
+}
+
+type AuditSummaryBlockProps = {
+  blockIndex: string;
+  metaLabel: string;
+  traceId: string;
+  question: string;
+  metadata: RagAnswerMetadata;
+  audit: RagAnswerAudit;
+  status?: RagQueryRunDetailResponse["status"];
+  errorCode?: RagQueryRunDetailResponse["errorCode"];
+  createdAt?: string;
+};
+
+function AuditSummaryBlock({
+  blockIndex,
+  metaLabel,
+  traceId,
+  question,
+  metadata,
+  audit,
+  status,
+  errorCode,
+  createdAt,
+}: AuditSummaryBlockProps) {
+  return (
+    <article className={`${styles.resultBlock} ${styles.metaBlockAccent}`}>
+      <header className={styles.blockHeader}>
+        <span className={styles.blockIndex}>{blockIndex}</span>
+        <span className={styles.blockMeta}>{metaLabel}</span>
+      </header>
+      <div className={styles.metaGrid}>
+        <MetaItem label="// trace id" value={traceId} />
+        <MetaItem label="// question chars" value={String(question.length)} />
+        <MetaItem label="// strategy" value={formatStrategy(metadata.retrievalStrategy)} />
+        <MetaItem label="// top-k" value={String(metadata.topK)} />
+        <MetaItem label="// candidates" value={String(metadata.candidateTopK)} />
+        <MetaItem label="// generation" value={metadata.generationModel} />
+        <MetaItem label="// embedding" value={metadata.embeddingModel} />
+        <MetaItem label="// latency" value={`${audit.latencyMs} ms`} />
+        <MetaItem
+          label="// embedding tokens"
+          value={String(audit.embedding.inputTokens)}
+        />
+        <MetaItem
+          label="// embedding cost"
+          value={formatUsd(audit.embedding.estimatedCostUsd)}
+        />
+        <MetaItem
+          label="// generation tokens"
+          value={
+            audit.generation
+              ? String(audit.generation.totalTokens)
+              : RAG_NO_GENERATION_AUDIT_MESSAGE
+          }
+        />
+        <MetaItem
+          label="// generation cost"
+          value={
+            audit.generation
+              ? formatUsd(audit.generation.estimatedCostUsd)
+              : RAG_NO_GENERATION_AUDIT_MESSAGE
+          }
+        />
+        <MetaItem label="// total cost" value={formatUsd(audit.totalCostUsd)} />
+        {status ? <MetaItem label="// status" value={formatRunStatus(status)} /> : null}
+        {errorCode ? <MetaItem label="// error code" value={errorCode} /> : null}
+        {createdAt ? (
+          <MetaItem label="// created at" value={formatTimestamp(createdAt)} />
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+function MetaItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.metaItem}>
+      <span className={styles.metaKey}>{label}</span>
+      <p className={styles.metaValue}>{value}</p>
+    </div>
+  );
+}
+
+function RelatedTermsBlock({
+  blockIndex,
+  terms,
+}: {
+  blockIndex: string;
+  terms: RelatedTerm[];
+}) {
+  return (
+    <article className={`${styles.resultBlock} ${styles.termsBlockAccent}`}>
+      <header className={styles.blockHeader}>
+        <span className={styles.blockIndex}>{blockIndex}</span>
+        <span className={styles.blockMeta}>n = {terms.length}</span>
+      </header>
+      <div className={styles.blockBody}>
+        {terms.length === 0 ? (
+          <p className={styles.emptyPanel}>
+            Nenhum termo relacionado auditavel foi encontrado.
+          </p>
+        ) : (
+          <ul className={styles.termList}>
+            {terms.map((term) => (
+              <li key={`${term.rank}-${term.term}`} className={styles.termCard}>
+                <p className={styles.termTitle}>
+                  #{term.rank} {term.term}
+                </p>
+                <p className={styles.termMeta}>
+                  ngram :: {term.ngramSize} | freq :: {term.frequency} |
+                  cobertura :: {term.sourceCoverageCount}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </article>
+  );
+}
+
+type SourceCard = {
+  sourceNumber: number;
+  chunkId: string;
+  documentId: string;
+  documentTitle: string;
+  chunkIndex: number;
+  excerpt: string;
+  score: number;
+  documentPipelineVersion: string;
+  chunkingVersion: string;
+  embeddingModel: string;
+  citedInAnswer?: boolean;
+};
+
+function SourcesBlock({
+  blockIndex,
+  sources,
+  showCitationFlags = false,
+}: {
+  blockIndex: string;
+  sources: SourceCard[];
+  showCitationFlags?: boolean;
+}) {
+  return (
+    <article className={`${styles.resultBlock} ${styles.sourcesBlockAccent}`}>
+      <header className={styles.blockHeader}>
+        <span className={styles.blockIndex}>{blockIndex}</span>
+        <span className={styles.blockMeta}>n = {sources.length}</span>
+      </header>
+      <div className={styles.blockBody}>
+        {sources.length === 0 ? (
+          <p className={styles.emptySources}>{RAG_EMPTY_SOURCES_MESSAGE}</p>
+        ) : (
+          <ol className={styles.sources}>
+            {sources.map((source) => (
+              <li key={source.chunkId} className={styles.sourceCard}>
+                <div className={styles.sourceNumber} aria-hidden="true">
+                  {source.sourceNumber}
+                </div>
+                <div>
+                  <p className={styles.sourceTitle}>
+                    {source.sourceNumber}. {source.documentTitle}
+                  </p>
+                  <p className={styles.sourceExcerpt}>
+                    {truncateExcerptPreview(source.excerpt)}
+                  </p>
+                  <div className={styles.sourceMetaRow}>
+                    <span className={styles.sourceChip}>
+                      score :: {source.score.toFixed(2)}
+                    </span>
+                    <span className={styles.sourceChip}>
+                      chunk :: {source.chunkIndex}
+                    </span>
+                    {showCitationFlags ? (
+                      <span className={styles.sourceChip}>
+                        citado :: {source.citedInAnswer ? "sim" : "nao"}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -417,4 +923,50 @@ function readTopKInput(value: string): number {
     RAG_RETRIEVAL_MAX_TOP_K,
     Math.max(RAG_RETRIEVAL_MIN_TOP_K, parsed),
   );
+}
+
+async function fetchJson(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<
+  | { kind: "network_error" }
+  | { kind: "http"; status: number; body: unknown }
+> {
+  try {
+    const response = await fetch(input, init);
+    const body = await response.json().catch(() => null);
+
+    return {
+      kind: "http",
+      status: response.status,
+      body,
+    };
+  } catch {
+    return { kind: "network_error" };
+  }
+}
+
+function formatUsd(value: number): string {
+  return `US$ ${value.toFixed(8)}`;
+}
+
+function formatStrategy(strategy: QuerySubmissionStrategy): string {
+  return strategy === "explore" ? "explore" : "standard";
+}
+
+function formatRunStatus(status: RagQueryRunSummaryResponse["status"]): string {
+  switch (status) {
+    case "answered":
+      return "respondida";
+    case "answered_no_evidence":
+      return "respondida sem evidencia";
+    case "generation_failed":
+      return "falha segura";
+    case "generation_unavailable":
+      return "geracao indisponivel";
+  }
+}
+
+function formatTimestamp(value: string): string {
+  return value.replace("T", " ").replace(".000Z", "Z");
 }

@@ -56,12 +56,7 @@ export function createRagAskHandler(deps: RagAskHandlerDeps) {
     const result = parsedResult.data;
 
     if (result.kind === "answered") {
-      const body = ragAskSuccessResponseSchema.safeParse({
-        answer: result.answer,
-        mode: result.mode,
-        sources: result.sources,
-        metadata: result.metadata,
-      });
+      const body = ragAskSuccessResponseSchema.safeParse(result);
 
       if (!body.success) {
         return generationFailedResponse();

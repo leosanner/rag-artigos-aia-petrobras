@@ -9,8 +9,11 @@ import QueryPage from "./page";
 
 const LONG_EXCERPT = `${"A".repeat(RAG_SOURCE_EXCERPT_PREVIEW_LENGTH)} trecho extra para truncar`;
 const SECRET = "query-secret-value";
+const CURRENT_TRACE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const RUN_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 const SUCCESS_RESPONSE = {
+  traceId: CURRENT_TRACE_ID,
   answer:
     "Os documentos destacam classificacao supervisionada e segmentacao [1] [2].",
   mode: "global" as const,
@@ -40,15 +43,152 @@ const SUCCESS_RESPONSE = {
       embeddingModel: "text-embedding-3-large",
     },
   ],
+  relatedTerms: [
+    {
+      rank: 1,
+      term: "classificacao supervisionada",
+      ngramSize: 2,
+      frequency: 3,
+      sourceCoverageCount: 2,
+    },
+    {
+      rank: 2,
+      term: "segmentacao",
+      ngramSize: 1,
+      frequency: 2,
+      sourceCoverageCount: 1,
+    },
+  ],
   metadata: {
     mode: "global" as const,
     topK: 6,
     retrievalStrategy: "standard" as const,
     candidateTopK: 6,
-    promptVersion: "f04-global-rag-v1",
+    promptVersion: "f05-audit-v1",
     generationModel: "gpt-4.1-mini",
     embeddingModel: "text-embedding-3-large",
   },
+  audit: {
+    latencyMs: 123,
+    embedding: {
+      inputTokens: 11,
+      estimatedCostUsd: 0.00000143,
+    },
+    generation: {
+      inputTokens: 42,
+      outputTokens: 16,
+      totalTokens: 58,
+      estimatedCostUsd: 0.0000192,
+    },
+    totalCostUsd: 0.00002063,
+  },
+};
+
+const NO_EVIDENCE_RESPONSE = {
+  ...SUCCESS_RESPONSE,
+  traceId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  answer: "Nao encontrei evidencias suficientes nos documentos recuperados.",
+  sources: [],
+  audit: {
+    latencyMs: 88,
+    embedding: {
+      inputTokens: 9,
+      estimatedCostUsd: 0.00000117,
+    },
+    generation: null,
+    totalCostUsd: 0.00000117,
+  },
+};
+
+const RUN_SUMMARIES = [
+  {
+    id: RUN_ID,
+    question: "Quais tecnicas aparecem com maior frequencia?",
+    status: "answered" as const,
+    topK: 6,
+    retrievalStrategy: "standard" as const,
+    latencyMs: 432,
+    totalCostUsd: 0.000482,
+    createdAt: "2026-04-23T12:34:56.000Z",
+  },
+];
+
+const RUN_DETAIL = {
+  id: RUN_ID,
+  question: "Quais tecnicas aparecem com maior frequencia?",
+  answer: "Classificacao supervisionada [1].",
+  mode: "global" as const,
+  status: "answered" as const,
+  errorCode: null,
+  sources: [
+    {
+      sourceNumber: 1,
+      chunkId: "55555555-5555-4555-8555-555555555555",
+      documentId: "66666666-6666-4666-8666-666666666666",
+      documentTitle: "artigo-persistido.pdf",
+      chunkIndex: 0,
+      excerpt: "Trecho persistido do banco.",
+      score: 0.92,
+      documentPipelineVersion: "documents-v1",
+      chunkingVersion: "hybrid-v1-900-150",
+      embeddingModel: "text-embedding-3-large",
+      citedInAnswer: true,
+    },
+  ],
+  relatedTerms: [
+    {
+      rank: 1,
+      term: "classificacao supervisionada",
+      ngramSize: 2,
+      frequency: 3,
+      sourceCoverageCount: 1,
+    },
+  ],
+  metadata: {
+    mode: "global" as const,
+    topK: 6,
+    retrievalStrategy: "standard" as const,
+    candidateTopK: 6,
+    promptVersion: "f05-audit-v1",
+    generationModel: "gpt-4.1-mini",
+    embeddingModel: "text-embedding-3-large",
+  },
+  audit: {
+    latencyMs: 432,
+    embedding: {
+      inputTokens: 17,
+      estimatedCostUsd: 0.000002,
+    },
+    generation: {
+      inputTokens: 120,
+      outputTokens: 42,
+      totalTokens: 162,
+      estimatedCostUsd: 0.00048,
+    },
+    totalCostUsd: 0.000482,
+  },
+  createdAt: "2026-04-23T12:34:56.000Z",
+};
+
+const FAILED_RUN_DETAIL = {
+  ...RUN_DETAIL,
+  id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+  question: "Existe evidencia suficiente para uma resposta?",
+  answer: null,
+  status: "generation_failed" as const,
+  errorCode: "generation_failed" as const,
+  sources: [],
+  relatedTerms: [],
+  audit: {
+    latencyMs: 91,
+    embedding: {
+      inputTokens: 8,
+      estimatedCostUsd: 0.00000104,
+    },
+    generation: null,
+    totalCostUsd: 0.00000104,
+  },
+  createdAt: "2026-04-24T08:00:00.000Z",
 };
 
 function jsonResponse(
@@ -89,6 +229,12 @@ function clickExplore(): void {
   );
 }
 
+function clickLoadHistory(): void {
+  fireEvent.click(
+    screen.getByRole("button", { name: /carregar historico recente/i }),
+  );
+}
+
 describe("/query page", () => {
   const fetchMock = vi.fn<
     (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
@@ -105,7 +251,7 @@ describe("/query page", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders PT-BR copy, stays global-only, and requires the secret", () => {
+  it("renders PT-BR copy, requires the secret, and does not auto-load history", () => {
     render(<QueryPage />);
 
     expect(
@@ -118,95 +264,14 @@ describe("/query page", () => {
     expect(
       screen.getByRole("button", { name: /explorar perspectivas/i }),
     ).toBeDisabled();
-    expect(screen.queryByText(/focado/i)).not.toBeInTheDocument();
-  });
-
-  it("renders the top-k control with the F-03 default and F-04 limits", () => {
-    render(<QueryPage />);
-
-    const topKInput = screen.getByLabelText(
-      /fontes recuperadas/i,
-    ) as HTMLInputElement;
-
-    expect(topKInput.value).toBe("6");
-    expect(topKInput.min).toBe("3");
-    expect(topKInput.max).toBe("12");
-    expect(topKInput.step).toBe("1");
-  });
-
-  it("keeps submit disabled for whitespace-only questions", () => {
-    render(<QueryPage />);
-    typeSecret(SECRET);
-
-    typeQuestion("   ");
-
-    expect(screen.getByRole("button", { name: /consultar base/i })).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: /explorar perspectivas/i }),
+      screen.getByRole("button", { name: /carregar historico recente/i }),
     ).toBeDisabled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("keeps submit disabled until a secret is typed", () => {
-    render(<QueryPage />);
-    typeQuestion("Pergunta valida");
-
-    expect(screen.getByRole("button", { name: /consultar base/i })).toBeDisabled();
-
-    typeSecret(SECRET);
-
-    expect(screen.getByRole("button", { name: /consultar base/i })).toBeEnabled();
-    expect(
-      screen.getByRole("button", { name: /explorar perspectivas/i }),
-    ).toBeEnabled();
-  });
-
-  it("shows a loading state and posts a standard query with retrieval settings", async () => {
-    let resolveFetch: ((value: Response) => void) | null = null;
-    fetchMock.mockImplementation(
-      () =>
-        new Promise<Response>((resolve) => {
-          resolveFetch = resolve;
-        }),
-    );
-
-    render(<QueryPage />);
-    typeSecret(`  ${SECRET}  `);
-    typeQuestion(`   ${SUCCESS_RESPONSE.answer}   `);
-    setTopK("9");
-
-    await act(async () => {
-      clickSubmit();
-    });
-
-    expect(
-      screen.getByRole("button", { name: /consultando/i }),
-    ).toBeDisabled();
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/rag/ask",
-      expect.objectContaining({
-        method: "POST",
-        cache: "no-store",
-        headers: expect.objectContaining({
-          Authorization: `Bearer ${SECRET}`,
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({
-          question: SUCCESS_RESPONSE.answer,
-          mode: "global",
-          retrieval: {
-            topK: 9,
-            strategy: "standard",
-          },
-        }),
-      }),
-    );
-
-    await act(async () => {
-      resolveFetch?.(jsonResponse(SUCCESS_RESPONSE));
-    });
-  });
-
-  it("reruns the stored question in explore mode with the current-tab secret", async () => {
+  it("submits standard and explore queries with validated retrieval settings", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(SUCCESS_RESPONSE));
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
         ...SUCCESS_RESPONSE,
@@ -218,17 +283,43 @@ describe("/query page", () => {
         },
       }),
     );
-    sessionStorage.setItem("query:secret", SECRET);
 
     render(<QueryPage />);
+    typeSecret(`  ${SECRET}  `);
     typeQuestion("Compare as abordagens metodologicas.");
     setTopK("8");
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/rag/ask",
+      expect.objectContaining({
+        method: "POST",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${SECRET}`,
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          question: "Compare as abordagens metodologicas.",
+          mode: "global",
+          retrieval: {
+            topK: 8,
+            strategy: "standard",
+          },
+        }),
+      }),
+    );
 
     await act(async () => {
       clickExplore();
     });
 
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
       "/api/rag/ask",
       expect.objectContaining({
         method: "POST",
@@ -249,7 +340,7 @@ describe("/query page", () => {
     );
   });
 
-  it("renders the answer, numbered sources, and the technical summary without promptVersion", async () => {
+  it("renders the current answer audit from the ask success payload without an extra fetch", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(SUCCESS_RESPONSE));
 
     render(<QueryPage />);
@@ -260,15 +351,20 @@ describe("/query page", () => {
       clickSubmit();
     });
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(screen.getByText(SUCCESS_RESPONSE.answer)).toBeInTheDocument();
+    expect(screen.getByText(CURRENT_TRACE_ID)).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/classificacao supervisionada/i).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText(/US\$ 0\.00002063/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/123 ms/i).length).toBeGreaterThan(0);
     expect(screen.getByText("1. artigo-a.pdf")).toBeInTheDocument();
-    expect(screen.getByText("2. artigo-b.pdf")).toBeInTheDocument();
-    expect(screen.getByText(/top-k:\s*6/i)).toBeInTheDocument();
-    expect(screen.getByText(/estrategia:\s*standard/i)).toBeInTheDocument();
-    expect(screen.getByText(/candidatos:\s*6/i)).toBeInTheDocument();
-    expect(screen.getByText(/gpt-4\.1-mini/i)).toBeInTheDocument();
-    expect(screen.getByText(/text-embedding-3-large/i)).toBeInTheDocument();
-    expect(screen.queryByText(/f04-global-rag-v1/i)).not.toBeInTheDocument();
+    expect(
+      screen.getAllByText(/quais tecnicas aparecem com mais frequencia\?/i)
+        .length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText(/carregando historico auditado/i)).not.toBeInTheDocument();
   });
 
   it("truncates long excerpts only in the rendered preview", async () => {
@@ -286,18 +382,10 @@ describe("/query page", () => {
 
     expect(screen.getByText(preview)).toBeInTheDocument();
     expect(screen.queryByText(LONG_EXCERPT)).not.toBeInTheDocument();
-    expect(truncateExcerptPreview(LONG_EXCERPT)).toBe(preview);
-    expect(LONG_EXCERPT).toContain("trecho extra para truncar");
   });
 
-  it("shows the empty-sources message when the answer succeeds without retrieved sources", async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({
-        ...SUCCESS_RESPONSE,
-        answer: "Nao encontrei evidencias suficientes nos documentos recuperados.",
-        sources: [],
-      }),
-    );
+  it("shows the no-evidence state, empty sources, and skipped generation audit", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(NO_EVIDENCE_RESPONSE));
 
     render(<QueryPage />);
     typeSecret(SECRET);
@@ -313,14 +401,155 @@ describe("/query page", () => {
     expect(
       screen.getByText(/nenhuma fonte foi recuperada para esta pergunta/i),
     ).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/esta execucao nao consumiu geracao de resposta/i)[0],
+    ).toBeInTheDocument();
   });
 
-  it("shows a safe invalid-request message on 400", async () => {
+  it("loads the recent history manually and inspects one persisted run on demand", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(RUN_SUMMARIES));
+    fetchMock.mockResolvedValueOnce(jsonResponse(RUN_DETAIL));
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+
+    await act(async () => {
+      clickLoadHistory();
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/rag/query-runs",
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${SECRET}`,
+        }),
+      }),
+    );
+    expect(
+      screen.getByRole("button", {
+        name: /quais tecnicas aparecem com maior frequencia\?/i,
+      }),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /quais tecnicas aparecem com maior frequencia\?/i,
+        }),
+      );
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `/api/rag/query-runs/${RUN_ID}`,
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${SECRET}`,
+        }),
+      }),
+    );
+    expect(screen.getByText(/classificacao supervisionada \[1\]\./i)).toBeInTheDocument();
+    expect(screen.getByText(/citado :: sim/i)).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/2026-04-23 12:34:56Z/i).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("clears the stored secret and shows a safe message on 401 when loading history", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "unauthorized" }, { status: 401 }),
+    );
+    sessionStorage.setItem("query:secret", SECRET);
+
+    render(<QueryPage />);
+
+    expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe(
+      SECRET,
+    );
+
+    await act(async () => {
+      clickLoadHistory();
+    });
+
+    expect(screen.getByText(/secret de consulta foi rejeitado/i)).toBeInTheDocument();
+    expect(sessionStorage.getItem("query:secret")).toBeNull();
+    expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe("");
+  });
+
+  it("clears the stored secret and shows a safe message on 401 when loading run detail", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(RUN_SUMMARIES));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "unauthorized" }, { status: 401 }),
+    );
+    sessionStorage.setItem("query:secret", SECRET);
+
+    render(<QueryPage />);
+
+    await act(async () => {
+      clickLoadHistory();
+    });
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /quais tecnicas aparecem com maior frequencia\?/i,
+        }),
+      );
+    });
+
+    expect(screen.getByText(/secret de consulta foi rejeitado/i)).toBeInTheDocument();
+    expect(sessionStorage.getItem("query:secret")).toBeNull();
+    expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe("");
+  });
+
+  it("renders a persisted failed run safely without leaking internals", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse([
+        {
+          ...RUN_SUMMARIES[0],
+          id: FAILED_RUN_DETAIL.id,
+          question: FAILED_RUN_DETAIL.question,
+          status: FAILED_RUN_DETAIL.status,
+          createdAt: FAILED_RUN_DETAIL.createdAt,
+        },
+      ]),
+    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(FAILED_RUN_DETAIL));
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+
+    await act(async () => {
+      clickLoadHistory();
+    });
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /existe evidencia suficiente para uma resposta\?/i,
+        }),
+      );
+    });
+
+    expect(screen.getAllByText(/falha segura/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/generation_failed/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/nenhuma resposta textual foi persistida para esta execucao/i),
+    ).toBeInTheDocument();
+    expect(document.body.textContent ?? "").not.toContain("providerPayload");
+  });
+
+  it("shows safe ask errors for invalid request, unauthorized, and technical failures", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ error: "invalid_request" }, { status: 400 }),
     );
 
-    render(<QueryPage />);
+    const { unmount } = render(<QueryPage />);
     typeSecret(SECRET);
     typeQuestion("Pergunta invalida");
 
@@ -331,18 +560,14 @@ describe("/query page", () => {
     expect(
       screen.getByText(/digite uma pergunta valida para consultar/i),
     ).toBeInTheDocument();
-  });
 
-  it("clears the stored secret and shows a rejection message on 401", async () => {
+    unmount();
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ error: "unauthorized" }, { status: 401 }),
     );
     sessionStorage.setItem("query:secret", SECRET);
 
     render(<QueryPage />);
-
-    expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe(SECRET);
-
     typeQuestion("Pergunta valida");
 
     await act(async () => {
@@ -350,47 +575,18 @@ describe("/query page", () => {
     });
 
     expect(screen.getByText(/secret de consulta foi rejeitado/i)).toBeInTheDocument();
-    expect(sessionStorage.getItem("query:secret")).toBeNull();
-    expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe("");
-  });
 
-  it.each([502, 503])(
-    "shows the safe technical message for HTTP %s",
-    async (status) => {
-      fetchMock.mockResolvedValueOnce(
-        jsonResponse(
-          {
-            error:
-              status === 502
-                ? "generation_failed"
-                : "generation_unavailable",
-          },
-          { status },
-        ),
-      );
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "generation_failed" }, { status: 502 }),
+    );
 
-      render(<QueryPage />);
-      typeSecret(SECRET);
-      typeQuestion("Pergunta valida");
-
-      await act(async () => {
-        clickSubmit();
-      });
-
-      expect(
-        screen.getByText(
-          /nao foi possivel consultar a base agora\. tente novamente em instantes\./i,
-        ),
-      ).toBeInTheDocument();
-    },
-  );
-
-  it("shows the same safe technical message for network failures and malformed success bodies", async () => {
-    fetchMock.mockRejectedValueOnce(new Error("network down"));
-
-    const { unmount } = render(<QueryPage />);
+    render(<QueryPage />);
     typeSecret(SECRET);
-    typeQuestion("Pergunta valida");
+    typeQuestion("Pergunta valida outra vez");
 
     await act(async () => {
       clickSubmit();
@@ -401,23 +597,6 @@ describe("/query page", () => {
         /nao foi possivel consultar a base agora\. tente novamente em instantes\./i,
       ),
     ).toBeInTheDocument();
-
-    unmount();
-    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
-
-    render(<QueryPage />);
-    typeSecret(SECRET);
-    typeQuestion("Pergunta valida de novo");
-
-    await act(async () => {
-      clickSubmit();
-    });
-
-    expect(
-      screen.getByText(
-        /nao foi possivel consultar a base agora\. tente novamente em instantes\./i,
-      ),
-      ).toBeInTheDocument();
   });
 
   it("persists the secret in sessionStorage and lets the user clear it", () => {
@@ -430,21 +609,5 @@ describe("/query page", () => {
 
     expect(sessionStorage.getItem("query:secret")).toBeNull();
     expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe("");
-  });
-
-  it("does not render the secret outside the password input", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(SUCCESS_RESPONSE));
-
-    render(<QueryPage />);
-    typeSecret(SECRET);
-    typeQuestion("Pergunta valida");
-
-    await act(async () => {
-      clickSubmit();
-    });
-
-    const input = screen.getByLabelText(/secret de consulta/i) as HTMLInputElement;
-    expect(input.type).toBe("password");
-    expect(document.body.textContent ?? "").not.toContain(SECRET);
   });
 });

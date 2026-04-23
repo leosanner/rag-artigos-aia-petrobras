@@ -2,9 +2,13 @@ import { z } from "zod";
 
 import {
   EXPLORE_RETRIEVAL_MAX_CANDIDATES,
+  RAG_QUERY_RUN_ERROR_CODES,
+  RAG_QUERY_RUN_STATUSES,
   RAG_RETRIEVAL_MAX_TOP_K,
   RAG_RETRIEVAL_MIN_TOP_K,
   type RagSource as DomainRagSource,
+  type RagQueryRunErrorCode as DomainRagQueryRunErrorCode,
+  type RagQueryRunStatus as DomainRagQueryRunStatus,
   type RelatedTerm as DomainRelatedTerm,
 } from "@/domain/rag";
 
@@ -34,22 +38,33 @@ export const ragAskRequestSchema = globalRagAskInputSchema;
 
 export type GlobalRagAskInput = z.infer<typeof globalRagAskInputSchema>;
 
+const ragSourceShape = {
+  sourceNumber: z.number().int().positive(),
+  chunkId: z.string().uuid(),
+  documentId: z.string().uuid(),
+  documentTitle: z.string().min(1),
+  chunkIndex: z.number().int().nonnegative(),
+  excerpt: z.string(),
+  score: z.number(),
+  documentPipelineVersion: z.string().min(1),
+  chunkingVersion: z.string().min(1),
+  embeddingModel: z.string().min(1),
+} satisfies z.ZodRawShape;
+
 export const ragSourceSchema: z.ZodType<DomainRagSource> = z
-  .object({
-    sourceNumber: z.number().int().positive(),
-    chunkId: z.string().uuid(),
-    documentId: z.string().uuid(),
-    documentTitle: z.string().min(1),
-    chunkIndex: z.number().int().nonnegative(),
-    excerpt: z.string(),
-    score: z.number(),
-    documentPipelineVersion: z.string().min(1),
-    chunkingVersion: z.string().min(1),
-    embeddingModel: z.string().min(1),
-  })
+  .object(ragSourceShape)
   .strip();
 
 export type RagSource = z.infer<typeof ragSourceSchema>;
+
+export const ragRunSourceResponseSchema = z
+  .object({
+    ...ragSourceShape,
+    citedInAnswer: z.boolean(),
+  })
+  .strip();
+
+export type RagRunSourceResponse = z.infer<typeof ragRunSourceResponseSchema>;
 
 export const relatedTermSchema: z.ZodType<DomainRelatedTerm> = z
   .object({
@@ -62,6 +77,13 @@ export const relatedTermSchema: z.ZodType<DomainRelatedTerm> = z
   .strip();
 
 export type RelatedTerm = z.infer<typeof relatedTermSchema>;
+
+const ragQueryRunStatusSchema: z.ZodType<DomainRagQueryRunStatus> = z.enum(
+  RAG_QUERY_RUN_STATUSES,
+);
+
+const ragQueryRunErrorCodeSchema: z.ZodType<DomainRagQueryRunErrorCode> =
+  z.enum(RAG_QUERY_RUN_ERROR_CODES);
 
 export const ragAnswerMetadataSchema = z
   .object({
@@ -125,11 +147,88 @@ export const ragAnsweredResponseSchema = z
   })
   .strip();
 
-export const ragAskSuccessResponseSchema = ragAnsweredResponseSchema;
+export const ragAskSuccessResponseSchema = ragAnsweredResponseSchema
+  .extend({
+    traceId: z.string().uuid(),
+    relatedTerms: z.array(relatedTermSchema),
+    audit: ragAnswerAuditSchema,
+  })
+  .strip();
 
 export type RagAnsweredResponse = z.infer<typeof ragAnsweredResponseSchema>;
 
 export type RagAskSuccessResponse = z.infer<typeof ragAskSuccessResponseSchema>;
+
+export const ragQueryRunSummaryResponseSchema = z
+  .object({
+    id: z.string().uuid(),
+    question: z.string().min(1),
+    status: ragQueryRunStatusSchema,
+    topK: z
+      .number()
+      .int()
+      .min(RAG_RETRIEVAL_MIN_TOP_K)
+      .max(RAG_RETRIEVAL_MAX_TOP_K),
+    retrievalStrategy: ragRetrievalStrategySchema,
+    latencyMs: z.number().int().nonnegative(),
+    totalCostUsd: z.number().nonnegative(),
+    createdAt: z.string().datetime({ offset: true }),
+  })
+  .strip();
+
+export type RagQueryRunSummaryResponse = z.infer<
+  typeof ragQueryRunSummaryResponseSchema
+>;
+
+export const ragQueryRunSummariesResponseSchema = z.array(
+  ragQueryRunSummaryResponseSchema,
+);
+
+export type RagQueryRunSummariesResponse = z.infer<
+  typeof ragQueryRunSummariesResponseSchema
+>;
+
+export const ragQueryRunDetailResponseSchema = z
+  .object({
+    id: z.string().uuid(),
+    question: z.string().min(1),
+    answer: z.string().min(1).nullable(),
+    mode: z.literal("global"),
+    status: ragQueryRunStatusSchema,
+    errorCode: ragQueryRunErrorCodeSchema.nullable(),
+    sources: z.array(ragRunSourceResponseSchema),
+    relatedTerms: z.array(relatedTermSchema),
+    metadata: ragAnswerMetadataSchema,
+    audit: ragAnswerAuditSchema,
+    createdAt: z.string().datetime({ offset: true }),
+  })
+  .strip();
+
+export type RagQueryRunDetailResponse = z.infer<
+  typeof ragQueryRunDetailResponseSchema
+>;
+
+export const ragQueryRunIdParamSchema = z.string().uuid();
+
+export const ragQueryRunInvalidIdResponseSchema = z
+  .object({
+    error: z.literal("invalid_id"),
+  })
+  .strip();
+
+export type RagQueryRunInvalidIdResponse = z.infer<
+  typeof ragQueryRunInvalidIdResponseSchema
+>;
+
+export const ragQueryRunNotFoundResponseSchema = z
+  .object({
+    error: z.literal("not_found"),
+  })
+  .strip();
+
+export type RagQueryRunNotFoundResponse = z.infer<
+  typeof ragQueryRunNotFoundResponseSchema
+>;
 
 export const ragInvalidRequestResponseSchema = z
   .object({
@@ -151,10 +250,7 @@ export type RagUnauthorizedResponse = z.infer<
   typeof ragUnauthorizedResponseSchema
 >;
 
-export const ragGenerationErrorCodeSchema = z.enum([
-  "generation_failed",
-  "generation_unavailable",
-]);
+export const ragGenerationErrorCodeSchema = z.enum(RAG_QUERY_RUN_ERROR_CODES);
 
 export type RagGenerationErrorCode = z.infer<
   typeof ragGenerationErrorCodeSchema
