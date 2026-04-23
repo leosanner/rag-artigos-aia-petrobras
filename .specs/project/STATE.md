@@ -1,32 +1,39 @@
 # State
 
 **Last Updated:** 2026-04-22
-**Current Work:** `/query` evolution contracts are prepared as `F-05 / Query Controls and Explore`, `F-06 / Answer Traceability`, and `F-07 / Conversational Query`; `F-04 / Focused RAG` is deferred until the shared query shell is rebased on those contracts
+**Current Work:** `/query` evolution contracts are prepared as `F-04 / Query Controls and Explore`, `F-05 / Answer Traceability`, and `F-06 / Conversational Query`; `F-07 / Focused RAG` is deferred until the shared query shell is rebased on those contracts
 
 ---
 
 ## Recent Decisions
 
+### AD-014: Query-evolution feature ids are renumbered to keep the roadmap sequence contiguous (2026-04-22)
+
+**Decision:** The new `/query` contracts are renumbered as `F-04 / Query Controls and Explore`, `F-05 / Answer Traceability`, `F-06 / Conversational Query`, and `F-07 / Focused RAG`.
+**Reason:** Once focused retrieval stopped being the immediate next step after F-03, keeping it as `F-04` made the project order harder to read and reason about. Renumbering keeps the feature list aligned with the intended implementation sequence.
+**Trade-off:** Historical references in older changelog entries still describe the numbering that existed at the time of those commits, so the docs now need a small amount of translation when reading older history.
+**Impact:** Current paths now live under `.specs/features/F-04-query-controls-and-explore/`, `.specs/features/F-05-answer-traceability/`, `.specs/features/F-06-conversational-query/`, and `.specs/features/F-07-focused-rag/`. Project docs, roadmap notes, and current references should use only the new numbering.
+
 ### AD-013: `/query` evolves through controls, traceability, and conversation before focused retrieval (2026-04-22)
 
-**Decision:** The shared `/query` surface now evolves through four contracts: `F-05 / Query Controls and Explore`, `F-06 / Answer Traceability`, `F-07 / Conversational Query`, and only then `F-04 / Focused RAG`. `POST /api/rag/ask` remains the base single-turn endpoint and gains optional retrieval controls. F-06 introduces persisted query-run traces with usage/cost/audit data, and F-07 adds conversations/messages without creating a separate chat page.
+**Decision:** The shared `/query` surface now evolves through four contracts: `F-04 / Query Controls and Explore`, `F-05 / Answer Traceability`, `F-06 / Conversational Query`, and only then `F-07 / Focused RAG`. `POST /api/rag/ask` remains the base single-turn endpoint and gains optional retrieval controls. F-05 introduces persisted query-run traces with usage/cost/audit data, and F-06 adds conversations/messages without creating a separate chat page.
 **Reason:** The current user need is not document scoping first; it is better control over global retrieval, stronger governance/audit visibility, and a more natural operator interaction model for broad questions. Pulling traceability forward also creates the right audited base for later chat.
-**Trade-off:** The project no longer follows the old straight-line `/query` sequence of F-03 -> F-04. Focused retrieval must be rebased on richer request/response contracts and a more capable page shell instead of the original global-only assumptions.
-**Impact:** `.specs/project/query-experience-evolution.md` becomes the sequence/guardrail document for `/query`. New implementation contracts now live in `.specs/features/F-05-query-controls-and-explore/spec.md`, `.specs/features/F-06-answer-traceability/spec.md`, and `.specs/features/F-07-conversational-query/spec.md`. `F-04 / Focused RAG` remains planned, but it is deferred and must plug into the F-05/F-06 trace and retrieval-controls model.
+**Trade-off:** The project no longer follows the old straight-line `/query` sequence of F-03 -> Focused RAG. Focused retrieval must be rebased on richer request/response contracts and a more capable page shell instead of the original global-only assumptions.
+**Impact:** `.specs/project/query-experience-evolution.md` becomes the sequence/guardrail document for `/query`. New implementation contracts now live in `.specs/features/F-04-query-controls-and-explore/spec.md`, `.specs/features/F-05-answer-traceability/spec.md`, and `.specs/features/F-06-conversational-query/spec.md`. `F-07 / Focused RAG` remains planned, but it is deferred and must plug into the F-04/F-05/F-06 shared query model.
 
 ### AD-012: Shared RAG page route uses the English segment `/query` (2026-04-21)
 
 **Decision:** The shared operator page for Global RAG and future Focused RAG uses the public route `/query` instead of `/consulta`. The page copy stays in PT-BR; only the URL segment changes to English.
 **Reason:** The route is a technical/public surface that benefits from a stable English path, while the UI language requirement still applies to the content rendered inside the page.
-**Trade-off:** This deviates from the original F-03/F-04 draft specs and requires those contracts to be synced before F-04 builds on the page.
-**Impact:** `F-03 / Global RAG` and `F-04 / Focused RAG` now reference `/query` and `src/app/query/page.tsx` as the shared UI surface.
+**Trade-off:** This deviates from the original F-03/F-04 draft specs and requires those contracts to be synced before focused retrieval builds on the page.
+**Impact:** `F-03 / Global RAG` and `F-07 / Focused RAG` now reference `/query` and `src/app/query/page.tsx` as the shared UI surface.
 
 ### AD-011: M2 Base RAG is split into three spec-first contracts (2026-04-20)
 
-**Decision:** M2 is implemented as three sequential feature contracts: `F-02 / Chunking and Embeddings`, `F-03 / Global RAG`, and `F-04 / Focused RAG`. F-02 uses manual operator-triggered indexing, asynchronous Inngest execution, hybrid paragraph-aware chunking with 900 estimated tokens and 150 estimated-token overlap, and `text-embedding-3-large` with 3072-dimension pgvector storage. F-03 adds a single `POST /api/rag/ask` route for global questions, top-k 6 cosine retrieval, Portuguese answers, inline citation markers plus structured source lists, and clear insufficient-evidence responses. F-04 extends the same route and `/query` page with focused document selection and strict document-scoped retrieval. M2 does not persist questions/answers or full observability traces; those remain M3.
+**Decision:** M2 base-RAG planning closes the core chunking/global/focused path around `F-02 / Chunking and Embeddings`, `F-03 / Global RAG`, and the current `F-07 / Focused RAG`. F-02 uses manual operator-triggered indexing, asynchronous Inngest execution, hybrid paragraph-aware chunking with 900 estimated tokens and 150 estimated-token overlap, and `text-embedding-3-large` with 3072-dimension pgvector storage. F-03 adds a single `POST /api/rag/ask` route for global questions, top-k 6 cosine retrieval, Portuguese answers, inline citation markers plus structured source lists, and clear insufficient-evidence responses. Focused RAG extends the same route and `/query` page with focused retrieval once the newer `/query` contracts have landed. M2 does not persist questions/answers or full observability traces; those remain M3.
 **Reason:** Splitting the milestone keeps TDD and independent review manageable while preserving a coherent RAG path from indexing to global and focused answers. Manual indexing gives the DEMO operator control over provider spend and avoids coupling F-01 ingestion completion to indexing. The local cost simulation over `assets/pdfs/art1.pdf` through `art4.pdf` estimated about 578k embedding tokens for 31 articles, making `text-embedding-3-large` a low absolute-cost choice for better retrieval quality.
 **Trade-off:** F-02 introduces pgvector schema and provider integration before the user-facing RAG UI is available. Reusing `INGESTION_SYNC_SECRET` for the indexing start action avoids config churn but keeps the secret name ingestion-specific until a later auth/config cleanup.
-**Impact:** `.specs/features/F-02-chunking-embeddings/spec.md`, `.specs/features/F-03-global-rag/spec.md`, and `.specs/features/F-04-focused-rag/spec.md` are the implementation contracts for M2. Chunking strategy and embedding model are no longer open architecture decisions for the M2 DEMO. The concrete generation model value is environment configuration through `RAG_GENERATION_MODEL`, behind the Vercel AI SDK/OpenAI provider boundary.
+**Impact:** `.specs/features/F-02-chunking-embeddings/spec.md`, `.specs/features/F-03-global-rag/spec.md`, and the current focused-RAG contract at `.specs/features/F-07-focused-rag/spec.md` define the base path. Chunking strategy and embedding model are no longer open architecture decisions for the M2 DEMO. The concrete generation model value is environment configuration through `RAG_GENERATION_MODEL`, behind the Vercel AI SDK/OpenAI provider boundary.
 
 ### AD-010: F-01 Block 05 completes processing orchestration with per-item isolation (2026-04-19)
 
@@ -137,10 +144,10 @@ _None for now._
 - [x] ~~Define concrete text-refinement strategy~~ — resolved in `F-01` as deterministic refinement without LLM calls
 - [x] ~~Break `F-01 / Document Ingestion` into small implementation blocks and execute with TDD~~ — completed by AD-010
 - [x] ~~Define M2 feature contracts and close base RAG planning decisions~~ — resolved by AD-011
-- [ ] Implement `F-05 / Query Controls and Explore` with TDD against its spec
-- [ ] Implement `F-06 / Answer Traceability` with TDD against its spec
-- [ ] Implement `F-07 / Conversational Query` with TDD against its spec
-- [ ] Rebase and implement `F-04 / Focused RAG` after the `/query` evolution contracts land
+- [ ] Implement `F-04 / Query Controls and Explore` with TDD against its spec
+- [ ] Implement `F-05 / Answer Traceability` with TDD against its spec
+- [ ] Implement `F-06 / Conversational Query` with TDD against its spec
+- [ ] Rebase and implement `F-07 / Focused RAG` after the `/query` evolution contracts land
 - [ ] Choose a definitive project name (current placeholder: "AIA Insight")
 - [ ] M4 PoC: compare **Mastra** vs **Vercel AI SDK alone** on one pilot task from `starter.md` §3.6 — criteria: Next.js integration, observability out of the box, maintenance cost (AD-003)
 

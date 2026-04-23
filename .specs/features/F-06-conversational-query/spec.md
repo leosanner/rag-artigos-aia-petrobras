@@ -1,4 +1,4 @@
-# F-07 - Conversational Query
+# F-06 - Conversational Query
 
 ## Scope
 
@@ -13,7 +13,7 @@
 - Keep per-turn citations, sources, related terms, token usage, latency, and
   cost visible for assistant messages.
 - Support transcript reload through the `/query` URL.
-- Keep F-05 retrieval controls available for each conversation turn.
+- Keep F-04 retrieval controls available for each conversation turn.
 - Add tests for conversation creation, message ordering, per-turn trace
   linkage, reload behavior, and regression of governance visibility.
 
@@ -21,12 +21,12 @@
 - Streaming responses, typing indicators, or partial token rendering.
 - Hidden automatic query rewriting, summarization, or agent planning.
 - A separate chat-specific generation pipeline.
-- Focused retrieval/document selectors; those remain F-04.
+- Focused retrieval/document selectors; those remain F-07.
 - Multi-user auth, RBAC, message deletion, or collaboration features.
 
 ## Context & Motivation
 
-After F-05 and F-06, `/query` already has operator-controlled retrieval and a
+After F-04 and F-05, `/query` already has operator-controlled retrieval and a
 governed trace model. The next user goal is to make that experience feel like a
 real conversation while preserving the same answer auditability.
 
@@ -42,7 +42,7 @@ system.
 - RN-03: The first persisted user message sets the conversation title from the
   trimmed message content, truncated deterministically to 80 characters.
 - RN-04: `POST /api/rag/conversations/:id/messages` accepts a user message plus
-  the same optional retrieval settings defined by F-05.
+  the same optional retrieval settings defined by F-04.
 - RN-05: Each successful or no-evidence assistant reply must correspond to
   exactly one persisted `rag_query_runs` record and expose its `traceId`.
 - RN-06: Technical generation failures after message validation persist the
@@ -50,7 +50,7 @@ system.
 - RN-07: Conversation retrieval context uses the latest user message plus up to
   the four immediately preceding visible stored messages, concatenated in
   display order with role labels.
-- RN-08: F-07 must not introduce hidden query rewriting, summarization, or any
+- RN-08: F-06 must not introduce hidden query rewriting, summarization, or any
   second retrieval query besides that explicit concatenated transcript context.
 - RN-09: Conversation endpoints require the same operator bearer secret pattern
   used by the existing ask and audit endpoints.
@@ -58,7 +58,7 @@ system.
   transcript for that conversation.
 - RN-11: Single-turn `POST /api/rag/ask` remains supported; chat reuses the
   same turn engine rather than replacing it.
-- RN-12: F-07 must not weaken citation validation, audit visibility, or safe
+- RN-12: F-06 must not weaken citation validation, audit visibility, or safe
   error responses.
 
 ## Functional Requirements
@@ -71,8 +71,8 @@ system.
   ordered messages and assistant-trace data needed by `/query`.
 - [ ] RF-04: `POST /api/rag/conversations/:id/messages` persists the user
   message before running the assistant turn.
-- [ ] RF-05: The assistant turn reuses the F-06 audited turn engine and the
-  F-05 retrieval controls.
+- [ ] RF-05: The assistant turn reuses the F-05 audited turn engine and the
+  F-04 retrieval controls.
 - [ ] RF-06: The retrieval-context builder concatenates the newest user message
   plus up to four immediately preceding stored messages with explicit role
   labels.
@@ -100,7 +100,7 @@ system.
 5. The message route validates the body, persists the user message, and builds
    retrieval context from the newest user message plus up to four immediately
    preceding stored messages with role labels.
-6. The route delegates to the same audited turn engine used by F-06, passing
+6. The route delegates to the same audited turn engine used by F-05, passing
    the constructed retrieval context and the normalized retrieval settings.
 7. If the turn succeeds or returns the no-evidence answer, the system persists
    an assistant message row linked to the returned `traceId`.
@@ -122,7 +122,7 @@ system.
   inserted.
 - INV-05: Conversation mode must preserve the same citation validation and safe
   error behavior as single-turn mode.
-- INV-06: F-07 must not depend on any agents framework.
+- INV-06: F-06 must not depend on any agents framework.
 
 ## Technical Design
 
@@ -132,7 +132,7 @@ system.
 |-------|------------|-------|
 | `rag_conversations` | `id`, nullable `title`, `createdAt`, `updatedAt`, `lastMessageAt` | One operator conversation thread. |
 | `rag_conversation_messages` | `id`, `conversationId`, `role`, `content`, nullable `traceId`, `createdAt` | Ordered transcript rows. `traceId` is present only on assistant rows. |
-| `ConversationMessageResponse` | `id`, `role`, `content`, `createdAt`, nullable `trace` | Assistant messages hydrate audit data from F-06 traces. |
+| `ConversationMessageResponse` | `id`, `role`, `content`, `createdAt`, nullable `trace` | Assistant messages hydrate audit data from F-05 traces. |
 | `ConversationDetailResponse` | `id`, `title`, timestamps, `messages[]` | DTO returned to `/query` for reload and rendering. |
 
 ### Endpoints / Interfaces (if applicable)
@@ -160,12 +160,12 @@ system.
 
 ## Dependencies
 
-- **Prerequisite features:** F-05 Query Controls and Explore; F-06 Answer
+- **Prerequisite features:** F-04 Query Controls and Explore; F-05 Answer
   Traceability.
 - **External packages added:** None.
 - **External services:** Postgres/pgvector, OpenAI API through the existing
   audited turn boundary.
-- **Environment variables:** Same as F-06/F-05/F-03. No new env vars are
+- **Environment variables:** Same as F-05/F-04/F-03. No new env vars are
   required by the contract.
 
 ## Acceptance Criteria
@@ -174,7 +174,7 @@ system.
 2. The operator can reload `/query?conversation=<id>` and recover the persisted
    transcript for that conversation.
 3. Each successful assistant message exposes the same citations, source
-   snapshots, related terms, usage, latency, and cost already defined by F-06.
+   snapshots, related terms, usage, latency, and cost already defined by F-05.
 4. The retrieval context for a chat turn contains the newest user message plus
    at most the previous four stored messages in display order.
 5. Technical failures after validation persist a failed trace run but do not

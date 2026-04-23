@@ -14,7 +14,7 @@
 
 **Out of scope:**
 - Retrieval, answer generation, citations, question UI, and RAG response contracts; those start in F-03.
-- Focused single-document question behavior; that is F-04.
+- Focused single-document question behavior; that is F-07.
 - Automatic indexing immediately after ingestion.
 - Full observability for tokens, cost, latency, and answer logs; that belongs to M3.
 - Reprocessing or changing F-01 ingestion behavior.
@@ -174,7 +174,7 @@ current task:
 
 | Decision | Alternatives considered | Rationale |
 |----------|-------------------------|-----------|
-| Split M2 into F-02/F-03/F-04 | One M2 spec; two specs combining global and focused RAG | Separate contracts keep TDD, review, and delivery incremental. |
+| Split the base path into F-02/F-03 plus a dedicated focused-retrieval contract | One M2 spec; two specs combining global and focused RAG | Separate contracts keep TDD, review, and delivery incremental. |
 | Manual indexing first | Automatic after ingestion; cron/job-only indexing | Manual control is clearer for a POC and avoids coupling F-01 completion to provider spend. |
 | Inngest async indexing | Synchronous request; CLI-only indexing | Reuses the F-01 async pattern and avoids request timeouts on large PDFs or provider latency. |
 | Hybrid paragraph-aware chunking at 900/150 estimated tokens | Fixed-size chunking; semantic section parser | Hybrid chunking is testable and respects article paragraphs without overbuilding a scientific-section parser. |

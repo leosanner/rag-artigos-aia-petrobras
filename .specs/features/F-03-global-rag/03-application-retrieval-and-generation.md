@@ -23,7 +23,7 @@ provider details into the route layer.
 
 - Route handlers and `/query` UI (Block 04).
 - Repository SQL implementation (Block 02), except through public APIs.
-- Focused mode, document listing, and F-04 selector behavior.
+- Focused mode, document listing, and F-07 selector behavior.
 - Persistence of answers, token usage, costs, latency, or traces.
 - Streaming responses, reranking, and agents.
 

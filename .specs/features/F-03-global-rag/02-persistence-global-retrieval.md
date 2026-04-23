@@ -24,7 +24,7 @@ and citations.
 - Context assembly, citation validation, or answer generation.
 - Query embedding and application orchestration.
 - API routes, Zod schemas, and `/query`.
-- Focused retrieval; that belongs to F-04.
+- Focused retrieval; that belongs to F-07.
 
 ## Business Rules
 

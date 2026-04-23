@@ -1,4 +1,4 @@
-# F-06 - Answer Traceability
+# F-05 - Answer Traceability
 
 ## Scope
 
@@ -20,8 +20,8 @@
   persisted.
 
 **Out of scope:**
-- Conversation management and transcript UX; those belong to F-07.
-- Focused document retrieval; that remains F-04.
+- Conversation management and transcript UX; those belong to F-06.
+- Focused document retrieval; that remains F-07.
 - Raw model-token attribution or chain-of-thought capture.
 - Streaming transport, user feedback, evaluations, or agent workflows.
 - Persisting unauthorized or malformed JSON requests that never pass the ask
@@ -35,7 +35,7 @@ latency, and cost. The architecture already reserved this work for later
 explainability and observability, and this contract intentionally pulls that
 governance layer forward onto the query surface.
 
-This feature builds on the operator controls from F-05 and defines the audited
+This feature builds on the operator controls from F-04 and defines the audited
 turn model that later chat and focused retrieval must reuse.
 
 ## Business Rules
@@ -66,7 +66,7 @@ turn model that later chat and focused retrieval must reuse.
   already used by `/api/rag/ask`.
 - RN-13: Stored traces must never include raw prompt text, operator secrets,
   stack traces, or raw provider response bodies.
-- RN-14: F-06 stays single-turn; it does not introduce conversations or chat
+- RN-14: F-05 stays single-turn; it does not introduce conversations or chat
   transcript state.
 
 ## Functional Requirements
@@ -110,7 +110,7 @@ turn model that later chat and focused retrieval must reuse.
 3. The application service starts total-latency timing for the run.
 4. The embedding provider embeds the question and returns the vector plus
    normalized embedding usage/cost metadata.
-5. Retrieval runs exactly as defined by F-05/F-03 and returns the selected
+5. Retrieval runs exactly as defined by F-04/F-03 and returns the selected
    sources for the current request.
 6. The related-term extractor derives up to 8 deterministic related terms from
    the normalized question plus the selected source excerpts. If no sources are
@@ -143,8 +143,8 @@ turn model that later chat and focused retrieval must reuse.
   question plus retrieved excerpts, not from model output.
 - INV-05: Technical error responses must remain sanitized even when the failed
   run is persisted internally.
-- INV-06: F-06 must not introduce chat conversations or a second turn engine.
-- INV-07: F-06 must not depend on any agents framework.
+- INV-06: F-05 must not introduce chat conversations or a second turn engine.
+- INV-07: F-05 must not depend on any agents framework.
 
 ## Technical Design
 
@@ -187,13 +187,13 @@ turn model that later chat and focused retrieval must reuse.
 
 ## Dependencies
 
-- **Prerequisite features:** F-05 Query Controls and Explore; F-03 Global RAG;
+- **Prerequisite features:** F-04 Query Controls and Explore; F-03 Global RAG;
   F-02 Chunking and Embeddings.
 - **External packages added:** None unless implementation chooses a small
   numeric helper; prefer none.
 - **External services:** Postgres/pgvector, OpenAI API through the existing
   provider boundary.
-- **Environment variables:** Same runtime env as F-05/F-03. No new env vars are
+- **Environment variables:** Same runtime env as F-04/F-03. No new env vars are
   required by the contract.
 
 ## Acceptance Criteria

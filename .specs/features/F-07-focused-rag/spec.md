@@ -1,12 +1,12 @@
-# F-04 - Focused RAG
+# F-07 - Focused RAG
 
 ## Scope
 
 **In scope:**
 - Extend the evolved RAG ask API to support questions scoped to one selected
   document.
-- Add document selection to `/query` on top of the post-F-05/F-06 shared page
-  shell.
+- Add document selection to `/query` on top of the post-F-04/F-05/F-06 shared
+  page shell.
 - Add a read endpoint for documents that are processed and indexed enough to be
   selectable.
 - Apply a strict `documentId` filter during retrieval for focused mode.
@@ -20,7 +20,7 @@
 - Multi-document subset filters, metadata filters, DOI/author/year filters, and
   cross-document comparison mode.
 - Conversation-specific focused workflow beyond reusing the shared retrieval
-  controls if F-07 is already present.
+  controls and conversation shell already introduced by F-06.
 - Document preview/PDF viewer, metadata editing, and document reprocessing.
 - Any agents framework or agentic workflows.
 
@@ -28,7 +28,7 @@
 
 F-03 makes global RAG available over the full indexed corpus. Since then, the
 project has intentionally reprioritized `/query` so operator controls,
-traceability, and conversation can land before focused retrieval. F-04 remains
+traceability, and conversation can land before focused retrieval. F-07 remains
 the document-scoped extension of the same route, but it now has to plug into a
 richer query shell instead of the original global-only page assumptions.
 
@@ -50,9 +50,9 @@ retrieval-controls and trace model stay intact.
 - RN-06: If a requested `documentId` is unknown, not processed, or not indexed,
   the API returns a safe client error and does not call the generation
   provider.
-- RN-07: F-04 must not duplicate the shared generation logic or the F-06
+- RN-07: F-07 must not duplicate the shared generation logic or the F-05
   traceability model.
-- RN-08: F-04 must not change the existing global request/response behavior.
+- RN-08: F-07 must not change the existing global request/response behavior.
 
 ## Functional Requirements
 
@@ -87,12 +87,12 @@ retrieval-controls and trace model stay intact.
 2. The page loads `GET /api/rag/documents` to populate the focused-mode
    document selector.
 3. In global mode, the page behaves according to the latest shared `/query`
-   contracts already delivered before F-04.
+   contracts already delivered before focused retrieval lands.
 4. In focused mode, the operator selects one document and submits a question.
 5. The page calls `POST /api/rag/ask` with
    `{ question, mode: "focused", documentId, retrieval? }`.
 6. The route validates the request and delegates to the same `AnswerQuestion`
-   service introduced in F-03 and later extended by F-05/F-06.
+   service introduced in F-03 and later extended by F-04/F-05.
 7. `AnswerQuestion` verifies that the selected document exists, is processed,
    and has retrieval-ready chunks.
 8. The retrieval service embeds the question, applies the shared retrieval
@@ -118,11 +118,11 @@ retrieval-controls and trace model stay intact.
   a later spec explicitly changes it.
 - INV-04: Adding focused mode must not break global mode request or response
   compatibility.
-- INV-05: Focused mode must not bypass or weaken the F-06 trace-persistence
+- INV-05: Focused mode must not bypass or weaken the F-05 trace-persistence
   model once that model exists.
 - INV-06: API responses must not leak database URLs, API keys, or raw provider
   errors.
-- INV-07: F-04 must not depend on any agents framework.
+- INV-07: F-07 must not depend on any agents framework.
 
 ## Technical Design
 
@@ -133,7 +133,7 @@ retrieval-controls and trace model stay intact.
 | `documents` | `id`, `title`, `status`, optional `authors`, `publication_year`, `doi` | Used for selector and selected-document validation. |
 | `document_chunks` | `document_id`, `chunk_index`, `embedding`, `content` | Queried with a strict `document_id` filter. |
 | `SelectableRagDocument` | `id`, `title`, `authors`, `publicationYear`, `doi`, `chunkCount`, `updatedAt` | API/UI DTO for focused selector. |
-| `FocusedRagRequest` | `question`, `mode`, `documentId`, optional `retrieval` | Extension of the shared ask request union after F-05. |
+| `FocusedRagRequest` | `question`, `mode`, `documentId`, optional `retrieval` | Extension of the shared ask request union after F-04. |
 
 ### Endpoints / Interfaces (if applicable)
 
@@ -159,7 +159,8 @@ retrieval-controls and trace model stay intact.
 ## Dependencies
 
 - **Prerequisite features:** F-02 Chunking and Embeddings; F-03 Global RAG;
-  F-05 Query Controls and Explore; F-06 Answer Traceability.
+  F-04 Query Controls and Explore; F-05 Answer Traceability;
+  F-06 Conversational Query.
 - **External packages added:** None.
 - **External services:** Postgres/pgvector, OpenAI API through the existing
   shared provider path.

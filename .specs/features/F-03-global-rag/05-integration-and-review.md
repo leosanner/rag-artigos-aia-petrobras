@@ -26,7 +26,7 @@ spec sync, changelog sync, and the required independent-review handoff.
 
 - New product behavior beyond what Blocks 01-04 already implement.
 - Focused retrieval, document selector UI, or `GET /api/rag/documents`; those
-  remain F-04.
+  remain F-07.
 - M3 observability, answer persistence, streaming, and agents.
 
 ## Business Rules
@@ -67,7 +67,7 @@ spec sync, changelog sync, and the required independent-review handoff.
   environment-specific caveats discovered during final checks.
 - [ ] RF-B05-09: The review handoff defines a reviewer prompt focused on
   active-config retrieval, citation validation, safe provider failures, no
-  `raw_text` access, and no F-04 leakage.
+  `raw_text` access, and no F-07 leakage.
 
 ## Verification Plan
 
@@ -104,5 +104,5 @@ Suggested reviewer prompt:
 > Review the current F-03 / Global RAG implementation against the attached git
 > diff plus `spec.md` and blocks 01-05 only. Prioritize invariant compliance
 > for active-config retrieval, no `raw_text` access, citation validation,
-> sanitized `502`/`503` failures, and whether any F-04-focused scope leaked
+> sanitized `502`/`503` failures, and whether any F-07-focused scope leaked
 > into F-03. Flag any mismatch between the implementation and the synced docs.

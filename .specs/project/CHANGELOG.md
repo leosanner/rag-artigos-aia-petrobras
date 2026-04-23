@@ -2,6 +2,41 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(query): renumber `/query` contracts to keep the sequence contiguous
+
+Date: 2026-04-22
+
+Changed:
+
+- Renumbered the shared `/query` contracts so the planned implementation order
+  is now `F-04 / Query Controls and Explore`, `F-05 / Answer Traceability`,
+  `F-06 / Conversational Query`, and `F-07 / Focused RAG`.
+- Renamed the feature folders accordingly and synced the current project docs,
+  root guidance docs, and the affected F-02/F-03/F-07 references to the new
+  numbering.
+- Recorded `AD-014` so future readers understand why focused retrieval is now
+  `F-07` instead of staying `F-04`.
+
+Files:
+
+- `CLAUDE.md`
+- `README.md`
+- `.specs/project/query-experience-evolution.md`
+- `.specs/project/ROADMAP.md`
+- `.specs/project/STATE.md`
+- `.specs/project/CHANGELOG.md`
+- `.specs/features/F-02-chunking-embeddings/spec.md`
+- `.specs/features/F-02-chunking-embeddings/05-integration-and-review.md`
+- `.specs/features/F-03-global-rag/02-persistence-global-retrieval.md`
+- `.specs/features/F-03-global-rag/03-application-retrieval-and-generation.md`
+- `.specs/features/F-03-global-rag/04-interface-api-and-page.md`
+- `.specs/features/F-03-global-rag/05-integration-and-review.md`
+- `.specs/features/F-03-global-rag/spec.md`
+- `.specs/features/F-04-query-controls-and-explore/spec.md`
+- `.specs/features/F-05-answer-traceability/spec.md`
+- `.specs/features/F-06-conversational-query/spec.md`
+- `.specs/features/F-07-focused-rag/spec.md`
+
 ## (unreleased) - docs(query): define `/query` evolution contracts and defer focused RAG
 
 Date: 2026-04-22

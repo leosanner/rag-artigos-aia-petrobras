@@ -6,10 +6,10 @@
 > Each phase of `starter.md` becomes a milestone. Features inside a milestone are demo-able increments. The first three milestones deliver the minimum functional DEMO.
 
 > Execution note (2026-04-22): the shared `/query` surface no longer moves
-> straight from F-03 Global RAG to F-04 Focused RAG. The current preferred
-> sequence is F-05 Query Controls and Explore -> F-06 Answer Traceability ->
-> F-07 Conversational Query -> then F-04 Focused RAG rebased on that richer
-> shell. F-06 intentionally pulls selected M3 explainability/observability work
+> straight from F-03 Global RAG to Focused RAG. The current preferred
+> sequence is F-04 Query Controls and Explore -> F-05 Answer Traceability ->
+> F-06 Conversational Query -> then F-07 Focused RAG rebased on that richer
+> shell. F-05 intentionally pulls selected M3 explainability/observability work
 > forward onto `/query`.
 
 ---
@@ -69,7 +69,7 @@
 
 - Filter by specific document during retrieval
 - UI for selecting the target document
-- Must plug into the post-F-05/F-06 `/query` shell instead of the old
+- Must plug into the post-F-04/F-05 `/query` shell instead of the old
   global-only page assumptions
 
 ---
@@ -118,7 +118,7 @@
 
 ## Future Considerations
 
-- More sophisticated interactive UI beyond F-07 (for example streaming turns)
+- More sophisticated interactive UI beyond F-06 (for example streaming turns)
 - Integration with external bases (e.g., Scielo, arXiv) beyond the fixed corpus
 - Automation of recurring analyses
 - Expansion to domains beyond EIA

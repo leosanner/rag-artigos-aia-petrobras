@@ -283,7 +283,7 @@ Prepare the independent review context from:
 Use a fresh reviewer thread and a prompt equivalent to:
 
 ```text
-Review the current F-02 / Chunking and Embeddings implementation against the attached git diff plus spec.md and blocks 01-05 only. Prioritize invariant compliance (processed-only selection, refined_text-only chunking, no partial chunks), skip vs force semantics, transaction safety around chunk replacement, safe error hygiene / non-leak responses, and whether any F-03/F-04 scope leaked into F-02. Flag any mismatch between the implementation and the synced docs.
+Review the current F-02 / Chunking and Embeddings implementation against the attached git diff plus spec.md and blocks 01-05 only. Prioritize invariant compliance (processed-only selection, refined_text-only chunking, no partial chunks), skip vs force semantics, transaction safety around chunk replacement, safe error hygiene / non-leak responses, and whether any F-03/F-07 scope leaked into F-02. Flag any mismatch between the implementation and the synced docs.
 ```
 
 ## Reviewer Checklist

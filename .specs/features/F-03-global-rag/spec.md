@@ -16,7 +16,7 @@
 - Tests for retrieval, context assembly, citation validation, generation prompt behavior, API validation, and UI behavior using fake providers where possible.
 
 **Out of scope:**
-- Focused single-document retrieval and document selector UI; those are F-04.
+- Focused single-document retrieval and document selector UI; those are F-07.
 - Persisting questions, answers, token usage, costs, latency, or full traces; those belong to M3.
 - Conversational memory, streaming responses, feedback/evaluation, reranking, and agents.
 - Automatic answer-quality evaluation.
@@ -36,7 +36,7 @@ metadata. It intentionally avoids M3-level persistence and observability so the
 first RAG slice remains small enough to validate quickly.
 
 Later `/query` evolution is tracked in
-`.specs/project/query-experience-evolution.md` and the F-05/F-06/F-07 feature
+`.specs/project/query-experience-evolution.md` and the F-04/F-05/F-06 feature
 contracts; F-03 remains the baseline global single-turn slice for that shared
 surface.
 
@@ -197,7 +197,7 @@ for the current task:
 
 | Method | Route / Signature | Description |
 |--------|-------------------|-------------|
-| `GET` | `/query` | Portuguese global RAG baseline page. Later query-evolution features extend the same route; focused mode remains F-04. |
+| `GET` | `/query` | Portuguese global RAG baseline page. Later query-evolution features extend the same route; focused mode remains F-07. |
 | `POST` | `/api/rag/ask` | Accepts `{ question, mode: "global" }`; returns `200` success, `400 invalid_request`, `502 generation_failed`, or `503 generation_unavailable`. |
 | Function | `AnswerQuestion.execute(input)` | Application service orchestrating retrieval, context assembly, citation validation, and generation. |
 | Function | `RetrieveChunks.search(input)` | Retrieval service for question embedding plus active-config vector search. |
@@ -260,7 +260,7 @@ for the current task:
 
 | Decision | Alternatives considered | Rationale |
 |----------|-------------------------|-----------|
-| One `/api/rag/ask` route with `mode` | Separate `/global` and `/focused` routes; server action only | One route keeps the API contract stable when F-04 adds focused mode. |
+| One `/api/rag/ask` route with `mode` | Separate `/global` and `/focused` routes; server action only | One route keeps the API contract stable when F-07 adds focused mode. |
 | `/query` as the single RAG page | Separate pages; API-first only | A single Portuguese operator surface is better for the DEMO and can grow from global to focused mode. |
 | Split F-03 into 5 implementation blocks | Keep one large spec only; split into more than 5 blocks | Matching the F-02 execution style keeps the implementation and review slices small without scattering the contract. |
 | Top-k 6 | 4 or 10 chunks | Six chunks balances coverage and context size for article-level questions. |

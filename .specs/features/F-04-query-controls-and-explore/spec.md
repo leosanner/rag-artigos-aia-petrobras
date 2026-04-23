@@ -1,4 +1,4 @@
-# F-05 - Query Controls and Explore
+# F-04 - Query Controls and Explore
 
 ## Scope
 
@@ -19,10 +19,10 @@
 
 **Out of scope:**
 - Persisting traces, tokens, costs, latency, or related terms; those belong to
-  F-06.
+  F-05.
 - Conversations, message history, streaming, or transcript management; those
-  belong to F-07.
-- Focused single-document retrieval and document selectors; that remains F-04.
+  belong to F-06.
+- Focused single-document retrieval and document selectors; that remains F-07.
 - Automatic detection of broad questions without an explicit user action.
 - Reranking with a second model, learned diversification, or agentic planning.
 
@@ -62,7 +62,7 @@ single narrow synthesis.
   answer facets in one response rather than one narrow synthesis.
 - RN-11: Explore mode must keep the same citation validation rules and safe
   error behavior already defined by F-03.
-- RN-12: F-05 does not persist traces or add chat behavior.
+- RN-12: F-04 does not persist traces or add chat behavior.
 
 ## Functional Requirements
 
@@ -89,7 +89,7 @@ single narrow synthesis.
   retyping the secret.
 - [ ] RF-12: Existing clients that send only `{ question, mode: "global" }`
   continue to work and receive the same default retrieval behavior.
-- [ ] RF-13: F-05 response bodies remain free of secrets, stack traces, raw
+- [ ] RF-13: F-04 response bodies remain free of secrets, stack traces, raw
   prompts, and provider internals.
 
 ## System Flow
@@ -121,15 +121,15 @@ single narrow synthesis.
 
 ## Invariants / Non-negotiables
 
-- INV-01: F-05 must never retrieve from `documents.raw_text`.
-- INV-02: F-05 must never activate explore mode automatically.
-- INV-03: F-05 must never request more than `24` retrieval candidates.
+- INV-01: F-04 must never retrieve from `documents.raw_text`.
+- INV-02: F-04 must never activate explore mode automatically.
+- INV-03: F-04 must never request more than `24` retrieval candidates.
 - INV-04: Standard mode must preserve F-03 default behavior when `retrieval` is
   omitted.
 - INV-05: Explore mode must not weaken citation validation or safe error
   handling.
-- INV-06: F-05 must not add persistence, observability tables, or chat state.
-- INV-07: F-05 must not depend on any agents framework.
+- INV-06: F-04 must not add persistence, observability tables, or chat state.
+- INV-07: F-04 must not depend on any agents framework.
 
 ## Technical Design
 

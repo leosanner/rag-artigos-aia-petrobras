@@ -24,7 +24,7 @@ shared route; later `/query` evolution is tracked separately in
 
 - Retrieval SQL and generation orchestration (Blocks 02 and 03).
 - Focused-mode selectors and later `/query` evolution beyond the F-03 baseline;
-  those start with F-05/F-06/F-07 and later F-04.
+  those start with F-04/F-05/F-06 and later F-07.
 - Auth, secrets, or operator-only bearer protection.
 - Streaming UI, chat history, observability, and agents.
 

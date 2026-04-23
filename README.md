@@ -8,7 +8,7 @@ O objetivo do projeto é permitir perguntas sobre um conjunto de documentos, ou 
 
 O projeto está avançando da base de ingestão para a M2 de RAG. A Fase 1 define e implementa ingestão documental assíncrona a partir de uma pasta fixa do Google Drive, registro governado em banco relacional, extração de texto bruto, geração determinística de texto refinado e preparação para chunking.
 
-As decisões de ingestão da Fase 1 estão registradas em `.specs/features/F-01-document-ingestion/spec.md`: `unpdf` para extração de PDF, refino determinístico, execução em background com Inngest e limite inicial de 3 novos documentos por execução. A M2 foi quebrada em contratos separados: `.specs/features/F-02-chunking-embeddings/spec.md`, `.specs/features/F-03-global-rag/spec.md` e `.specs/features/F-04-focused-rag/spec.md`.
+As decisões de ingestão da Fase 1 estão registradas em `.specs/features/F-01-document-ingestion/spec.md`: `unpdf` para extração de PDF, refino determinístico, execução em background com Inngest e limite inicial de 3 novos documentos por execução. O fluxo atual do RAG e da evolução de `/query` está organizado em contratos separados: `.specs/features/F-02-chunking-embeddings/spec.md`, `.specs/features/F-03-global-rag/spec.md`, `.specs/features/F-04-query-controls-and-explore/spec.md`, `.specs/features/F-05-answer-traceability/spec.md`, `.specs/features/F-06-conversational-query/spec.md` e `.specs/features/F-07-focused-rag/spec.md`.
 
 ## Fluxo Proposto
 
