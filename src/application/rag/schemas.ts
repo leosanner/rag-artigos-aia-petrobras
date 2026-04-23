@@ -5,6 +5,7 @@ import {
   RAG_RETRIEVAL_MAX_TOP_K,
   RAG_RETRIEVAL_MIN_TOP_K,
   type RagSource as DomainRagSource,
+  type RelatedTerm as DomainRelatedTerm,
 } from "@/domain/rag";
 
 const ragRetrievalStrategySchema = z.enum(["standard", "explore"]);
@@ -50,6 +51,18 @@ export const ragSourceSchema: z.ZodType<DomainRagSource> = z
 
 export type RagSource = z.infer<typeof ragSourceSchema>;
 
+export const relatedTermSchema: z.ZodType<DomainRelatedTerm> = z
+  .object({
+    rank: z.number().int().positive(),
+    term: z.string().min(1),
+    ngramSize: z.number().int().positive(),
+    frequency: z.number().int().positive(),
+    sourceCoverageCount: z.number().int().nonnegative(),
+  })
+  .strip();
+
+export type RelatedTerm = z.infer<typeof relatedTermSchema>;
+
 export const ragAnswerMetadataSchema = z
   .object({
     mode: z.literal("global"),
@@ -71,6 +84,37 @@ export const ragAnswerMetadataSchema = z
   .strip();
 
 export type RagAnswerMetadata = z.infer<typeof ragAnswerMetadataSchema>;
+
+export const embeddingUsageSchema = z
+  .object({
+    inputTokens: z.number().int().nonnegative(),
+    estimatedCostUsd: z.number().nonnegative(),
+  })
+  .strip();
+
+export type EmbeddingUsage = z.infer<typeof embeddingUsageSchema>;
+
+export const generationUsageSchema = z
+  .object({
+    inputTokens: z.number().int().nonnegative(),
+    outputTokens: z.number().int().nonnegative(),
+    totalTokens: z.number().int().nonnegative(),
+    estimatedCostUsd: z.number().nonnegative(),
+  })
+  .strip();
+
+export type GenerationUsage = z.infer<typeof generationUsageSchema>;
+
+export const ragAnswerAuditSchema = z
+  .object({
+    latencyMs: z.number().int().nonnegative(),
+    embedding: embeddingUsageSchema,
+    generation: generationUsageSchema.nullable(),
+    totalCostUsd: z.number().nonnegative(),
+  })
+  .strip();
+
+export type RagAnswerAudit = z.infer<typeof ragAnswerAuditSchema>;
 
 export const ragAnsweredResponseSchema = z
   .object({
@@ -163,10 +207,13 @@ export type RagAskResponse = z.infer<typeof ragAskResponseSchema>;
 export const answerQuestionAnsweredResultSchema = z
   .object({
     kind: z.literal("answered"),
+    traceId: z.string().uuid(),
     answer: z.string().min(1),
     mode: z.literal("global"),
     sources: z.array(ragSourceSchema),
+    relatedTerms: z.array(relatedTermSchema),
     metadata: ragAnswerMetadataSchema,
+    audit: ragAnswerAuditSchema,
   })
   .strip();
 
@@ -182,4 +229,10 @@ export const answerQuestionResultSchema = z.discriminatedUnion("kind", [
   answerQuestionErrorResultSchema,
 ]);
 
+export type AnswerQuestionAnsweredResult = z.infer<
+  typeof answerQuestionAnsweredResultSchema
+>;
+export type AnswerQuestionErrorResult = z.infer<
+  typeof answerQuestionErrorResultSchema
+>;
 export type AnswerQuestionResult = z.infer<typeof answerQuestionResultSchema>;

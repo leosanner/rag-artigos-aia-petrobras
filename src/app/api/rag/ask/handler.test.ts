@@ -15,6 +15,7 @@ const DATABASE_URL = "postgres://user:password@localhost:5432/app";
 function buildAnsweredResult(): AnswerQuestionResult {
   return {
     kind: "answered",
+    traceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     answer: "As tecnicas mais citadas sao segmentacao e classificacao [1].",
     mode: "global",
     sources: [
@@ -39,6 +40,29 @@ function buildAnsweredResult(): AnswerQuestionResult {
       promptVersion: "f04-global-rag-v1",
       generationModel: "gpt-4.1-mini",
       embeddingModel: "text-embedding-3-large",
+    },
+    relatedTerms: [
+      {
+        rank: 1,
+        term: "segmentacao",
+        ngramSize: 1,
+        frequency: 2,
+        sourceCoverageCount: 1,
+      },
+    ],
+    audit: {
+      latencyMs: 123,
+      embedding: {
+        inputTokens: 11,
+        estimatedCostUsd: 0.00000143,
+      },
+      generation: {
+        inputTokens: 42,
+        outputTokens: 16,
+        totalTokens: 58,
+        estimatedCostUsd: 0.0000192,
+      },
+      totalCostUsd: 0.00002063,
     },
   };
 }

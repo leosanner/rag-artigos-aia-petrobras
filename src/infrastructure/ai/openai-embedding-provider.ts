@@ -6,10 +6,17 @@ import type { QuestionEmbeddingProvider } from "@/application/rag/ports";
 import { IndexingError, type IndexingErrorCode } from "@/domain/indexing/errors";
 import type { ServerEnv } from "@/env/server";
 
+import { estimateOpenAiEmbeddingCostUsd } from "./openai-pricing";
+
 type EmbedManyFn = (input: {
   model: unknown;
   values: string[];
-}) => Promise<{ embeddings: number[][] }>;
+}) => Promise<{
+  embeddings: number[][];
+  usage?: {
+    tokens: number;
+  };
+}>;
 
 type ModelFactory = (model: string) => unknown;
 
@@ -49,35 +56,64 @@ export class OpenAiEmbeddingProvider
   }
 
   async embedMany(texts: string[]): Promise<number[][]> {
-    let embeddings: number[][];
-    try {
-      const result = await this.embedManyFn({
-        model: this.modelFactory(this.model),
-        values: texts,
-      });
-      embeddings = result.embeddings;
-    } catch {
-      throw new EmbeddingProviderError("embedding_failed");
-    }
-
-    for (const embedding of embeddings) {
-      if (embedding.length !== this.embeddingDimensions) {
-        throw new EmbeddingProviderError("embedding_dimensions_mismatch");
-      }
-    }
-
+    const { embeddings } = await this.embedWithUsage(texts);
     return embeddings;
   }
 
-  async embedQuestion(question: string): Promise<number[]> {
-    const embeddings = await this.embedMany([question]);
+  async embedQuestion(question: string): Promise<{
+    embedding: number[];
+    usage: {
+      inputTokens: number;
+      estimatedCostUsd: number;
+    };
+  }> {
+    const { embeddings, usage } = await this.embedWithUsage([question]);
     const [embedding] = embeddings;
 
     if (embedding === undefined) {
       throw new EmbeddingProviderError("embedding_dimensions_mismatch");
     }
 
-    return embedding;
+    const inputTokens = usage?.tokens ?? 0;
+
+    return {
+      embedding,
+      usage: {
+        inputTokens,
+        estimatedCostUsd: estimateOpenAiEmbeddingCostUsd(this.model, inputTokens),
+      },
+    };
+  }
+
+  private async embedWithUsage(texts: string[]): Promise<{
+    embeddings: number[][];
+    usage?: {
+      tokens: number;
+    };
+  }> {
+    let result: {
+      embeddings: number[][];
+      usage?: {
+        tokens: number;
+      };
+    };
+
+    try {
+      result = await this.embedManyFn({
+        model: this.modelFactory(this.model),
+        values: texts,
+      });
+    } catch {
+      throw new EmbeddingProviderError("embedding_failed");
+    }
+
+    for (const embedding of result.embeddings) {
+      if (embedding.length !== this.embeddingDimensions) {
+        throw new EmbeddingProviderError("embedding_dimensions_mismatch");
+      }
+    }
+
+    return result;
   }
 }
 

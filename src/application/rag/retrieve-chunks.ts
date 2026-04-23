@@ -7,6 +7,7 @@ import {
 } from "@/domain/rag";
 
 import type {
+  EmbeddingUsage,
   GlobalChunkSearchRepository,
   QuestionEmbeddingProvider,
 } from "./ports";
@@ -20,6 +21,11 @@ export type RetrieveChunksDeps = {
 export type RetrieveChunksInput = {
   question: string;
   retrieval: RagRetrievalSettings;
+};
+
+export type RetrieveChunksResult = {
+  matches: RetrievedChunkMatch[];
+  embedding: EmbeddingUsage;
 };
 
 export class RetrieveChunks {
@@ -36,10 +42,9 @@ export class RetrieveChunks {
     this.chunkingVersion = DEFAULT_CHUNKING_CONFIG.chunkingVersion;
   }
 
-  async search(input: RetrieveChunksInput): Promise<RetrievedChunkMatch[]> {
-    const queryEmbedding = await this.questionEmbeddingProvider.embedQuestion(
-      input.question,
-    );
+  async search(input: RetrieveChunksInput): Promise<RetrieveChunksResult> {
+    const { embedding: queryEmbedding, usage } =
+      await this.questionEmbeddingProvider.embedQuestion(input.question);
     const candidateTopK = getCandidateTopK(input.retrieval);
 
     const matches = await this.chunksRepository.searchGlobal({
@@ -50,12 +55,18 @@ export class RetrieveChunks {
     });
 
     if (input.retrieval.strategy === "standard") {
-      return matches;
+      return {
+        matches,
+        embedding: usage,
+      };
     }
 
-    return selectDiversifiedMatches({
-      matches,
-      topK: input.retrieval.topK,
-    });
+    return {
+      matches: selectDiversifiedMatches({
+        matches,
+        topK: input.retrieval.topK,
+      }),
+      embedding: usage,
+    };
   }
 }

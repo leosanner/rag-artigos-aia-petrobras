@@ -8,11 +8,23 @@ import type {
 import { GenerationFailure, type RagRetrievalStrategy } from "@/domain/rag";
 import type { ServerEnv } from "@/env/server";
 
+import { estimateOpenAiGenerationCostUsd } from "./openai-pricing";
+
 type GenerateTextFn = (input: {
   model: unknown;
   system: string;
   prompt: string;
-}) => Promise<{ text: string }>;
+}) => Promise<{
+  text: string;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    inputTokenDetails?: {
+      cacheReadTokens?: number;
+    };
+  };
+}>;
 
 type ModelFactory = (model: string) => unknown;
 type OpenAiProviderFactory = (options?: { apiKey?: string }) => {
@@ -42,7 +54,15 @@ export class OpenAiGenerationProvider implements GenerationProvider {
       deps.generateText ?? (aiGenerateText as unknown as GenerateTextFn);
   }
 
-  async generateAnswer(input: GenerateAnswerInput): Promise<{ answer: string }> {
+  async generateAnswer(input: GenerateAnswerInput): Promise<{
+    answer: string;
+    usage: {
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      estimatedCostUsd: number;
+    };
+  }> {
     const generationModel =
       input.generationModel || this.defaultGenerationModel;
 
@@ -65,7 +85,27 @@ export class OpenAiGenerationProvider implements GenerationProvider {
         throw new GenerationFailure("generation_failed", "generation_failed");
       }
 
-      return { answer };
+      const inputTokens = result.usage?.inputTokens ?? 0;
+      const outputTokens = result.usage?.outputTokens ?? 0;
+      const totalTokens =
+        result.usage?.totalTokens ?? inputTokens + outputTokens;
+      const cachedInputTokens =
+        result.usage?.inputTokenDetails?.cacheReadTokens ?? 0;
+
+      return {
+        answer,
+        usage: {
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          estimatedCostUsd: estimateOpenAiGenerationCostUsd({
+            model: generationModel,
+            inputTokens,
+            cachedInputTokens,
+            outputTokens,
+          }),
+        },
+      };
     } catch (error) {
       throw new GenerationFailure(
         classifyGenerationFailure(error),

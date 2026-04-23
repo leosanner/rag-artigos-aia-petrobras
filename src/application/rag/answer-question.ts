@@ -3,18 +3,32 @@ import {
   assertValidCitationMarkers,
   assembleRagContext,
   buildNoEvidenceAnswer,
+  extractCitationNumbers,
+  extractRelatedTerms,
   getCandidateTopK,
   normalizeRetrievalSettings,
-  type RagRetrievalSettings,
   toSafeGenerationFailureCode,
+  type RagRetrievalSettings,
+  type RagSource,
 } from "@/domain/rag";
+import type {
+  PersistRagQueryRunInput,
+  PersistedRagSourceSnapshot,
+  RagQueryRunsRepository,
+} from "@/repositories/rag-query-runs-repository";
 
 import { GLOBAL_RAG_PROMPT_VERSION } from "./constants";
-import type { GenerationProvider } from "./ports";
+import type {
+  EmbeddingUsage,
+  GenerationProvider,
+  GenerationUsage,
+} from "./ports";
 import type {
   AnswerQuestionResult,
   GlobalRagAskInput,
+  RagAnswerAudit,
   RagAnswerMetadata,
+  RelatedTerm,
 } from "./schemas";
 import { answerQuestionResultSchema } from "./schemas";
 import type { RetrieveChunks } from "./retrieve-chunks";
@@ -22,8 +36,10 @@ import type { RetrieveChunks } from "./retrieve-chunks";
 export type AnswerQuestionDeps = {
   retrieveChunks: Pick<RetrieveChunks, "search" | "embeddingModel">;
   generationProvider: GenerationProvider;
+  runsRepository: Pick<RagQueryRunsRepository, "create">;
   generationModel: string;
   promptVersion?: string;
+  nowMs?: () => number;
 };
 
 const NO_EVIDENCE_ANSWER = buildNoEvidenceAnswer();
@@ -34,14 +50,18 @@ export class AnswerQuestion {
     "search" | "embeddingModel"
   >;
   private readonly generationProvider: GenerationProvider;
+  private readonly runsRepository: Pick<RagQueryRunsRepository, "create">;
   private readonly generationModel: string;
   private readonly promptVersion: string;
+  private readonly nowMs: () => number;
 
   constructor(deps: AnswerQuestionDeps) {
     this.retrieveChunks = deps.retrieveChunks;
     this.generationProvider = deps.generationProvider;
+    this.runsRepository = deps.runsRepository;
     this.generationModel = deps.generationModel;
     this.promptVersion = deps.promptVersion ?? GLOBAL_RAG_PROMPT_VERSION;
+    this.nowMs = deps.nowMs ?? Date.now;
   }
 
   async execute(input: GlobalRagAskInput): Promise<AnswerQuestionResult> {
@@ -50,23 +70,53 @@ export class AnswerQuestion {
     }
 
     const retrieval = normalizeRetrievalSettings(input.retrieval);
-    const matches = await this.retrieveChunks.search({
+    const startedAtMs = this.nowMs();
+    const retrievalResult = await this.retrieveChunks.search({
       question: input.question,
       retrieval,
     });
     const metadata = this.buildMetadata(retrieval);
+    const { matches, embedding } = retrievalResult;
 
     if (matches.length === 0) {
+      const relatedTerms = extractRelatedTerms({
+        question: input.question,
+        sourceExcerpts: [],
+      });
+      const audit = this.buildAudit(startedAtMs, embedding, null);
+      const persisted = await this.runsRepository.create(
+        this.buildPersistInput({
+          question: input.question,
+          answer: NO_EVIDENCE_ANSWER,
+          status: "answered_no_evidence",
+          errorCode: null,
+          metadata,
+          audit,
+          sources: [],
+          relatedTerms,
+          generation: null,
+        }),
+      );
+
       return answerQuestionResultSchema.parse({
         kind: "answered",
+        traceId: persisted.id,
         answer: NO_EVIDENCE_ANSWER,
         mode: "global",
         sources: [],
+        relatedTerms,
         metadata,
+        audit,
       });
     }
 
     const { sources, promptContext } = assembleRagContext(matches);
+    const relatedTerms = extractRelatedTerms({
+      question: input.question,
+      sourceExcerpts: sources.map((source) => source.excerpt),
+    });
+
+    let generation: GenerationUsage | null = null;
 
     try {
       const result = await this.generationProvider.generateAnswer({
@@ -76,30 +126,68 @@ export class AnswerQuestion {
         generationModel: this.generationModel,
         retrievalStrategy: retrieval.strategy,
       });
+      generation = result.usage;
 
-      if (result.answer.trim() === NO_EVIDENCE_ANSWER) {
-        return answerQuestionResultSchema.parse({
-          kind: "answered",
-          answer: NO_EVIDENCE_ANSWER,
-          mode: "global",
-          sources,
-          metadata,
-        });
+      const answer =
+        result.answer.trim() === NO_EVIDENCE_ANSWER
+          ? NO_EVIDENCE_ANSWER
+          : result.answer;
+
+      const citedSourceNumbers =
+        answer === NO_EVIDENCE_ANSWER
+          ? new Set<number>()
+          : new Set(extractCitationNumbers(answer));
+
+      if (answer !== NO_EVIDENCE_ANSWER) {
+        assertValidCitationMarkers(answer, sources);
       }
 
-      assertValidCitationMarkers(result.answer, sources);
+      const audit = this.buildAudit(startedAtMs, embedding, generation);
+      const persisted = await this.runsRepository.create(
+        this.buildPersistInput({
+          question: input.question,
+          answer,
+          status: "answered",
+          errorCode: null,
+          metadata,
+          audit,
+          sources: toPersistedSources(sources, citedSourceNumbers),
+          relatedTerms,
+          generation,
+        }),
+      );
 
       return answerQuestionResultSchema.parse({
         kind: "answered",
-        answer: result.answer,
+        traceId: persisted.id,
+        answer,
         mode: "global",
         sources,
+        relatedTerms,
         metadata,
+        audit,
       });
     } catch (error) {
+      const failureCode = toApplicationGenerationFailureCode(error);
+      const audit = this.buildAudit(startedAtMs, embedding, generation);
+
+      await this.runsRepository.create(
+        this.buildPersistInput({
+          question: input.question,
+          answer: null,
+          status: failureCode,
+          errorCode: failureCode,
+          metadata,
+          audit,
+          sources: toPersistedSources(sources, new Set<number>()),
+          relatedTerms,
+          generation,
+        }),
+      );
+
       return answerQuestionResultSchema.parse({
         kind: "error",
-        error: toApplicationGenerationFailureCode(error),
+        error: failureCode,
       });
     }
   }
@@ -115,6 +203,79 @@ export class AnswerQuestion {
       embeddingModel: this.retrieveChunks.embeddingModel,
     };
   }
+
+  private buildAudit(
+    startedAtMs: number,
+    embedding: EmbeddingUsage,
+    generation: GenerationUsage | null,
+  ): RagAnswerAudit {
+    return {
+      latencyMs: Math.max(0, Math.round(this.nowMs() - startedAtMs)),
+      embedding,
+      generation,
+      totalCostUsd:
+        embedding.estimatedCostUsd + (generation?.estimatedCostUsd ?? 0),
+    };
+  }
+
+  private buildPersistInput(input: {
+    question: string;
+    answer: string | null;
+    status:
+      | "answered"
+      | "answered_no_evidence"
+      | "generation_failed"
+      | "generation_unavailable";
+    errorCode: "generation_failed" | "generation_unavailable" | null;
+    metadata: RagAnswerMetadata;
+    audit: RagAnswerAudit;
+    sources: PersistedRagSourceSnapshot[];
+    relatedTerms: RelatedTerm[];
+    generation: GenerationUsage | null;
+  }): PersistRagQueryRunInput {
+    return {
+      question: input.question,
+      answer: input.answer,
+      mode: "global",
+      status: input.status,
+      errorCode: input.errorCode,
+      topK: input.metadata.topK,
+      retrievalStrategy: input.metadata.retrievalStrategy,
+      candidateTopK: input.metadata.candidateTopK,
+      promptVersion: input.metadata.promptVersion,
+      generationModel: input.metadata.generationModel,
+      embeddingModel: input.metadata.embeddingModel,
+      latencyMs: input.audit.latencyMs,
+      embeddingInputTokens: input.audit.embedding.inputTokens,
+      embeddingCostUsd: input.audit.embedding.estimatedCostUsd,
+      generationInputTokens: input.generation?.inputTokens ?? null,
+      generationOutputTokens: input.generation?.outputTokens ?? null,
+      generationTotalTokens: input.generation?.totalTokens ?? null,
+      generationCostUsd: input.generation?.estimatedCostUsd ?? null,
+      totalCostUsd: input.audit.totalCostUsd,
+      sources: input.sources,
+      relatedTerms: input.relatedTerms,
+    };
+  }
+}
+
+function toPersistedSources(
+  sources: RagSource[],
+  citedSourceNumbers: Set<number>,
+): PersistedRagSourceSnapshot[] {
+  return sources.map((source) => ({
+    sourceNumber: source.sourceNumber,
+    chunkId: source.chunkId,
+    documentId: source.documentId,
+    documentTitle: source.documentTitle,
+    chunkIndex: source.chunkIndex,
+    excerpt: source.excerpt,
+    score: source.score,
+    documentPipelineVersion: source.documentPipelineVersion,
+    chunkingVersion: source.chunkingVersion,
+    embeddingModel: source.embeddingModel,
+    citedInAnswer: citedSourceNumbers.has(source.sourceNumber),
+  }));
 }
 
 function toApplicationGenerationFailureCode(

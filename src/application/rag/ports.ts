@@ -11,9 +11,24 @@ export interface GlobalChunkSearchRepository {
   searchGlobal(input: SearchGlobalChunksInput): Promise<RetrievedChunkMatch[]>;
 }
 
+export type EmbeddingUsage = {
+  inputTokens: number;
+  estimatedCostUsd: number;
+};
+
 export interface QuestionEmbeddingProvider {
-  embedQuestion(question: string): Promise<number[]>;
+  embedQuestion(question: string): Promise<{
+    embedding: number[];
+    usage: EmbeddingUsage;
+  }>;
 }
+
+export type GenerationUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+};
 
 export type GenerateAnswerInput = {
   question: string;
@@ -24,5 +39,8 @@ export type GenerateAnswerInput = {
 };
 
 export interface GenerationProvider {
-  generateAnswer(input: GenerateAnswerInput): Promise<{ answer: string }>;
+  generateAnswer(input: GenerateAnswerInput): Promise<{
+    answer: string;
+    usage: GenerationUsage;
+  }>;
 }

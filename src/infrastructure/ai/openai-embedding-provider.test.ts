@@ -18,6 +18,7 @@ describe("OpenAiEmbeddingProvider", () => {
     const modelFactory = vi.fn().mockReturnValue(model);
     const embedMany = vi.fn().mockResolvedValue({
       embeddings: [vector(0.1), vector(0.2)],
+      usage: { tokens: 44 },
     });
     const provider = new OpenAiEmbeddingProvider({
       model: MODEL,
@@ -37,11 +38,12 @@ describe("OpenAiEmbeddingProvider", () => {
     });
   });
 
-  it("embeds a single question through the same configured model and dimensions contract", async () => {
+  it("embeds a single question with normalized usage and estimated cost", async () => {
     const model = { provider: "openai", modelId: MODEL };
     const modelFactory = vi.fn().mockReturnValue(model);
     const embedMany = vi.fn().mockResolvedValue({
       embeddings: [vector(0.3)],
+      usage: { tokens: 1234 },
     });
     const provider = new OpenAiEmbeddingProvider({
       model: MODEL,
@@ -50,13 +52,39 @@ describe("OpenAiEmbeddingProvider", () => {
       embedMany,
     });
 
-    await expect(provider.embedQuestion("what does the paper say?")).resolves.toEqual(
-      vector(0.3),
-    );
+    await expect(
+      provider.embedQuestion("what does the paper say?"),
+    ).resolves.toEqual({
+      embedding: vector(0.3),
+      usage: {
+        inputTokens: 1234,
+        estimatedCostUsd: 0.00016042,
+      },
+    });
     expect(modelFactory).toHaveBeenCalledWith(MODEL);
     expect(embedMany).toHaveBeenCalledWith({
       model,
       values: ["what does the paper say?"],
+    });
+  });
+
+  it("returns zero cost for unknown or test embedding models", async () => {
+    const provider = new OpenAiEmbeddingProvider({
+      model: "test-embedding-model",
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      modelFactory: vi.fn().mockReturnValue({}),
+      embedMany: vi.fn().mockResolvedValue({
+        embeddings: [vector(0.5)],
+        usage: { tokens: 987 },
+      }),
+    });
+
+    await expect(provider.embedQuestion("Pergunta")).resolves.toEqual({
+      embedding: vector(0.5),
+      usage: {
+        inputTokens: 987,
+        estimatedCostUsd: 0,
+      },
     });
   });
 
@@ -67,6 +95,7 @@ describe("OpenAiEmbeddingProvider", () => {
       modelFactory: vi.fn().mockReturnValue({}),
       embedMany: vi.fn().mockResolvedValue({
         embeddings: [[0.1, 0.2, 0.3]],
+        usage: { tokens: 3 },
       }),
     });
 

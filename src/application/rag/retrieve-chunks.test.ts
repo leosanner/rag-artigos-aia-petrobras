@@ -28,11 +28,18 @@ function buildMatch(
 }
 
 describe("RetrieveChunks", () => {
-  it("embeds the question and searches the active configuration with standard top-k", async () => {
+  it("embeds the question, returns embedding audit, and searches the active configuration with standard top-k", async () => {
     const queryEmbedding = [0.1, 0.2, 0.3];
+    const embeddingUsage = {
+      inputTokens: 14,
+      estimatedCostUsd: 0.00000182,
+    };
     const matches = [buildMatch()];
     const questionEmbeddingProvider = {
-      embedQuestion: vi.fn().mockResolvedValue(queryEmbedding),
+      embedQuestion: vi.fn().mockResolvedValue({
+        embedding: queryEmbedding,
+        usage: embeddingUsage,
+      }),
     };
     const chunksRepository = {
       searchGlobal: vi.fn().mockResolvedValue(matches),
@@ -51,7 +58,10 @@ describe("RetrieveChunks", () => {
           strategy: "standard",
         },
       }),
-    ).resolves.toEqual(matches);
+    ).resolves.toEqual({
+      matches,
+      embedding: embeddingUsage,
+    });
 
     expect(questionEmbeddingProvider.embedQuestion).toHaveBeenCalledWith(
       "Quais técnicas foram usadas nos artigos?",
@@ -67,8 +77,12 @@ describe("RetrieveChunks", () => {
     );
   });
 
-  it("fetches explore candidates and returns a deterministic diversified top-k selection", async () => {
+  it("fetches explore candidates, returns the diversified top-k selection, and preserves embedding audit data", async () => {
     const queryEmbedding = [0.1, 0.2, 0.3];
+    const embeddingUsage = {
+      inputTokens: 18,
+      estimatedCostUsd: 0.00000234,
+    };
     const candidates = [
       buildMatch({
         chunkId: "10000000-0000-4000-8000-000000000000",
@@ -102,7 +116,10 @@ describe("RetrieveChunks", () => {
       }),
     ];
     const questionEmbeddingProvider = {
-      embedQuestion: vi.fn().mockResolvedValue(queryEmbedding),
+      embedQuestion: vi.fn().mockResolvedValue({
+        embedding: queryEmbedding,
+        usage: embeddingUsage,
+      }),
     };
     const chunksRepository = {
       searchGlobal: vi.fn().mockResolvedValue(candidates),
@@ -121,12 +138,10 @@ describe("RetrieveChunks", () => {
           strategy: "explore",
         },
       }),
-    ).resolves.toEqual([
-      candidates[0],
-      candidates[1],
-      candidates[3],
-      candidates[4],
-    ]);
+    ).resolves.toEqual({
+      matches: [candidates[0], candidates[1], candidates[3], candidates[4]],
+      embedding: embeddingUsage,
+    });
 
     expect(chunksRepository.searchGlobal).toHaveBeenCalledWith({
       queryEmbedding,
@@ -139,7 +154,13 @@ describe("RetrieveChunks", () => {
   it("caps explore candidate fetches at 24", async () => {
     const queryEmbedding = [0.1, 0.2, 0.3];
     const questionEmbeddingProvider = {
-      embedQuestion: vi.fn().mockResolvedValue(queryEmbedding),
+      embedQuestion: vi.fn().mockResolvedValue({
+        embedding: queryEmbedding,
+        usage: {
+          inputTokens: 9,
+          estimatedCostUsd: 0.00000117,
+        },
+      }),
     };
     const chunksRepository = {
       searchGlobal: vi.fn().mockResolvedValue([]),

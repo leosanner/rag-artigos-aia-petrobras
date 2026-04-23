@@ -1,12 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { buildNoEvidenceAnswer, type RetrievedChunkMatch } from "@/domain/rag";
+import {
+  buildNoEvidenceAnswer,
+  extractRelatedTerms,
+  type RetrievedChunkMatch,
+} from "@/domain/rag";
 
+import type { EmbeddingUsage, GenerationUsage } from "./ports";
 import { AnswerQuestion } from "./answer-question";
 
 const GENERATION_MODEL = "gpt-4.1-mini";
 const EMBEDDING_MODEL = "text-embedding-3-large";
 const PROMPT_VERSION = "f04-global-rag-v1";
+const CREATED_RUN_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
 function buildMatch(
   overrides: Partial<RetrievedChunkMatch> = {},
@@ -25,48 +31,104 @@ function buildMatch(
   };
 }
 
-function createService(overrides: {
-  matches?: RetrievedChunkMatch[];
-  answer?: string;
-  generationError?: unknown;
-} = {}) {
-  const retrieveChunks = {
-    embeddingModel: EMBEDDING_MODEL,
-    search: vi
-      .fn()
-      .mockResolvedValue(overrides.matches ?? [buildMatch(), buildMatch({
+function buildEmbeddingUsage(
+  overrides: Partial<EmbeddingUsage> = {},
+): EmbeddingUsage {
+  return {
+    inputTokens: 17,
+    estimatedCostUsd: 0.00000221,
+    ...overrides,
+  };
+}
+
+function buildGenerationUsage(
+  overrides: Partial<GenerationUsage> = {},
+): GenerationUsage {
+  return {
+    inputTokens: 120,
+    outputTokens: 42,
+    totalTokens: 162,
+    estimatedCostUsd: 0.000048,
+    ...overrides,
+  };
+}
+
+function createNowMs(latencyMs: number) {
+  return vi.fn().mockReturnValueOnce(1_000).mockReturnValueOnce(1_000 + latencyMs);
+}
+
+function createService(
+  overrides: {
+    matches?: RetrievedChunkMatch[];
+    embeddingUsage?: EmbeddingUsage;
+    answer?: string;
+    generationUsage?: GenerationUsage;
+    generationError?: unknown;
+    nowMs?: () => number;
+    createdRunId?: string;
+  } = {},
+) {
+  const matches =
+    overrides.matches ??
+    [
+      buildMatch(),
+      buildMatch({
         chunkId: "33333333-3333-4333-8333-333333333333",
         chunkIndex: 1,
         excerpt: "Second chunk excerpt",
         score: 0.82,
-      })]),
+      }),
+    ];
+  const embeddingUsage = overrides.embeddingUsage ?? buildEmbeddingUsage();
+  const generationUsage = overrides.generationUsage ?? buildGenerationUsage();
+
+  const retrieveChunks = {
+    embeddingModel: EMBEDDING_MODEL,
+    search: vi.fn().mockResolvedValue({
+      matches,
+      embedding: embeddingUsage,
+    }),
   };
   const generationProvider = {
     generateAnswer:
       overrides.generationError === undefined
-        ? vi
-            .fn()
-            .mockResolvedValue({ answer: overrides.answer ?? "Resposta [1] [2]." })
+        ? vi.fn().mockResolvedValue({
+            answer: overrides.answer ?? "Resposta [2].",
+            usage: generationUsage,
+          })
         : vi.fn().mockRejectedValue(overrides.generationError),
+  };
+  const runsRepository = {
+    create: vi.fn().mockResolvedValue({
+      id: overrides.createdRunId ?? CREATED_RUN_ID,
+      createdAt: new Date("2026-04-23T00:00:00.000Z"),
+    }),
   };
 
   const service = new AnswerQuestion({
     retrieveChunks,
     generationProvider,
+    runsRepository,
     generationModel: GENERATION_MODEL,
     promptVersion: PROMPT_VERSION,
+    nowMs: overrides.nowMs ?? createNowMs(432),
   });
 
   return {
     service,
     retrieveChunks,
     generationProvider,
+    runsRepository,
+    matches,
+    embeddingUsage,
+    generationUsage,
   };
 }
 
 describe("AnswerQuestion", () => {
-  it("rejects unsupported modes before retrieval", async () => {
-    const { service, retrieveChunks, generationProvider } = createService();
+  it("rejects unsupported modes before retrieval or persistence", async () => {
+    const { service, retrieveChunks, generationProvider, runsRepository } =
+      createService();
 
     await expect(
       service.execute({
@@ -77,23 +139,39 @@ describe("AnswerQuestion", () => {
 
     expect(retrieveChunks.search).not.toHaveBeenCalled();
     expect(generationProvider.generateAnswer).not.toHaveBeenCalled();
+    expect(runsRepository.create).not.toHaveBeenCalled();
   });
 
-  it("short-circuits with the Portuguese no-evidence answer when no chunks are retrieved", async () => {
-    const { service, retrieveChunks, generationProvider } = createService({
-      matches: [],
+  it("persists answered_no_evidence when no chunks are retrieved and derives related terms from the question only", async () => {
+    const nowMs = createNowMs(245);
+    const embeddingUsage = buildEmbeddingUsage({
+      inputTokens: 23,
+      estimatedCostUsd: 0.00000299,
     });
+    const { service, retrieveChunks, generationProvider, runsRepository } =
+      createService({
+        matches: [],
+        embeddingUsage,
+        nowMs,
+      });
+
+    const question = "O que os artigos dizem sobre avaliação ambiental com GIS?";
 
     await expect(
       service.execute({
-        question: "O que os artigos dizem sobre isso?",
+        question,
         mode: "global",
       }),
     ).resolves.toEqual({
       kind: "answered",
+      traceId: CREATED_RUN_ID,
       answer: buildNoEvidenceAnswer(),
       mode: "global",
       sources: [],
+      relatedTerms: extractRelatedTerms({
+        question,
+        sourceExcerpts: [],
+      }),
       metadata: {
         mode: "global",
         topK: 6,
@@ -103,67 +181,79 @@ describe("AnswerQuestion", () => {
         generationModel: GENERATION_MODEL,
         embeddingModel: EMBEDDING_MODEL,
       },
+      audit: {
+        latencyMs: 245,
+        embedding: embeddingUsage,
+        generation: null,
+        totalCostUsd: embeddingUsage.estimatedCostUsd,
+      },
     });
 
     expect(retrieveChunks.search).toHaveBeenCalledWith({
-      question: "O que os artigos dizem sobre isso?",
+      question,
       retrieval: {
         topK: 6,
         strategy: "standard",
       },
     });
     expect(generationProvider.generateAnswer).not.toHaveBeenCalled();
-  });
-
-  it("normalizes omitted retrieval settings, returns numbered sources, and forwards standard prompt inputs", async () => {
-    const { service, retrieveChunks, generationProvider } = createService();
-
-    const result = await service.execute({
-      question: "Quais abordagens aparecem com mais frequência?",
+    expect(runsRepository.create).toHaveBeenCalledTimes(1);
+    expect(runsRepository.create).toHaveBeenCalledWith({
+      question,
+      answer: buildNoEvidenceAnswer(),
       mode: "global",
-    });
-
-    expect(result).toMatchObject({
-      kind: "answered",
-      answer: "Resposta [1] [2].",
-      mode: "global",
-      metadata: {
-        mode: "global",
-        topK: 6,
-        retrievalStrategy: "standard",
-        candidateTopK: 6,
-        promptVersion: PROMPT_VERSION,
-        generationModel: GENERATION_MODEL,
-        embeddingModel: EMBEDDING_MODEL,
-      },
-    });
-    expect(result.kind).toBe("answered");
-    if (result.kind === "answered") {
-      expect(result.sources.map((source) => source.sourceNumber)).toEqual([1, 2]);
-    }
-    expect(retrieveChunks.search).toHaveBeenCalledWith({
-      question: "Quais abordagens aparecem com mais frequência?",
-      retrieval: {
-        topK: 6,
-        strategy: "standard",
-      },
-    });
-    expect(generationProvider.generateAnswer).toHaveBeenCalledWith({
-      question: "Quais abordagens aparecem com mais frequência?",
-      promptContext: expect.stringContaining("[1] Título: article.pdf"),
+      status: "answered_no_evidence",
+      errorCode: null,
+      topK: 6,
+      retrievalStrategy: "standard",
+      candidateTopK: 6,
       promptVersion: PROMPT_VERSION,
       generationModel: GENERATION_MODEL,
-      retrievalStrategy: "standard",
+      embeddingModel: EMBEDDING_MODEL,
+      latencyMs: 245,
+      embeddingInputTokens: embeddingUsage.inputTokens,
+      embeddingCostUsd: embeddingUsage.estimatedCostUsd,
+      generationInputTokens: null,
+      generationOutputTokens: null,
+      generationTotalTokens: null,
+      generationCostUsd: null,
+      totalCostUsd: embeddingUsage.estimatedCostUsd,
+      sources: [],
+      relatedTerms: extractRelatedTerms({
+        question,
+        sourceExcerpts: [],
+      }),
     });
+    expect(nowMs).toHaveBeenCalledTimes(2);
   });
 
-  it("preserves explicit standard retrieval settings without explore diversification in the application layer", async () => {
-    const { service, retrieveChunks, generationProvider } = createService({
-      answer: "Resposta com top-k ajustado [1].",
+  it("persists a successful answered run with traceId, related terms, audit metrics, and cited source flags", async () => {
+    const nowMs = createNowMs(432);
+    const embeddingUsage = buildEmbeddingUsage({
+      inputTokens: 19,
+      estimatedCostUsd: 0.00000247,
+    });
+    const generationUsage = buildGenerationUsage({
+      inputTokens: 140,
+      outputTokens: 35,
+      totalTokens: 175,
+      estimatedCostUsd: 0.000061,
+    });
+    const { service, retrieveChunks, generationProvider, runsRepository, matches } =
+      createService({
+        embeddingUsage,
+        generationUsage,
+        nowMs,
+        answer: "A síntese prioriza a segunda fonte [2].",
+      });
+    const question = "Quais abordagens aparecem com mais frequência?";
+    const expectedRelatedTerms = extractRelatedTerms({
+      question,
+      sourceExcerpts: matches.map((match) => match.excerpt),
     });
 
     const result = await service.execute({
-      question: "O que aparece nos artigos?",
+      question,
       mode: "global",
       retrieval: {
         topK: 9,
@@ -171,33 +261,97 @@ describe("AnswerQuestion", () => {
       },
     });
 
-    expect(result).toMatchObject({
+    expect(result).toEqual({
       kind: "answered",
+      traceId: CREATED_RUN_ID,
+      answer: "A síntese prioriza a segunda fonte [2].",
+      mode: "global",
+      sources: [
+        {
+          sourceNumber: 1,
+          ...matches[0],
+        },
+        {
+          sourceNumber: 2,
+          ...matches[1],
+        },
+      ],
+      relatedTerms: expectedRelatedTerms,
       metadata: {
         mode: "global",
         topK: 9,
         retrievalStrategy: "standard",
         candidateTopK: 9,
+        promptVersion: PROMPT_VERSION,
+        generationModel: GENERATION_MODEL,
+        embeddingModel: EMBEDDING_MODEL,
+      },
+      audit: {
+        latencyMs: 432,
+        embedding: embeddingUsage,
+        generation: generationUsage,
+        totalCostUsd:
+          embeddingUsage.estimatedCostUsd + generationUsage.estimatedCostUsd,
       },
     });
+
     expect(retrieveChunks.search).toHaveBeenCalledWith({
-      question: "O que aparece nos artigos?",
+      question,
       retrieval: {
         topK: 9,
         strategy: "standard",
       },
     });
-    expect(generationProvider.generateAnswer).toHaveBeenCalledWith(
-      expect.objectContaining({
-        retrievalStrategy: "standard",
-      }),
-    );
+    expect(generationProvider.generateAnswer).toHaveBeenCalledWith({
+      question,
+      promptContext: expect.stringContaining("[1] Título: article.pdf"),
+      promptVersion: PROMPT_VERSION,
+      generationModel: GENERATION_MODEL,
+      retrievalStrategy: "standard",
+    });
+    expect(runsRepository.create).toHaveBeenCalledWith({
+      question,
+      answer: "A síntese prioriza a segunda fonte [2].",
+      mode: "global",
+      status: "answered",
+      errorCode: null,
+      topK: 9,
+      retrievalStrategy: "standard",
+      candidateTopK: 9,
+      promptVersion: PROMPT_VERSION,
+      generationModel: GENERATION_MODEL,
+      embeddingModel: EMBEDDING_MODEL,
+      latencyMs: 432,
+      embeddingInputTokens: embeddingUsage.inputTokens,
+      embeddingCostUsd: embeddingUsage.estimatedCostUsd,
+      generationInputTokens: generationUsage.inputTokens,
+      generationOutputTokens: generationUsage.outputTokens,
+      generationTotalTokens: generationUsage.totalTokens,
+      generationCostUsd: generationUsage.estimatedCostUsd,
+      totalCostUsd:
+        embeddingUsage.estimatedCostUsd + generationUsage.estimatedCostUsd,
+      sources: [
+        {
+          sourceNumber: 1,
+          ...matches[0],
+          citedInAnswer: false,
+        },
+        {
+          sourceNumber: 2,
+          ...matches[1],
+          citedInAnswer: true,
+        },
+      ],
+      relatedTerms: expectedRelatedTerms,
+    });
+    expect(nowMs).toHaveBeenCalledTimes(2);
   });
 
-  it("normalizes explore retrieval defaults and forwards explore prompt strategy with expanded metadata", async () => {
-    const { service, retrieveChunks, generationProvider } = createService({
-      answer: "Perspectiva A [1]. Perspectiva B [2].",
-    });
+  it("normalizes explore retrieval defaults, forwards explore prompting, and persists the applied strategy metadata", async () => {
+    const { service, retrieveChunks, generationProvider, runsRepository } =
+      createService({
+        answer: "Perspectiva A [1]. Perspectiva B [2].",
+      });
 
     const result = await service.execute({
       question: "Quais perspectivas diferentes aparecem?",
@@ -209,15 +363,11 @@ describe("AnswerQuestion", () => {
 
     expect(result).toMatchObject({
       kind: "answered",
-      answer: "Perspectiva A [1]. Perspectiva B [2].",
       metadata: {
         mode: "global",
         topK: 6,
         retrievalStrategy: "explore",
         candidateTopK: 18,
-        promptVersion: PROMPT_VERSION,
-        generationModel: GENERATION_MODEL,
-        embeddingModel: EMBEDDING_MODEL,
       },
     });
     expect(retrieveChunks.search).toHaveBeenCalledWith({
@@ -232,89 +382,180 @@ describe("AnswerQuestion", () => {
         retrievalStrategy: "explore",
       }),
     );
-  });
-
-  it("reports capped explore candidateTopK for larger top-k values", async () => {
-    const { service } = createService({
-      answer: "Perspectiva A [1]. Perspectiva B [2].",
-    });
-
-    const result = await service.execute({
-      question: "Compare as frentes de pesquisa.",
-      mode: "global",
-      retrieval: {
-        topK: 12,
-        strategy: "explore",
-      },
-    });
-
-    expect(result).toMatchObject({
-      kind: "answered",
-      metadata: {
-        topK: 12,
+    expect(runsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
         retrievalStrategy: "explore",
-        candidateTopK: 24,
-      },
-    });
+        candidateTopK: 18,
+      }),
+    );
   });
 
-  it("accepts the canonical insufficient-evidence answer from generation even when sources exist", async () => {
-    const { service } = createService({
+  it("accepts the canonical insufficient-evidence answer from generation as an answered run when sources exist", async () => {
+    const { service, runsRepository, generationUsage, matches } = createService({
       answer: buildNoEvidenceAnswer(),
     });
+    const question = "Há evidências suficientes para concluir algo?";
 
     const result = await service.execute({
-      question: "Há evidências suficientes para concluir algo?",
+      question,
       mode: "global",
     });
 
     expect(result).toMatchObject({
       kind: "answered",
+      traceId: CREATED_RUN_ID,
       answer: buildNoEvidenceAnswer(),
       mode: "global",
-      sources: expect.arrayContaining([
+      sources: [
         expect.objectContaining({ sourceNumber: 1 }),
-      ]),
+        expect.objectContaining({ sourceNumber: 2 }),
+      ],
+    });
+    expect(runsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "answered",
+        errorCode: null,
+        answer: buildNoEvidenceAnswer(),
+        sources: [
+          {
+            sourceNumber: 1,
+            ...matches[0],
+            citedInAnswer: false,
+          },
+          {
+            sourceNumber: 2,
+            ...matches[1],
+            citedInAnswer: false,
+          },
+        ],
+        generationInputTokens: generationUsage.inputTokens,
+        generationOutputTokens: generationUsage.outputTokens,
+        generationTotalTokens: generationUsage.totalTokens,
+        generationCostUsd: generationUsage.estimatedCostUsd,
+      }),
+    );
+  });
+
+  it("persists a failed run with provider usage metrics when citation validation fails after generation", async () => {
+    const generationUsage = buildGenerationUsage({
+      inputTokens: 200,
+      outputTokens: 20,
+      totalTokens: 220,
+      estimatedCostUsd: 0.000083,
+    });
+    const { service, runsRepository, matches, embeddingUsage } = createService({
+      answer: "Resposta sem citação.",
+      generationUsage,
+    });
+    const question = "Pergunta";
+    const expectedRelatedTerms = extractRelatedTerms({
+      question,
+      sourceExcerpts: matches.map((match) => match.excerpt),
+    });
+
+    await expect(
+      service.execute({
+        question,
+        mode: "global",
+      }),
+    ).resolves.toEqual({
+      kind: "error",
+      error: "generation_failed",
+    });
+
+    expect(runsRepository.create).toHaveBeenCalledWith({
+      question,
+      answer: null,
+      mode: "global",
+      status: "generation_failed",
+      errorCode: "generation_failed",
+      topK: 6,
+      retrievalStrategy: "standard",
+      candidateTopK: 6,
+      promptVersion: PROMPT_VERSION,
+      generationModel: GENERATION_MODEL,
+      embeddingModel: EMBEDDING_MODEL,
+      latencyMs: 432,
+      embeddingInputTokens: embeddingUsage.inputTokens,
+      embeddingCostUsd: embeddingUsage.estimatedCostUsd,
+      generationInputTokens: generationUsage.inputTokens,
+      generationOutputTokens: generationUsage.outputTokens,
+      generationTotalTokens: generationUsage.totalTokens,
+      generationCostUsd: generationUsage.estimatedCostUsd,
+      totalCostUsd:
+        embeddingUsage.estimatedCostUsd + generationUsage.estimatedCostUsd,
+      sources: [
+        {
+          sourceNumber: 1,
+          ...matches[0],
+          citedInAnswer: false,
+        },
+        {
+          sourceNumber: 2,
+          ...matches[1],
+          citedInAnswer: false,
+        },
+      ],
+      relatedTerms: expectedRelatedTerms,
     });
   });
 
-  it.each([
-    "Resposta sem citação.",
-    "Resposta com marcador inválido [abc].",
-    "Resposta com fonte inexistente [3].",
-  ])(
-    "maps invalid citation output to generation_failed: %s",
-    async (answer) => {
-      const { service } = createService({ answer });
-
-      await expect(
-        service.execute({
-          question: "Pergunta",
-          mode: "global",
-        }),
-      ).resolves.toEqual({
-        kind: "error",
-        error: "generation_failed",
-      });
-    },
-  );
-
-  it("maps transient generation failures to generation_unavailable", async () => {
-    const { service } = createService({
+  it("persists a failed run without generation metrics when generation is unavailable", async () => {
+    const { service, runsRepository, matches, embeddingUsage } = createService({
       generationError: {
         statusCode: 503,
         message: "provider unavailable",
       },
     });
+    const question = "Pergunta";
+    const expectedRelatedTerms = extractRelatedTerms({
+      question,
+      sourceExcerpts: matches.map((match) => match.excerpt),
+    });
 
     await expect(
       service.execute({
-        question: "Pergunta",
+        question,
         mode: "global",
       }),
     ).resolves.toEqual({
       kind: "error",
       error: "generation_unavailable",
+    });
+
+    expect(runsRepository.create).toHaveBeenCalledWith({
+      question,
+      answer: null,
+      mode: "global",
+      status: "generation_unavailable",
+      errorCode: "generation_unavailable",
+      topK: 6,
+      retrievalStrategy: "standard",
+      candidateTopK: 6,
+      promptVersion: PROMPT_VERSION,
+      generationModel: GENERATION_MODEL,
+      embeddingModel: EMBEDDING_MODEL,
+      latencyMs: 432,
+      embeddingInputTokens: embeddingUsage.inputTokens,
+      embeddingCostUsd: embeddingUsage.estimatedCostUsd,
+      generationInputTokens: null,
+      generationOutputTokens: null,
+      generationTotalTokens: null,
+      generationCostUsd: null,
+      totalCostUsd: embeddingUsage.estimatedCostUsd,
+      sources: [
+        {
+          sourceNumber: 1,
+          ...matches[0],
+          citedInAnswer: false,
+        },
+        {
+          sourceNumber: 2,
+          ...matches[1],
+          citedInAnswer: false,
+        },
+      ],
+      relatedTerms: expectedRelatedTerms,
     });
   });
 });

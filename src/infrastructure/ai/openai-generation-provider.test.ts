@@ -9,11 +9,19 @@ const GENERATION_MODEL = "gpt-4.1-mini";
 const PROMPT_VERSION = "f04-global-rag-v1";
 
 describe("OpenAiGenerationProvider", () => {
-  it("generates an answer through the configured OpenAI model with the expected grounded prompt", async () => {
+  it("generates an answer with normalized usage and estimated cost", async () => {
     const model = { provider: "openai", modelId: GENERATION_MODEL };
     const modelFactory = vi.fn().mockReturnValue(model);
     const generateText = vi.fn().mockResolvedValue({
       text: "Resposta em português [1].",
+      usage: {
+        inputTokens: 100,
+        outputTokens: 25,
+        totalTokens: 125,
+        inputTokenDetails: {
+          cacheReadTokens: 20,
+        },
+      },
     });
     const provider = new OpenAiGenerationProvider({
       defaultGenerationModel: GENERATION_MODEL,
@@ -31,6 +39,12 @@ describe("OpenAiGenerationProvider", () => {
       }),
     ).resolves.toEqual({
       answer: "Resposta em português [1].",
+      usage: {
+        inputTokens: 100,
+        outputTokens: 25,
+        totalTokens: 125,
+        estimatedCostUsd: 0.000074,
+      },
     });
 
     expect(modelFactory).toHaveBeenCalledWith(GENERATION_MODEL);
@@ -73,6 +87,14 @@ describe("OpenAiGenerationProvider", () => {
     const modelFactory = vi.fn().mockReturnValue(model);
     const generateText = vi.fn().mockResolvedValue({
       text: "Perspectiva A [1]. Perspectiva B [2].",
+      usage: {
+        inputTokens: 88,
+        outputTokens: 19,
+        totalTokens: 107,
+        inputTokenDetails: {
+          cacheReadTokens: 0,
+        },
+      },
     });
     const provider = new OpenAiGenerationProvider({
       defaultGenerationModel: GENERATION_MODEL,
@@ -91,6 +113,12 @@ describe("OpenAiGenerationProvider", () => {
       }),
     ).resolves.toEqual({
       answer: "Perspectiva A [1]. Perspectiva B [2].",
+      usage: {
+        inputTokens: 88,
+        outputTokens: 19,
+        totalTokens: 107,
+        estimatedCostUsd: 0.0000656,
+      },
     });
 
     expect(generateText).toHaveBeenCalledWith(
@@ -103,6 +131,42 @@ describe("OpenAiGenerationProvider", () => {
         system: expect.stringContaining("cite cada perspectiva"),
       }),
     );
+  });
+
+  it("returns zeroed audit metrics for unknown or test generation models", async () => {
+    const provider = new OpenAiGenerationProvider({
+      defaultGenerationModel: "test-rag-generation-model",
+      modelFactory: vi.fn().mockReturnValue({}),
+      generateText: vi.fn().mockResolvedValue({
+        text: "Resposta [1].",
+        usage: {
+          inputTokens: 11,
+          outputTokens: 7,
+          totalTokens: 18,
+          inputTokenDetails: {
+            cacheReadTokens: 5,
+          },
+        },
+      }),
+    });
+
+    await expect(
+      provider.generateAnswer({
+        question: "Pergunta",
+        promptContext: "[1] Fonte",
+        promptVersion: PROMPT_VERSION,
+        generationModel: "test-rag-generation-model",
+        retrievalStrategy: "standard",
+      }),
+    ).resolves.toEqual({
+      answer: "Resposta [1].",
+      usage: {
+        inputTokens: 11,
+        outputTokens: 7,
+        totalTokens: 18,
+        estimatedCostUsd: 0,
+      },
+    });
   });
 
   it("maps transient provider failures to a sanitized generation_unavailable error", async () => {
@@ -160,6 +224,14 @@ describe("OpenAiGenerationProvider", () => {
     });
     const generateText = vi.fn().mockResolvedValue({
       text: "Resposta em português [1].",
+      usage: {
+        inputTokens: 44,
+        outputTokens: 9,
+        totalTokens: 53,
+        inputTokenDetails: {
+          cacheReadTokens: 4,
+        },
+      },
     });
     const provider = createOpenAiGenerationProviderFromEnv(
       {
@@ -181,7 +253,13 @@ describe("OpenAiGenerationProvider", () => {
         retrievalStrategy: "standard",
       }),
     ).resolves.toEqual({
-      answer: expect.any(String),
+      answer: "Resposta em português [1].",
+      usage: {
+        inputTokens: 44,
+        outputTokens: 9,
+        totalTokens: 53,
+        estimatedCostUsd: 0.0000308,
+      },
     });
 
     expect(createProvider).toHaveBeenCalledWith({
