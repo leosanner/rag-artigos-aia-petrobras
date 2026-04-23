@@ -1,11 +1,13 @@
 import { sql } from "drizzle-orm";
 import {
-  check,
   boolean,
+  check,
+  doublePrecision,
   index,
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -43,6 +45,18 @@ export const ragIndexingRunItemStatus = pgEnum(
   "rag_indexing_run_item_status",
   ["processing", "processed", "failed"],
 );
+
+export const ragQueryRunStatus = pgEnum("rag_query_run_status", [
+  "answered",
+  "answered_no_evidence",
+  "generation_failed",
+  "generation_unavailable",
+]);
+
+export const ragQueryRunErrorCode = pgEnum("rag_query_run_error_code", [
+  "generation_failed",
+  "generation_unavailable",
+]);
 
 export const documents = pgTable("documents", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -266,6 +280,206 @@ export const ragIndexingRunItems = pgTable(
   ],
 );
 
+export const ragQueryRuns = pgTable(
+  "rag_query_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    question: text("question").notNull(),
+    answer: text("answer"),
+    mode: text("mode").$type<"global">().notNull(),
+    status: ragQueryRunStatus("status").notNull(),
+    errorCode: ragQueryRunErrorCode("error_code"),
+    topK: integer("top_k").notNull(),
+    retrievalStrategy: text("retrieval_strategy")
+      .$type<"standard" | "explore">()
+      .notNull(),
+    candidateTopK: integer("candidate_top_k").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    generationModel: text("generation_model").notNull(),
+    embeddingModel: text("embedding_model").notNull(),
+    latencyMs: integer("latency_ms").notNull(),
+    embeddingInputTokens: integer("embedding_input_tokens").notNull(),
+    embeddingCostUsd: doublePrecision("embedding_cost_usd").notNull(),
+    generationInputTokens: integer("generation_input_tokens"),
+    generationOutputTokens: integer("generation_output_tokens"),
+    generationTotalTokens: integer("generation_total_tokens"),
+    generationCostUsd: doublePrecision("generation_cost_usd"),
+    totalCostUsd: doublePrecision("total_cost_usd").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      "rag_query_runs_question_non_empty",
+      sql`length(btrim(${table.question})) > 0`,
+    ),
+    check(
+      "rag_query_runs_answer_non_empty_when_present",
+      sql`${table.answer} is null or length(btrim(${table.answer})) > 0`,
+    ),
+    check("rag_query_runs_mode_global", sql`${table.mode} = 'global'`),
+    check("rag_query_runs_top_k_positive", sql`${table.topK} > 0`),
+    check(
+      "rag_query_runs_retrieval_strategy_valid",
+      sql`${table.retrievalStrategy} in ('standard', 'explore')`,
+    ),
+    check(
+      "rag_query_runs_candidate_top_k_positive",
+      sql`${table.candidateTopK} > 0`,
+    ),
+    check(
+      "rag_query_runs_latency_ms_non_negative",
+      sql`${table.latencyMs} >= 0`,
+    ),
+    check(
+      "rag_query_runs_embedding_input_tokens_non_negative",
+      sql`${table.embeddingInputTokens} >= 0`,
+    ),
+    check(
+      "rag_query_runs_embedding_cost_usd_non_negative",
+      sql`${table.embeddingCostUsd} >= 0`,
+    ),
+    check(
+      "rag_query_runs_generation_input_tokens_non_negative",
+      sql`${table.generationInputTokens} is null or ${table.generationInputTokens} >= 0`,
+    ),
+    check(
+      "rag_query_runs_generation_output_tokens_non_negative",
+      sql`${table.generationOutputTokens} is null or ${table.generationOutputTokens} >= 0`,
+    ),
+    check(
+      "rag_query_runs_generation_total_tokens_non_negative",
+      sql`${table.generationTotalTokens} is null or ${table.generationTotalTokens} >= 0`,
+    ),
+    check(
+      "rag_query_runs_generation_cost_usd_non_negative",
+      sql`${table.generationCostUsd} is null or ${table.generationCostUsd} >= 0`,
+    ),
+    check(
+      "rag_query_runs_total_cost_usd_non_negative",
+      sql`${table.totalCostUsd} >= 0`,
+    ),
+    check(
+      "rag_query_runs_generation_metrics_all_or_none",
+      sql`
+        (
+          ${table.generationInputTokens} is null and
+          ${table.generationOutputTokens} is null and
+          ${table.generationTotalTokens} is null and
+          ${table.generationCostUsd} is null
+        ) or (
+          ${table.generationInputTokens} is not null and
+          ${table.generationOutputTokens} is not null and
+          ${table.generationTotalTokens} is not null and
+          ${table.generationCostUsd} is not null
+        )
+      `,
+    ),
+    check(
+      "rag_query_runs_error_code_matches_status",
+      sql`
+        (
+          ${table.status} in ('answered', 'answered_no_evidence') and
+          ${table.errorCode} is null
+        ) or (
+          ${table.status} = 'generation_failed' and
+          ${table.errorCode} = 'generation_failed'
+        ) or (
+          ${table.status} = 'generation_unavailable' and
+          ${table.errorCode} = 'generation_unavailable'
+        )
+      `,
+    ),
+    index("rag_query_runs_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export const ragQueryRunSources = pgTable(
+  "rag_query_run_sources",
+  {
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => ragQueryRuns.id, { onDelete: "cascade" }),
+    sourceNumber: integer("source_number").notNull(),
+    chunkId: uuid("chunk_id").notNull(),
+    documentId: uuid("document_id").notNull(),
+    documentTitle: text("document_title").notNull(),
+    chunkIndex: integer("chunk_index").notNull(),
+    excerpt: text("excerpt").notNull(),
+    score: doublePrecision("score").notNull(),
+    documentPipelineVersion: text("document_pipeline_version").notNull(),
+    chunkingVersion: text("chunking_version").notNull(),
+    embeddingModel: text("embedding_model").notNull(),
+    citedInAnswer: boolean("cited_in_answer").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.runId, table.sourceNumber],
+      name: "rag_query_run_sources_pk",
+    }),
+    check(
+      "rag_query_run_sources_source_number_positive",
+      sql`${table.sourceNumber} > 0`,
+    ),
+    check(
+      "rag_query_run_sources_chunk_index_non_negative",
+      sql`${table.chunkIndex} >= 0`,
+    ),
+    check(
+      "rag_query_run_sources_document_title_non_empty",
+      sql`length(btrim(${table.documentTitle})) > 0`,
+    ),
+    check(
+      "rag_query_run_sources_excerpt_non_empty",
+      sql`length(btrim(${table.excerpt})) > 0`,
+    ),
+    index("rag_query_run_sources_run_id_idx").on(table.runId),
+  ],
+);
+
+export const ragQueryRunRelatedTerms = pgTable(
+  "rag_query_run_related_terms",
+  {
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => ragQueryRuns.id, { onDelete: "cascade" }),
+    rank: integer("rank").notNull(),
+    term: text("term").notNull(),
+    ngramSize: integer("ngram_size").notNull(),
+    frequency: integer("frequency").notNull(),
+    sourceCoverageCount: integer("source_coverage_count").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.runId, table.rank],
+      name: "rag_query_run_related_terms_pk",
+    }),
+    check("rag_query_run_related_terms_rank_positive", sql`${table.rank} > 0`),
+    check(
+      "rag_query_run_related_terms_rank_max_eight",
+      sql`${table.rank} <= 8`,
+    ),
+    check(
+      "rag_query_run_related_terms_term_non_empty",
+      sql`length(btrim(${table.term})) > 0`,
+    ),
+    check(
+      "rag_query_run_related_terms_ngram_size_positive",
+      sql`${table.ngramSize} > 0`,
+    ),
+    check(
+      "rag_query_run_related_terms_frequency_positive",
+      sql`${table.frequency} > 0`,
+    ),
+    check(
+      "rag_query_run_related_terms_source_coverage_count_non_negative",
+      sql`${table.sourceCoverageCount} >= 0`,
+    ),
+    index("rag_query_run_related_terms_run_id_idx").on(table.runId),
+  ],
+);
+
 export type DocumentStatus = (typeof documentStatus.enumValues)[number];
 export type Document = typeof documents.$inferSelect;
 export type NewDocument = typeof documents.$inferInsert;
@@ -286,3 +500,14 @@ export type RagIndexingRunItemStatus =
   (typeof ragIndexingRunItemStatus.enumValues)[number];
 export type RagIndexingRunItem = typeof ragIndexingRunItems.$inferSelect;
 export type NewRagIndexingRunItem = typeof ragIndexingRunItems.$inferInsert;
+export type RagQueryRunStatus = (typeof ragQueryRunStatus.enumValues)[number];
+export type RagQueryRunErrorCode =
+  (typeof ragQueryRunErrorCode.enumValues)[number];
+export type RagQueryRun = typeof ragQueryRuns.$inferSelect;
+export type NewRagQueryRun = typeof ragQueryRuns.$inferInsert;
+export type RagQueryRunSource = typeof ragQueryRunSources.$inferSelect;
+export type NewRagQueryRunSource = typeof ragQueryRunSources.$inferInsert;
+export type RagQueryRunRelatedTerm =
+  typeof ragQueryRunRelatedTerms.$inferSelect;
+export type NewRagQueryRunRelatedTerm =
+  typeof ragQueryRunRelatedTerms.$inferInsert;

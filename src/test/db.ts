@@ -34,6 +34,9 @@ export async function resetTestDatabase(
 
   await db.execute(sql`
     truncate table
+      "rag_query_run_related_terms",
+      "rag_query_run_sources",
+      "rag_query_runs",
       "rag_indexing_run_items",
       "rag_indexing_runs",
       "document_chunks",

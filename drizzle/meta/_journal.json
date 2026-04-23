@@ -22,6 +22,13 @@
       "when": 1776695774836,
       "tag": "0002_low_skullbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776975971160,
+      "tag": "0003_flippant_vargas",
+      "breakpoints": true
     }
   ]
 }
