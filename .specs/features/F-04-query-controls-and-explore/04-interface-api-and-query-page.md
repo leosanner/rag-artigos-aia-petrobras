@@ -51,26 +51,26 @@ route evolves beyond the F-03 baseline without adding a second endpoint.
 
 ## Functional Requirements
 
-- [ ] RF-B04-01: `ragAskRequestSchema` accepts an optional strict `retrieval`
+- [x] RF-B04-01: `ragAskRequestSchema` accepts an optional strict `retrieval`
   object with `topK?: number` and `strategy?: "standard" | "explore"`.
-- [ ] RF-B04-02: The request schema rejects unknown root and retrieval fields.
-- [ ] RF-B04-03: The request schema rejects non-integer `topK`, values below
+- [x] RF-B04-02: The request schema rejects unknown root and retrieval fields.
+- [x] RF-B04-03: The request schema rejects non-integer `topK`, values below
   `3`, and values above `12`.
-- [ ] RF-B04-04: Response schemas cover success plus sanitized
+- [x] RF-B04-04: Response schemas cover success plus sanitized
   `invalid_request`, `generation_failed`, and `generation_unavailable` shapes
   without adding provider internals.
-- [ ] RF-B04-05: `createRagAskHandler` returns `400` for malformed JSON or
+- [x] RF-B04-05: `createRagAskHandler` returns `400` for malformed JSON or
   invalid parsed bodies and forwards only validated input to
   `AnswerQuestion.execute`.
-- [ ] RF-B04-06: `/query` renders a PT-BR `topK` control with a visible default
+- [x] RF-B04-06: `/query` renders a PT-BR `topK` control with a visible default
   aligned to the F-03 baseline of `6`.
-- [ ] RF-B04-07: `/query` renders a default standard submit action and a
+- [x] RF-B04-07: `/query` renders a default standard submit action and a
   separate explicit explore action using the same question and stored secret.
-- [ ] RF-B04-08: `/query` can rerun the same question in explore mode without
+- [x] RF-B04-08: `/query` can rerun the same question in explore mode without
   requiring the operator to retype the secret.
-- [ ] RF-B04-09: On success, `/query` renders answer, numbered sources, and
+- [x] RF-B04-09: On success, `/query` renders answer, numbered sources, and
   retrieval metadata including applied strategy and candidate count.
-- [ ] RF-B04-10: On `400`, `502`, or `503`, `/query` shows safe PT-BR error
+- [x] RF-B04-10: On `400`, `502`, or `503`, `/query` shows safe PT-BR error
   messages without rendering raw provider details.
 
 ## Key Modules
