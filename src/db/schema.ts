@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 import {
   boolean,
   check,
@@ -57,6 +57,11 @@ export const ragQueryRunErrorCode = pgEnum("rag_query_run_error_code", [
   "generation_failed",
   "generation_unavailable",
 ]);
+
+export const ragConversationMessageRole = pgEnum(
+  "rag_conversation_message_role",
+  ["user", "assistant"],
+);
 
 export const documents = pgTable("documents", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -480,6 +485,65 @@ export const ragQueryRunRelatedTerms = pgTable(
   ],
 );
 
+export const ragConversations = pgTable(
+  "rag_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    title: text("title"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+  },
+  (table) => [
+    check(
+      "rag_conversations_title_non_empty",
+      sql`${table.title} is null or length(btrim(${table.title})) > 0`,
+    ),
+    index("rag_conversations_last_message_at_idx").on(
+      desc(table.lastMessageAt),
+    ),
+  ],
+);
+
+export const ragConversationMessages = pgTable(
+  "rag_conversation_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => ragConversations.id, { onDelete: "cascade" }),
+    role: ragConversationMessageRole("role").notNull(),
+    content: text("content").notNull(),
+    traceId: uuid("trace_id").references(() => ragQueryRuns.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      "rag_conversation_messages_content_non_empty",
+      sql`length(btrim(${table.content})) > 0`,
+    ),
+    check(
+      "rag_conversation_messages_assistant_requires_trace",
+      sql`${table.role} <> 'assistant' or ${table.traceId} is not null`,
+    ),
+    check(
+      "rag_conversation_messages_user_has_no_trace",
+      sql`${table.role} <> 'user' or ${table.traceId} is null`,
+    ),
+    index("rag_conversation_messages_conversation_created_at_idx").on(
+      table.conversationId,
+      table.createdAt,
+      table.id,
+    ),
+  ],
+);
+
 export type DocumentStatus = (typeof documentStatus.enumValues)[number];
 export type Document = typeof documents.$inferSelect;
 export type NewDocument = typeof documents.$inferInsert;
@@ -511,3 +575,11 @@ export type RagQueryRunRelatedTerm =
   typeof ragQueryRunRelatedTerms.$inferSelect;
 export type NewRagQueryRunRelatedTerm =
   typeof ragQueryRunRelatedTerms.$inferInsert;
+export type RagConversationMessageRole =
+  (typeof ragConversationMessageRole.enumValues)[number];
+export type RagConversation = typeof ragConversations.$inferSelect;
+export type NewRagConversation = typeof ragConversations.$inferInsert;
+export type RagConversationMessage =
+  typeof ragConversationMessages.$inferSelect;
+export type NewRagConversationMessage =
+  typeof ragConversationMessages.$inferInsert;
