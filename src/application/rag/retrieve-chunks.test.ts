@@ -6,13 +6,16 @@ import type { RetrievedChunkMatch } from "@/domain/rag";
 import { RetrieveChunks } from "./retrieve-chunks";
 
 const EMBEDDING_MODEL = "text-embedding-3-large";
+const DOCUMENT_A = "11111111-1111-4111-8111-111111111111";
+const DOCUMENT_B = "22222222-2222-4222-8222-222222222222";
+const DOCUMENT_C = "33333333-3333-4333-8333-333333333333";
 
 function buildMatch(
   overrides: Partial<RetrievedChunkMatch> = {},
 ): RetrievedChunkMatch {
   return {
     chunkId: "11111111-1111-4111-8111-111111111111",
-    documentId: "22222222-2222-4222-8222-222222222222",
+    documentId: DOCUMENT_A,
     documentTitle: "article.pdf",
     chunkIndex: 0,
     excerpt: "Chunk excerpt",
@@ -25,7 +28,7 @@ function buildMatch(
 }
 
 describe("RetrieveChunks", () => {
-  it("embeds the question and searches the active configuration with top-k 6", async () => {
+  it("embeds the question and searches the active configuration with standard top-k", async () => {
     const queryEmbedding = [0.1, 0.2, 0.3];
     const matches = [buildMatch()];
     const questionEmbeddingProvider = {
@@ -41,7 +44,13 @@ describe("RetrieveChunks", () => {
     });
 
     await expect(
-      service.search("Quais técnicas foram usadas nos artigos?"),
+      service.search({
+        question: "Quais técnicas foram usadas nos artigos?",
+        retrieval: {
+          topK: 9,
+          strategy: "standard",
+        },
+      }),
     ).resolves.toEqual(matches);
 
     expect(questionEmbeddingProvider.embedQuestion).toHaveBeenCalledWith(
@@ -49,13 +58,110 @@ describe("RetrieveChunks", () => {
     );
     expect(chunksRepository.searchGlobal).toHaveBeenCalledWith({
       queryEmbedding,
-      topK: 6,
+      topK: 9,
       chunkingVersion: DEFAULT_CHUNKING_CONFIG.chunkingVersion,
       embeddingModel: EMBEDDING_MODEL,
     });
-    expect(service.topK).toBe(6);
     expect(service.chunkingVersion).toBe(
       DEFAULT_CHUNKING_CONFIG.chunkingVersion,
+    );
+  });
+
+  it("fetches explore candidates and returns a deterministic diversified top-k selection", async () => {
+    const queryEmbedding = [0.1, 0.2, 0.3];
+    const candidates = [
+      buildMatch({
+        chunkId: "10000000-0000-4000-8000-000000000000",
+        documentId: DOCUMENT_A,
+        chunkIndex: 0,
+        score: 0.99,
+      }),
+      buildMatch({
+        chunkId: "10000000-0000-4000-8000-000000000001",
+        documentId: DOCUMENT_A,
+        chunkIndex: 1,
+        score: 0.98,
+      }),
+      buildMatch({
+        chunkId: "10000000-0000-4000-8000-000000000002",
+        documentId: DOCUMENT_A,
+        chunkIndex: 2,
+        score: 0.97,
+      }),
+      buildMatch({
+        chunkId: "20000000-0000-4000-8000-000000000000",
+        documentId: DOCUMENT_B,
+        chunkIndex: 0,
+        score: 0.96,
+      }),
+      buildMatch({
+        chunkId: "30000000-0000-4000-8000-000000000000",
+        documentId: DOCUMENT_C,
+        chunkIndex: 0,
+        score: 0.95,
+      }),
+    ];
+    const questionEmbeddingProvider = {
+      embedQuestion: vi.fn().mockResolvedValue(queryEmbedding),
+    };
+    const chunksRepository = {
+      searchGlobal: vi.fn().mockResolvedValue(candidates),
+    };
+    const service = new RetrieveChunks({
+      questionEmbeddingProvider,
+      chunksRepository,
+      embeddingModel: EMBEDDING_MODEL,
+    });
+
+    await expect(
+      service.search({
+        question: "Quais linhas de pesquisa aparecem?",
+        retrieval: {
+          topK: 4,
+          strategy: "explore",
+        },
+      }),
+    ).resolves.toEqual([
+      candidates[0],
+      candidates[1],
+      candidates[3],
+      candidates[4],
+    ]);
+
+    expect(chunksRepository.searchGlobal).toHaveBeenCalledWith({
+      queryEmbedding,
+      topK: 12,
+      chunkingVersion: DEFAULT_CHUNKING_CONFIG.chunkingVersion,
+      embeddingModel: EMBEDDING_MODEL,
+    });
+  });
+
+  it("caps explore candidate fetches at 24", async () => {
+    const queryEmbedding = [0.1, 0.2, 0.3];
+    const questionEmbeddingProvider = {
+      embedQuestion: vi.fn().mockResolvedValue(queryEmbedding),
+    };
+    const chunksRepository = {
+      searchGlobal: vi.fn().mockResolvedValue([]),
+    };
+    const service = new RetrieveChunks({
+      questionEmbeddingProvider,
+      chunksRepository,
+      embeddingModel: EMBEDDING_MODEL,
+    });
+
+    await service.search({
+      question: "Compare os estudos.",
+      retrieval: {
+        topK: 12,
+        strategy: "explore",
+      },
+    });
+
+    expect(chunksRepository.searchGlobal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        topK: 24,
+      }),
     );
   });
 });

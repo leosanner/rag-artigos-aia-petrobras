@@ -43,7 +43,9 @@ const SUCCESS_RESPONSE = {
   metadata: {
     mode: "global" as const,
     topK: 6,
-    promptVersion: "f03-global-rag-v1",
+    retrievalStrategy: "standard" as const,
+    candidateTopK: 6,
+    promptVersion: "f04-global-rag-v1",
     generationModel: "gpt-4.1-mini",
     embeddingModel: "text-embedding-3-large",
   },
@@ -181,7 +183,7 @@ describe("/query page", () => {
     expect(screen.getByText(/top-k:\s*6/i)).toBeInTheDocument();
     expect(screen.getByText(/gpt-4\.1-mini/i)).toBeInTheDocument();
     expect(screen.getByText(/text-embedding-3-large/i)).toBeInTheDocument();
-    expect(screen.queryByText(/f03-global-rag-v1/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/f04-global-rag-v1/i)).not.toBeInTheDocument();
   });
 
   it("truncates long excerpts only in the rendered preview", async () => {

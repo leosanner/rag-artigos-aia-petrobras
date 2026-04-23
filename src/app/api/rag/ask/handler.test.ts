@@ -34,7 +34,9 @@ function buildAnsweredResult(): AnswerQuestionResult {
     metadata: {
       mode: "global",
       topK: 6,
-      promptVersion: "f03-global-rag-v1",
+      retrievalStrategy: "standard",
+      candidateTopK: 6,
+      promptVersion: "f04-global-rag-v1",
       generationModel: "gpt-4.1-mini",
       embeddingModel: "text-embedding-3-large",
     },
@@ -104,7 +106,9 @@ describe("POST /api/rag/ask handler", () => {
       metadata: {
         mode: "global",
         topK: 6,
-        promptVersion: "f03-global-rag-v1",
+        retrievalStrategy: "standard",
+        candidateTopK: 6,
+        promptVersion: "f04-global-rag-v1",
         generationModel: "gpt-4.1-mini",
         embeddingModel: "text-embedding-3-large",
       },

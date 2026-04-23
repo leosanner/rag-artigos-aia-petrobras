@@ -1,7 +1,11 @@
 import { DEFAULT_CHUNKING_CONFIG } from "@/domain/chunking/hybrid-text-chunker";
-import type { RetrievedChunkMatch } from "@/domain/rag";
+import {
+  getCandidateTopK,
+  selectDiversifiedMatches,
+  type RagRetrievalSettings,
+  type RetrievedChunkMatch,
+} from "@/domain/rag";
 
-import { GLOBAL_RAG_TOP_K } from "./constants";
 import type {
   GlobalChunkSearchRepository,
   QuestionEmbeddingProvider,
@@ -13,8 +17,12 @@ export type RetrieveChunksDeps = {
   embeddingModel: string;
 };
 
+export type RetrieveChunksInput = {
+  question: string;
+  retrieval: RagRetrievalSettings;
+};
+
 export class RetrieveChunks {
-  readonly topK: number;
   readonly embeddingModel: string;
   readonly chunkingVersion: string;
 
@@ -25,20 +33,29 @@ export class RetrieveChunks {
     this.questionEmbeddingProvider = deps.questionEmbeddingProvider;
     this.chunksRepository = deps.chunksRepository;
     this.embeddingModel = deps.embeddingModel;
-    this.topK = GLOBAL_RAG_TOP_K;
     this.chunkingVersion = DEFAULT_CHUNKING_CONFIG.chunkingVersion;
   }
 
-  async search(question: string): Promise<RetrievedChunkMatch[]> {
+  async search(input: RetrieveChunksInput): Promise<RetrievedChunkMatch[]> {
     const queryEmbedding = await this.questionEmbeddingProvider.embedQuestion(
-      question,
+      input.question,
     );
+    const candidateTopK = getCandidateTopK(input.retrieval);
 
-    return this.chunksRepository.searchGlobal({
+    const matches = await this.chunksRepository.searchGlobal({
       queryEmbedding,
-      topK: this.topK,
+      topK: candidateTopK,
       chunkingVersion: this.chunkingVersion,
       embeddingModel: this.embeddingModel,
+    });
+
+    if (input.retrieval.strategy === "standard") {
+      return matches;
+    }
+
+    return selectDiversifiedMatches({
+      matches,
+      topK: input.retrieval.topK,
     });
   }
 }

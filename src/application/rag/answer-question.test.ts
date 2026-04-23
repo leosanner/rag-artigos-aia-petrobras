@@ -6,7 +6,7 @@ import { AnswerQuestion } from "./answer-question";
 
 const GENERATION_MODEL = "gpt-4.1-mini";
 const EMBEDDING_MODEL = "text-embedding-3-large";
-const PROMPT_VERSION = "f03-global-rag-v1";
+const PROMPT_VERSION = "f04-global-rag-v1";
 
 function buildMatch(
   overrides: Partial<RetrievedChunkMatch> = {},
@@ -31,7 +31,6 @@ function createService(overrides: {
   generationError?: unknown;
 } = {}) {
   const retrieveChunks = {
-    topK: 6,
     embeddingModel: EMBEDDING_MODEL,
     search: vi
       .fn()
@@ -98,20 +97,26 @@ describe("AnswerQuestion", () => {
       metadata: {
         mode: "global",
         topK: 6,
+        retrievalStrategy: "standard",
+        candidateTopK: 6,
         promptVersion: PROMPT_VERSION,
         generationModel: GENERATION_MODEL,
         embeddingModel: EMBEDDING_MODEL,
       },
     });
 
-    expect(retrieveChunks.search).toHaveBeenCalledWith(
-      "O que os artigos dizem sobre isso?",
-    );
+    expect(retrieveChunks.search).toHaveBeenCalledWith({
+      question: "O que os artigos dizem sobre isso?",
+      retrieval: {
+        topK: 6,
+        strategy: "standard",
+      },
+    });
     expect(generationProvider.generateAnswer).not.toHaveBeenCalled();
   });
 
-  it("returns numbered sources, stable metadata, and forwards the prompt inputs to generation", async () => {
-    const { service, generationProvider } = createService();
+  it("normalizes omitted retrieval settings, returns numbered sources, and forwards standard prompt inputs", async () => {
+    const { service, retrieveChunks, generationProvider } = createService();
 
     const result = await service.execute({
       question: "Quais abordagens aparecem com mais frequência?",
@@ -125,6 +130,8 @@ describe("AnswerQuestion", () => {
       metadata: {
         mode: "global",
         topK: 6,
+        retrievalStrategy: "standard",
+        candidateTopK: 6,
         promptVersion: PROMPT_VERSION,
         generationModel: GENERATION_MODEL,
         embeddingModel: EMBEDDING_MODEL,
@@ -134,11 +141,120 @@ describe("AnswerQuestion", () => {
     if (result.kind === "answered") {
       expect(result.sources.map((source) => source.sourceNumber)).toEqual([1, 2]);
     }
+    expect(retrieveChunks.search).toHaveBeenCalledWith({
+      question: "Quais abordagens aparecem com mais frequência?",
+      retrieval: {
+        topK: 6,
+        strategy: "standard",
+      },
+    });
     expect(generationProvider.generateAnswer).toHaveBeenCalledWith({
       question: "Quais abordagens aparecem com mais frequência?",
       promptContext: expect.stringContaining("[1] Título: article.pdf"),
       promptVersion: PROMPT_VERSION,
       generationModel: GENERATION_MODEL,
+      retrievalStrategy: "standard",
+    });
+  });
+
+  it("preserves explicit standard retrieval settings without explore diversification in the application layer", async () => {
+    const { service, retrieveChunks, generationProvider } = createService({
+      answer: "Resposta com top-k ajustado [1].",
+    });
+
+    const result = await service.execute({
+      question: "O que aparece nos artigos?",
+      mode: "global",
+      retrieval: {
+        topK: 9,
+        strategy: "standard",
+      },
+    });
+
+    expect(result).toMatchObject({
+      kind: "answered",
+      metadata: {
+        mode: "global",
+        topK: 9,
+        retrievalStrategy: "standard",
+        candidateTopK: 9,
+      },
+    });
+    expect(retrieveChunks.search).toHaveBeenCalledWith({
+      question: "O que aparece nos artigos?",
+      retrieval: {
+        topK: 9,
+        strategy: "standard",
+      },
+    });
+    expect(generationProvider.generateAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        retrievalStrategy: "standard",
+      }),
+    );
+  });
+
+  it("normalizes explore retrieval defaults and forwards explore prompt strategy with expanded metadata", async () => {
+    const { service, retrieveChunks, generationProvider } = createService({
+      answer: "Perspectiva A [1]. Perspectiva B [2].",
+    });
+
+    const result = await service.execute({
+      question: "Quais perspectivas diferentes aparecem?",
+      mode: "global",
+      retrieval: {
+        strategy: "explore",
+      },
+    });
+
+    expect(result).toMatchObject({
+      kind: "answered",
+      answer: "Perspectiva A [1]. Perspectiva B [2].",
+      metadata: {
+        mode: "global",
+        topK: 6,
+        retrievalStrategy: "explore",
+        candidateTopK: 18,
+        promptVersion: PROMPT_VERSION,
+        generationModel: GENERATION_MODEL,
+        embeddingModel: EMBEDDING_MODEL,
+      },
+    });
+    expect(retrieveChunks.search).toHaveBeenCalledWith({
+      question: "Quais perspectivas diferentes aparecem?",
+      retrieval: {
+        topK: 6,
+        strategy: "explore",
+      },
+    });
+    expect(generationProvider.generateAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        retrievalStrategy: "explore",
+      }),
+    );
+  });
+
+  it("reports capped explore candidateTopK for larger top-k values", async () => {
+    const { service } = createService({
+      answer: "Perspectiva A [1]. Perspectiva B [2].",
+    });
+
+    const result = await service.execute({
+      question: "Compare as frentes de pesquisa.",
+      mode: "global",
+      retrieval: {
+        topK: 12,
+        strategy: "explore",
+      },
+    });
+
+    expect(result).toMatchObject({
+      kind: "answered",
+      metadata: {
+        topK: 12,
+        retrievalStrategy: "explore",
+        candidateTopK: 24,
+      },
     });
   });
 

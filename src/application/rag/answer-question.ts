@@ -3,6 +3,9 @@ import {
   assertValidCitationMarkers,
   assembleRagContext,
   buildNoEvidenceAnswer,
+  getCandidateTopK,
+  normalizeRetrievalSettings,
+  type RagRetrievalSettings,
   toSafeGenerationFailureCode,
 } from "@/domain/rag";
 
@@ -17,7 +20,7 @@ import { answerQuestionResultSchema } from "./schemas";
 import type { RetrieveChunks } from "./retrieve-chunks";
 
 export type AnswerQuestionDeps = {
-  retrieveChunks: Pick<RetrieveChunks, "search" | "topK" | "embeddingModel">;
+  retrieveChunks: Pick<RetrieveChunks, "search" | "embeddingModel">;
   generationProvider: GenerationProvider;
   generationModel: string;
   promptVersion?: string;
@@ -28,7 +31,7 @@ const NO_EVIDENCE_ANSWER = buildNoEvidenceAnswer();
 export class AnswerQuestion {
   private readonly retrieveChunks: Pick<
     RetrieveChunks,
-    "search" | "topK" | "embeddingModel"
+    "search" | "embeddingModel"
   >;
   private readonly generationProvider: GenerationProvider;
   private readonly generationModel: string;
@@ -46,8 +49,12 @@ export class AnswerQuestion {
       throw new Error("Unsupported RAG mode");
     }
 
-    const matches = await this.retrieveChunks.search(input.question);
-    const metadata = this.buildMetadata();
+    const retrieval = normalizeRetrievalSettings(input.retrieval);
+    const matches = await this.retrieveChunks.search({
+      question: input.question,
+      retrieval,
+    });
+    const metadata = this.buildMetadata(retrieval);
 
     if (matches.length === 0) {
       return answerQuestionResultSchema.parse({
@@ -67,6 +74,7 @@ export class AnswerQuestion {
         promptContext,
         promptVersion: this.promptVersion,
         generationModel: this.generationModel,
+        retrievalStrategy: retrieval.strategy,
       });
 
       if (result.answer.trim() === NO_EVIDENCE_ANSWER) {
@@ -96,10 +104,12 @@ export class AnswerQuestion {
     }
   }
 
-  private buildMetadata(): RagAnswerMetadata {
+  private buildMetadata(retrieval: RagRetrievalSettings): RagAnswerMetadata {
     return {
       mode: "global",
-      topK: this.retrieveChunks.topK,
+      topK: retrieval.topK,
+      retrievalStrategy: retrieval.strategy,
+      candidateTopK: getCandidateTopK(retrieval),
       promptVersion: this.promptVersion,
       generationModel: this.generationModel,
       embeddingModel: this.retrieveChunks.embeddingModel,

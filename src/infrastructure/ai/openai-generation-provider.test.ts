@@ -6,7 +6,7 @@ import {
 } from "./openai-generation-provider";
 
 const GENERATION_MODEL = "gpt-4.1-mini";
-const PROMPT_VERSION = "f03-global-rag-v1";
+const PROMPT_VERSION = "f04-global-rag-v1";
 
 describe("OpenAiGenerationProvider", () => {
   it("generates an answer through the configured OpenAI model with the expected grounded prompt", async () => {
@@ -27,6 +27,7 @@ describe("OpenAiGenerationProvider", () => {
         promptContext: "[1] Título: artigo.pdf\nChunk: 0\nTrecho:\nTexto",
         promptVersion: PROMPT_VERSION,
         generationModel: GENERATION_MODEL,
+        retrievalStrategy: "standard",
       }),
     ).resolves.toEqual({
       answer: "Resposta em português [1].",
@@ -60,6 +61,48 @@ describe("OpenAiGenerationProvider", () => {
         ),
       }),
     );
+    expect(generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.not.stringContaining("2 a 4 perspectivas"),
+      }),
+    );
+  });
+
+  it("adds explore-mode instructions for cited perspectives only when requested", async () => {
+    const model = { provider: "openai", modelId: GENERATION_MODEL };
+    const modelFactory = vi.fn().mockReturnValue(model);
+    const generateText = vi.fn().mockResolvedValue({
+      text: "Perspectiva A [1]. Perspectiva B [2].",
+    });
+    const provider = new OpenAiGenerationProvider({
+      defaultGenerationModel: GENERATION_MODEL,
+      modelFactory,
+      generateText,
+    });
+
+    await expect(
+      provider.generateAnswer({
+        question: "Quais perspectivas aparecem?",
+        promptContext:
+          "[1] Título: artigo-a.pdf\nChunk: 0\nTrecho:\nTexto A\n\n[2] Título: artigo-b.pdf\nChunk: 0\nTrecho:\nTexto B",
+        promptVersion: PROMPT_VERSION,
+        generationModel: GENERATION_MODEL,
+        retrievalStrategy: "explore",
+      }),
+    ).resolves.toEqual({
+      answer: "Perspectiva A [1]. Perspectiva B [2].",
+    });
+
+    expect(generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.stringContaining("2 a 4 perspectivas"),
+      }),
+    );
+    expect(generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.stringContaining("cite cada perspectiva"),
+      }),
+    );
   });
 
   it("maps transient provider failures to a sanitized generation_unavailable error", async () => {
@@ -78,6 +121,7 @@ describe("OpenAiGenerationProvider", () => {
         promptContext: "[1] Fonte",
         promptVersion: PROMPT_VERSION,
         generationModel: GENERATION_MODEL,
+        retrievalStrategy: "standard",
       }),
     ).rejects.toMatchObject({
       code: "generation_unavailable",
@@ -100,6 +144,7 @@ describe("OpenAiGenerationProvider", () => {
         promptContext: "[1] Fonte",
         promptVersion: PROMPT_VERSION,
         generationModel: GENERATION_MODEL,
+        retrievalStrategy: "standard",
       }),
     ).rejects.toMatchObject({
       code: "generation_failed",
@@ -133,6 +178,7 @@ describe("OpenAiGenerationProvider", () => {
         promptContext: "[1] Fonte",
         promptVersion: PROMPT_VERSION,
         generationModel: GENERATION_MODEL,
+        retrievalStrategy: "standard",
       }),
     ).resolves.toEqual({
       answer: expect.any(String),

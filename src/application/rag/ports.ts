@@ -1,4 +1,4 @@
-import type { RetrievedChunkMatch } from "@/domain/rag";
+import type { RagRetrievalStrategy, RetrievedChunkMatch } from "@/domain/rag";
 
 export type SearchGlobalChunksInput = {
   queryEmbedding: number[];
@@ -20,6 +20,7 @@ export type GenerateAnswerInput = {
   promptContext: string;
   promptVersion: string;
   generationModel: string;
+  retrievalStrategy: RagRetrievalStrategy;
 };
 
 export interface GenerationProvider {

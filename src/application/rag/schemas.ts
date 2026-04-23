@@ -1,11 +1,31 @@
 import { z } from "zod";
 
-import type { RagSource as DomainRagSource } from "@/domain/rag";
+import {
+  EXPLORE_RETRIEVAL_MAX_CANDIDATES,
+  RAG_RETRIEVAL_MAX_TOP_K,
+  RAG_RETRIEVAL_MIN_TOP_K,
+  type RagSource as DomainRagSource,
+} from "@/domain/rag";
+
+const ragRetrievalStrategySchema = z.enum(["standard", "explore"]);
+
+export const ragRetrievalInputSchema = z
+  .object({
+    topK: z
+      .number()
+      .int()
+      .min(RAG_RETRIEVAL_MIN_TOP_K)
+      .max(RAG_RETRIEVAL_MAX_TOP_K)
+      .optional(),
+    strategy: ragRetrievalStrategySchema.optional(),
+  })
+  .strict();
 
 export const globalRagAskInputSchema = z
   .object({
     question: z.string().trim().min(1),
     mode: z.literal("global"),
+    retrieval: ragRetrievalInputSchema.optional(),
   })
   .strict();
 
@@ -33,7 +53,17 @@ export type RagSource = z.infer<typeof ragSourceSchema>;
 export const ragAnswerMetadataSchema = z
   .object({
     mode: z.literal("global"),
-    topK: z.number().int().positive(),
+    topK: z
+      .number()
+      .int()
+      .min(RAG_RETRIEVAL_MIN_TOP_K)
+      .max(RAG_RETRIEVAL_MAX_TOP_K),
+    retrievalStrategy: ragRetrievalStrategySchema,
+    candidateTopK: z
+      .number()
+      .int()
+      .positive()
+      .max(EXPLORE_RETRIEVAL_MAX_CANDIDATES),
     promptVersion: z.string().min(1),
     generationModel: z.string().min(1),
     embeddingModel: z.string().min(1),

@@ -1,8 +1,11 @@
 import { createOpenAI, openai } from "@ai-sdk/openai";
 import { generateText as aiGenerateText } from "ai";
 
-import type { GenerationProvider } from "@/application/rag/ports";
-import { GenerationFailure } from "@/domain/rag";
+import type {
+  GenerateAnswerInput,
+  GenerationProvider,
+} from "@/application/rag/ports";
+import { GenerationFailure, type RagRetrievalStrategy } from "@/domain/rag";
 import type { ServerEnv } from "@/env/server";
 
 type GenerateTextFn = (input: {
@@ -39,12 +42,7 @@ export class OpenAiGenerationProvider implements GenerationProvider {
       deps.generateText ?? (aiGenerateText as unknown as GenerateTextFn);
   }
 
-  async generateAnswer(input: {
-    question: string;
-    promptContext: string;
-    promptVersion: string;
-    generationModel: string;
-  }): Promise<{ answer: string }> {
+  async generateAnswer(input: GenerateAnswerInput): Promise<{ answer: string }> {
     const generationModel =
       input.generationModel || this.defaultGenerationModel;
 
@@ -58,7 +56,7 @@ export class OpenAiGenerationProvider implements GenerationProvider {
     try {
       const result = await this.generateTextFn({
         model: this.modelFactory(generationModel),
-        system: buildSystemPrompt(input.promptVersion),
+        system: buildSystemPrompt(input.promptVersion, input.retrievalStrategy),
         prompt: buildUserPrompt(input.question, input.promptContext),
       });
 
@@ -95,8 +93,11 @@ export function createOpenAiGenerationProviderFromEnv(
   });
 }
 
-function buildSystemPrompt(promptVersion: string): string {
-  return [
+function buildSystemPrompt(
+  promptVersion: string,
+  retrievalStrategy: RagRetrievalStrategy,
+): string {
+  const baseInstructions = [
     `Versão do prompt: ${promptVersion}`,
     "Você é um assistente de RAG para uma base de artigos científicos.",
     "Responda sempre em português do Brasil.",
@@ -104,7 +105,15 @@ function buildSystemPrompt(promptVersion: string): string {
     "Toda afirmação factual apoiada nas fontes deve usar marcadores inline no formato [n].",
     "Nunca invente fontes, trechos ou citações.",
     'Se o contexto não sustentar a resposta, diga claramente que "não encontrou evidências suficientes" nos documentos recuperados.',
-  ].join("\n");
+  ];
+
+  if (retrievalStrategy === "explore") {
+    baseInstructions.push(
+      "No modo explore, apresente 2 a 4 perspectivas ou facetas em uma única resposta e cite cada perspectiva com pelo menos uma fonte inline.",
+    );
+  }
+
+  return baseInstructions.join("\n");
 }
 
 function buildUserPrompt(question: string, promptContext: string): string {
