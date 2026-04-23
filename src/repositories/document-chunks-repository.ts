@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { cosineDistance } from "drizzle-orm/sql/functions/vector";
 
@@ -64,6 +64,7 @@ export class DocumentChunksRepository {
       documentChunks.embedding,
       input.queryEmbedding,
     );
+    const score = sql<number>`1 - (${distance})`;
 
     return this.db
       .select({
@@ -72,7 +73,7 @@ export class DocumentChunksRepository {
         documentTitle: documents.title,
         chunkIndex: documentChunks.chunkIndex,
         excerpt: documentChunks.content,
-        score: sql<number>`1 - (${distance})`,
+        score,
         documentPipelineVersion: documents.pipelineVersion,
         chunkingVersion: documentChunks.chunkingVersion,
         embeddingModel: documentChunks.embeddingModel,
@@ -87,7 +88,7 @@ export class DocumentChunksRepository {
         ),
       )
       .orderBy(
-        distance,
+        desc(score),
         asc(documentChunks.documentId),
         asc(documentChunks.chunkIndex),
       )

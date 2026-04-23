@@ -49,24 +49,24 @@ rules.
 
 ## Functional Requirements
 
-- [ ] RF-B02-01: `DocumentChunksRepository.searchGlobal(input)` accepts a query
+- [x] RF-B02-01: `DocumentChunksRepository.searchGlobal(input)` accepts a query
   embedding, requested `topK`, active `chunkingVersion`, and active
   `embeddingModel`.
-- [ ] RF-B02-02: `searchGlobal(input)` returns at most the requested `topK`
+- [x] RF-B02-02: `searchGlobal(input)` returns at most the requested `topK`
   matches ordered by descending `score`.
-- [ ] RF-B02-03: Standard-mode callers may pass any validated `topK` in the
+- [x] RF-B02-03: Standard-mode callers may pass any validated `topK` in the
   inclusive range `3..12`.
-- [ ] RF-B02-04: Explore-mode callers may pass any validated candidate fetch
+- [x] RF-B02-04: Explore-mode callers may pass any validated candidate fetch
   size up to `24`.
-- [ ] RF-B02-05: `searchGlobal(input)` joins `documents` and returns
+- [x] RF-B02-05: `searchGlobal(input)` joins `documents` and returns
   `documentTitle` plus `documentPipelineVersion`.
-- [ ] RF-B02-06: `searchGlobal(input)` excludes rows from non-matching
+- [x] RF-B02-06: `searchGlobal(input)` excludes rows from non-matching
   `chunking_version` values.
-- [ ] RF-B02-07: `searchGlobal(input)` excludes rows from non-matching
+- [x] RF-B02-07: `searchGlobal(input)` excludes rows from non-matching
   `embedding_model` values.
-- [ ] RF-B02-08: `searchGlobal(input)` excludes rows whose parent document is
+- [x] RF-B02-08: `searchGlobal(input)` excludes rows whose parent document is
   not `processed`.
-- [ ] RF-B02-09: Repository tests prove standard and explore fetch sizes,
+- [x] RF-B02-09: Repository tests prove standard and explore fetch sizes,
   active-config filtering, descending score ordering, and exclusion of
   non-processed rows.
 

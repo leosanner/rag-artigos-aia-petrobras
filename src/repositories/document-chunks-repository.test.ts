@@ -17,6 +17,12 @@ const CHUNKING_VERSION = "hybrid-v1-900-150";
 const EMBEDDING_MODEL = "text-embedding-3-large";
 const EMBEDDING_DIMENSIONS = 3072;
 
+function documentIdForIndex(index: number): string {
+  return `00000000-0000-4000-8000-${index
+    .toString()
+    .padStart(12, "0")}`;
+}
+
 function vector(value: number): number[] {
   return Array.from({ length: EMBEDDING_DIMENSIONS }, () => value);
 }
@@ -549,6 +555,196 @@ describe("DocumentChunksRepository", () => {
       { documentId: DOCUMENT_ID, chunkIndex: 0 },
       { documentId: OTHER_DOCUMENT_ID, chunkIndex: 0 },
     ]);
+  });
+
+  it("returns only the requested standard top-k size from score-ordered active matches", async () => {
+    await insertDocument(db, {
+      id: OTHER_DOCUMENT_ID,
+      title: "Documento B.pdf",
+    });
+    await insertDocument(db, {
+      id: THIRD_DOCUMENT_ID,
+      title: "Documento C.pdf",
+    });
+
+    await repository.replaceDocumentChunks({
+      documentId: DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "Best standard chunk",
+          contentHash: "best-standard",
+          estimatedTokens: 3,
+          embedding: directionalVector(1, 0, 0),
+        },
+        {
+          chunkIndex: 1,
+          content: "Fourth standard chunk",
+          contentHash: "fourth-standard",
+          estimatedTokens: 3,
+          embedding: directionalVector(0.7, 0.714, 0),
+        },
+      ],
+    });
+    await repository.replaceDocumentChunks({
+      documentId: OTHER_DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "Second standard chunk",
+          contentHash: "second-standard",
+          estimatedTokens: 3,
+          embedding: directionalVector(0.9, 0.436, 0),
+        },
+      ],
+    });
+    await repository.replaceDocumentChunks({
+      documentId: THIRD_DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "Third standard chunk",
+          contentHash: "third-standard",
+          estimatedTokens: 3,
+          embedding: directionalVector(0.8, 0.6, 0),
+        },
+      ],
+    });
+
+    const matches = await repository.searchGlobal({
+      queryEmbedding: directionalVector(1, 0, 0),
+      topK: 3,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+    });
+
+    expect(matches).toHaveLength(3);
+    expect(matches.map((match) => match.excerpt)).toEqual([
+      "Best standard chunk",
+      "Second standard chunk",
+      "Third standard chunk",
+    ]);
+  });
+
+  it("returns an explore-sized candidate set while still ignoring stale configs and non-processed documents", async () => {
+    await insertDocument(db, {
+      id: NON_PROCESSED_DOCUMENT_ID,
+      title: "Documento pendente.pdf",
+      status: "pending",
+    });
+
+    const activeDocumentIds = Array.from({ length: 26 }, (_, index) =>
+      documentIdForIndex(index + 1),
+    );
+
+    for (const [index, documentId] of activeDocumentIds.entries()) {
+      await insertDocument(db, {
+        id: documentId,
+        title: `Documento ativo ${index + 1}.pdf`,
+      });
+      await repository.replaceDocumentChunks({
+        documentId,
+        documentPipelineVersion: pipelineVersion,
+        chunkingVersion: CHUNKING_VERSION,
+        embeddingModel: EMBEDDING_MODEL,
+        embeddingDimensions: EMBEDDING_DIMENSIONS,
+        chunks: [
+          {
+            chunkIndex: 0,
+            content: `Active candidate ${index + 1}`,
+            contentHash: `active-candidate-${index + 1}`,
+            estimatedTokens: 3,
+            embedding: directionalVector(26 - index, index + 1, 0),
+          },
+        ],
+      });
+    }
+
+    await repository.replaceDocumentChunks({
+      documentId: DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: "hybrid-v0-700-100",
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "Stale chunk with a stronger score",
+          contentHash: "stale-stronger-score",
+          estimatedTokens: 5,
+          embedding: directionalVector(1, 0, 0),
+        },
+      ],
+    });
+    await repository.replaceDocumentChunks({
+      documentId: activeDocumentIds[0] ?? DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: "text-embedding-3-small",
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 1,
+          content: "Other model chunk with a stronger score",
+          contentHash: "other-model-stronger-score",
+          estimatedTokens: 6,
+          embedding: directionalVector(1, 0, 0),
+        },
+      ],
+    });
+    await repository.replaceDocumentChunks({
+      documentId: NON_PROCESSED_DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "Pending chunk with a stronger score",
+          contentHash: "pending-stronger-score",
+          estimatedTokens: 6,
+          embedding: directionalVector(1, 0, 0),
+        },
+      ],
+    });
+
+    const matches = await repository.searchGlobal({
+      queryEmbedding: directionalVector(1, 0, 0),
+      topK: 24,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+    });
+
+    expect(matches).toHaveLength(24);
+    expect(matches.map((match) => match.excerpt)).toEqual(
+      Array.from({ length: 24 }, (_, index) => `Active candidate ${index + 1}`),
+    );
+    expect(matches.map((match) => match.excerpt)).not.toContain(
+      "Stale chunk with a stronger score",
+    );
+    expect(matches.map((match) => match.excerpt)).not.toContain(
+      "Other model chunk with a stronger score",
+    );
+    expect(matches.map((match) => match.excerpt)).not.toContain(
+      "Pending chunk with a stronger score",
+    );
+    expect(matches.every((match) => match.chunkingVersion === CHUNKING_VERSION))
+      .toBe(true);
+    expect(matches.every((match) => match.embeddingModel === EMBEDDING_MODEL))
+      .toBe(true);
   });
 
   it("returns the pipeline version from the joined document metadata", async () => {
