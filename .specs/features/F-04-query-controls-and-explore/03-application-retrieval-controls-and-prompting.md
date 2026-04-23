@@ -53,28 +53,28 @@ F-03 citation-validation or safe failure rules.
 
 ## Functional Requirements
 
-- [ ] RF-B03-01: `AnswerQuestion.execute(input)` accepts
+- [x] RF-B03-01: `AnswerQuestion.execute(input)` accepts
   `{ question, mode: "global", retrieval?: { topK?: number; strategy?: "standard" | "explore" } }`.
-- [ ] RF-B03-02: `AnswerQuestion.execute(input)` normalizes omitted retrieval
+- [x] RF-B03-02: `AnswerQuestion.execute(input)` normalizes omitted retrieval
   settings before calling retrieval.
-- [ ] RF-B03-03: `RetrieveChunks.search(input)` accepts normalized retrieval
+- [x] RF-B03-03: `RetrieveChunks.search(input)` accepts normalized retrieval
   settings instead of using a fixed F-03-only top-k.
-- [ ] RF-B03-04: Standard-mode retrieval calls the repository once with the
+- [x] RF-B03-04: Standard-mode retrieval calls the repository once with the
   applied `topK`.
-- [ ] RF-B03-05: Explore-mode retrieval calls the repository once with
+- [x] RF-B03-05: Explore-mode retrieval calls the repository once with
   `candidateTopK`, then runs Block 01 deterministic downselection to final
   `topK`.
-- [ ] RF-B03-06: No retrieved chunks still return the Portuguese
+- [x] RF-B03-06: No retrieved chunks still return the Portuguese
   insufficient-evidence answer without calling the generation provider.
-- [ ] RF-B03-07: The generation provider receives a prompt variant that asks
+- [x] RF-B03-07: The generation provider receives a prompt variant that asks
   for `2..4` cited perspectives when `strategy = "explore"`.
-- [ ] RF-B03-08: Standard mode preserves the F-03 answer-generation behavior
+- [x] RF-B03-08: Standard mode preserves the F-03 answer-generation behavior
   apart from applied retrieval metadata.
-- [ ] RF-B03-09: Success results include the applied retrieval metadata and the
+- [x] RF-B03-09: Success results include the applied retrieval metadata and the
   final selected `sources`.
-- [ ] RF-B03-10: Error results remain limited to safe
+- [x] RF-B03-10: Error results remain limited to safe
   `generation_failed` or `generation_unavailable`.
-- [ ] RF-B03-11: Unit tests prove normalization defaults, standard-mode
+- [x] RF-B03-11: Unit tests prove normalization defaults, standard-mode
   direct retrieval, explore-mode diversification, prompt branching, metadata
   assembly, and unchanged citation-validation failure handling.
 
