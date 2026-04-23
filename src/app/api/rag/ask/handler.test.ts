@@ -119,6 +119,38 @@ describe("POST /api/rag/ask handler", () => {
     });
   });
 
+  it("accepts retrieval controls and forwards only the validated input to the service", async () => {
+    const answerQuestion = buildAnswerQuestion(buildAnsweredResult());
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      post(
+        {
+          question: `  ${QUESTION}  `,
+          mode: "global",
+          retrieval: {
+            topK: 9,
+            strategy: "explore",
+          },
+        },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(answerQuestion.execute).toHaveBeenCalledWith({
+      question: QUESTION,
+      mode: "global",
+      retrieval: {
+        topK: 9,
+        strategy: "explore",
+      },
+    });
+  });
+
   it("returns 400 for malformed JSON without calling the service", async () => {
     const answerQuestion = buildAnswerQuestion(buildAnsweredResult());
     const handler = createRagAskHandler({
@@ -177,6 +209,42 @@ describe("POST /api/rag/ask handler", () => {
     expect(await extraField.json()).toEqual({ error: "invalid_request" });
     expect(answerQuestion.execute).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["topK below the allowed range", { retrieval: { topK: 2 } }],
+    ["topK above the allowed range", { retrieval: { topK: 13 } }],
+    ["non-integer topK", { retrieval: { topK: 6.5 } }],
+    ["invalid strategy", { retrieval: { strategy: "auto" } }],
+    [
+      "unknown retrieval fields",
+      { retrieval: { topK: 6, strategy: "standard", ignored: true } },
+    ],
+  ])(
+    "returns 400 for invalid retrieval controls: %s",
+    async (_name, bodyOverride) => {
+      const answerQuestion = buildAnswerQuestion(buildAnsweredResult());
+      const handler = createRagAskHandler({
+        answerQuestion,
+        secret: VALID_SECRET,
+      });
+
+      const response = await handler(
+        post(
+          {
+            question: QUESTION,
+            mode: "global",
+            ...bodyOverride,
+          },
+          { Authorization: `Bearer ${VALID_SECRET}` },
+        ),
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(await response.json()).toEqual({ error: "invalid_request" });
+      expect(answerQuestion.execute).not.toHaveBeenCalled();
+    },
+  );
 
   it("returns 401 when the bearer secret is missing or wrong and never calls the service", async () => {
     const answerQuestion = buildAnswerQuestion(buildAnsweredResult());

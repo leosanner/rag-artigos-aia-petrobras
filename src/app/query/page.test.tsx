@@ -73,8 +73,20 @@ function typeSecret(value: string): void {
   });
 }
 
+function setTopK(value: string): void {
+  fireEvent.change(screen.getByLabelText(/fontes recuperadas/i), {
+    target: { value },
+  });
+}
+
 function clickSubmit(): void {
   fireEvent.click(screen.getByRole("button", { name: /consultar base/i }));
+}
+
+function clickExplore(): void {
+  fireEvent.click(
+    screen.getByRole("button", { name: /explorar perspectivas/i }),
+  );
 }
 
 describe("/query page", () => {
@@ -101,8 +113,25 @@ describe("/query page", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText(/pergunta/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/secret de consulta/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue(6);
     expect(screen.getByRole("button", { name: /consultar base/i })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /explorar perspectivas/i }),
+    ).toBeDisabled();
     expect(screen.queryByText(/focado/i)).not.toBeInTheDocument();
+  });
+
+  it("renders the top-k control with the F-03 default and F-04 limits", () => {
+    render(<QueryPage />);
+
+    const topKInput = screen.getByLabelText(
+      /fontes recuperadas/i,
+    ) as HTMLInputElement;
+
+    expect(topKInput.value).toBe("6");
+    expect(topKInput.min).toBe("3");
+    expect(topKInput.max).toBe("12");
+    expect(topKInput.step).toBe("1");
   });
 
   it("keeps submit disabled for whitespace-only questions", () => {
@@ -112,6 +141,9 @@ describe("/query page", () => {
     typeQuestion("   ");
 
     expect(screen.getByRole("button", { name: /consultar base/i })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /explorar perspectivas/i }),
+    ).toBeDisabled();
   });
 
   it("keeps submit disabled until a secret is typed", () => {
@@ -123,9 +155,12 @@ describe("/query page", () => {
     typeSecret(SECRET);
 
     expect(screen.getByRole("button", { name: /consultar base/i })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: /explorar perspectivas/i }),
+    ).toBeEnabled();
   });
 
-  it("shows a loading state and posts the trimmed global question", async () => {
+  it("shows a loading state and posts a standard query with retrieval settings", async () => {
     let resolveFetch: ((value: Response) => void) | null = null;
     fetchMock.mockImplementation(
       () =>
@@ -137,6 +172,7 @@ describe("/query page", () => {
     render(<QueryPage />);
     typeSecret(`  ${SECRET}  `);
     typeQuestion(`   ${SUCCESS_RESPONSE.answer}   `);
+    setTopK("9");
 
     await act(async () => {
       clickSubmit();
@@ -157,6 +193,10 @@ describe("/query page", () => {
         body: JSON.stringify({
           question: SUCCESS_RESPONSE.answer,
           mode: "global",
+          retrieval: {
+            topK: 9,
+            strategy: "standard",
+          },
         }),
       }),
     );
@@ -164,6 +204,49 @@ describe("/query page", () => {
     await act(async () => {
       resolveFetch?.(jsonResponse(SUCCESS_RESPONSE));
     });
+  });
+
+  it("reruns the stored question in explore mode with the current-tab secret", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ...SUCCESS_RESPONSE,
+        metadata: {
+          ...SUCCESS_RESPONSE.metadata,
+          topK: 8,
+          retrievalStrategy: "explore",
+          candidateTopK: 24,
+        },
+      }),
+    );
+    sessionStorage.setItem("query:secret", SECRET);
+
+    render(<QueryPage />);
+    typeQuestion("Compare as abordagens metodologicas.");
+    setTopK("8");
+
+    await act(async () => {
+      clickExplore();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rag/ask",
+      expect.objectContaining({
+        method: "POST",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${SECRET}`,
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          question: "Compare as abordagens metodologicas.",
+          mode: "global",
+          retrieval: {
+            topK: 8,
+            strategy: "explore",
+          },
+        }),
+      }),
+    );
   });
 
   it("renders the answer, numbered sources, and the technical summary without promptVersion", async () => {
@@ -181,6 +264,8 @@ describe("/query page", () => {
     expect(screen.getByText("1. artigo-a.pdf")).toBeInTheDocument();
     expect(screen.getByText("2. artigo-b.pdf")).toBeInTheDocument();
     expect(screen.getByText(/top-k:\s*6/i)).toBeInTheDocument();
+    expect(screen.getByText(/estrategia:\s*standard/i)).toBeInTheDocument();
+    expect(screen.getByText(/candidatos:\s*6/i)).toBeInTheDocument();
     expect(screen.getByText(/gpt-4\.1-mini/i)).toBeInTheDocument();
     expect(screen.getByText(/text-embedding-3-large/i)).toBeInTheDocument();
     expect(screen.queryByText(/f04-global-rag-v1/i)).not.toBeInTheDocument();

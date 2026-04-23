@@ -9,6 +9,12 @@ import {
   ragUnauthorizedResponseSchema,
   type RagAskSuccessResponse,
 } from "@/application/rag/schemas";
+import {
+  RAG_RETRIEVAL_DEFAULT_TOP_K,
+  RAG_RETRIEVAL_MAX_TOP_K,
+  RAG_RETRIEVAL_MIN_TOP_K,
+  type RagRetrievalStrategy,
+} from "@/domain/rag";
 
 import {
   RAG_EMPTY_SOURCES_MESSAGE,
@@ -21,9 +27,14 @@ import styles from "./page.module.css";
 
 const SECRET_STORAGE_KEY = "query:secret";
 
+type QuerySubmissionStrategy = Extract<
+  RagRetrievalStrategy,
+  "standard" | "explore"
+>;
+
 type QueryPageState =
   | { kind: "idle" }
-  | { kind: "submitting" }
+  | { kind: "submitting"; strategy: QuerySubmissionStrategy }
   | { kind: "success"; response: RagAskSuccessResponse }
   | { kind: "invalid_request" }
   | { kind: "unauthorized" }
@@ -32,6 +43,7 @@ type QueryPageState =
 export default function QueryPage() {
   const [question, setQuestion] = useState("");
   const [secret, setSecret] = useState("");
+  const [topK, setTopK] = useState(RAG_RETRIEVAL_DEFAULT_TOP_K);
   const [state, setState] = useState<QueryPageState>({ kind: "idle" });
 
   const trimmedQuestion = question.trim();
@@ -40,6 +52,14 @@ export default function QueryPage() {
   const canSubmit =
     trimmedQuestion.length > 0 && trimmedSecret.length > 0 && !isSubmitting;
   const successResponse = state.kind === "success" ? state.response : null;
+  const isStandardSubmitting =
+    state.kind === "submitting" && state.strategy === "standard";
+  const isExploreSubmitting =
+    state.kind === "submitting" && state.strategy === "explore";
+  const standardButtonLabel =
+    isStandardSubmitting ? "Consultando..." : "Consultar base";
+  const exploreButtonLabel =
+    isExploreSubmitting ? "Explorando..." : "Explorar perspectivas";
 
   useEffect(() => {
     const stored = sessionStorage.getItem(SECRET_STORAGE_KEY);
@@ -64,14 +84,12 @@ export default function QueryPage() {
     setSecret("");
   }, []);
 
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function submitQuestion(strategy: QuerySubmissionStrategy) {
     if (trimmedQuestion.length === 0 || trimmedSecret.length === 0) {
       return;
     }
 
-    setState({ kind: "submitting" });
+    setState({ kind: "submitting", strategy });
 
     let response: Response;
     try {
@@ -85,6 +103,10 @@ export default function QueryPage() {
         body: JSON.stringify({
           question: trimmedQuestion,
           mode: "global",
+          retrieval: {
+            topK,
+            strategy,
+          },
         }),
       });
     } catch {
@@ -132,6 +154,11 @@ export default function QueryPage() {
     }
 
     setState({ kind: "technical_error" });
+  }
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await submitQuestion("standard");
   }
 
   return (
@@ -191,15 +218,49 @@ export default function QueryPage() {
             />
           </div>
 
+          <div className={`${styles.field} ${styles.fieldControls}`}>
+            <label htmlFor="query-top-k" className={styles.label}>
+              <span>Fontes recuperadas</span>
+              <span className={styles.labelIndex}>[ 03 ]</span>
+            </label>
+            <div className={styles.controlRow}>
+              <input
+                id="query-top-k"
+                type="number"
+                min={RAG_RETRIEVAL_MIN_TOP_K}
+                max={RAG_RETRIEVAL_MAX_TOP_K}
+                step={1}
+                value={topK}
+                onChange={(event) => setTopK(readTopKInput(event.target.value))}
+                className={`${styles.input} ${styles.numberInput}`}
+              />
+              <span className={styles.rangeBadge}>
+                {RAG_RETRIEVAL_MIN_TOP_K}-{RAG_RETRIEVAL_MAX_TOP_K}
+              </span>
+            </div>
+          </div>
+
           <div className={styles.actions}>
             <button
               type="submit"
               disabled={!canSubmit}
               className={`${styles.btn} ${
-                isSubmitting ? styles.btnLoading : styles.btnPrimary
+                isStandardSubmitting ? styles.btnLoading : styles.btnPrimary
               }`}
             >
-              {isSubmitting ? "Consultando..." : "Consultar base"}
+              {standardButtonLabel}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void submitQuestion("explore");
+              }}
+              disabled={!canSubmit}
+              className={`${styles.btn} ${
+                isExploreSubmitting ? styles.btnLoading : styles.btnExplore
+              }`}
+            >
+              {exploreButtonLabel}
             </button>
             <button
               type="button"
@@ -274,6 +335,18 @@ export default function QueryPage() {
                   </p>
                 </div>
                 <div className={styles.metaItem}>
+                  <span className={styles.metaKey}>{"// strategy"}</span>
+                  <p className={styles.metaValue}>
+                    Estrategia: {successResponse.metadata.retrievalStrategy}
+                  </p>
+                </div>
+                <div className={styles.metaItem}>
+                  <span className={styles.metaKey}>{"// candidates"}</span>
+                  <p className={styles.metaValue}>
+                    Candidatos: {successResponse.metadata.candidateTopK}
+                  </p>
+                </div>
+                <div className={styles.metaItem}>
                   <span className={styles.metaKey}>{"// generation"}</span>
                   <p className={styles.metaValue}>
                     Modelo de geracao: {successResponse.metadata.generationModel}
@@ -330,5 +403,18 @@ export default function QueryPage() {
         ) : null}
       </div>
     </main>
+  );
+}
+
+function readTopKInput(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+
+  if (!Number.isFinite(parsed)) {
+    return RAG_RETRIEVAL_DEFAULT_TOP_K;
+  }
+
+  return Math.min(
+    RAG_RETRIEVAL_MAX_TOP_K,
+    Math.max(RAG_RETRIEVAL_MIN_TOP_K, parsed),
   );
 }

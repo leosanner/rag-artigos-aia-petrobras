@@ -205,6 +205,27 @@
   border: var(--border);
 }
 
+.fieldControls {
+  grid-column: 1 / -1;
+  position: relative;
+  background: var(--paper-deep);
+}
+
+.fieldControls::after {
+  content: "TOP-K";
+  position: absolute;
+  top: -12px;
+  right: 16px;
+  padding: 3px 10px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  border: var(--border);
+}
+
 .label {
   display: flex;
   align-items: baseline;
@@ -242,6 +263,12 @@
   letter-spacing: 0.2em;
 }
 
+.numberInput {
+  max-width: 160px;
+  letter-spacing: 0;
+  font-weight: 700;
+}
+
 .textarea {
   resize: vertical;
   min-height: 172px;
@@ -260,6 +287,27 @@
   transform: translate(-2px, -2px);
   box-shadow: 4px 4px 0 0 var(--ink);
   background: var(--paper);
+}
+
+.controlRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+
+.rangeBadge {
+  display: inline-grid;
+  place-items: center;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: var(--border);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
 }
 
 .actions {
@@ -319,6 +367,16 @@
 
 .btnSecondary {
   background: var(--paper);
+}
+
+.btnExplore {
+  background: var(--lime);
+}
+
+.btnExplore::before {
+  content: "*";
+  font-family: var(--font-body), sans-serif;
+  font-size: 1.1rem;
 }
 
 .btnLoading {
