@@ -39,6 +39,28 @@ same base RAG flow, but makes retrieval behavior operator-tunable and adds an
 explicit explore mode for questions whose best answer is more varied than a
 single narrow synthesis.
 
+## Implementation Blocks
+
+The feature should be implemented in the same small-block style used by F-01,
+F-02, and F-03. Read this overview first, then open only the block document
+needed for the current task:
+
+- [01 - Domain: Retrieval Settings and Diversification](01-domain-retrieval-settings-and-diversification.md):
+  pure logic for retrieval-setting normalization helpers, candidate-top-k
+  calculation, and deterministic diversified downselection for explore mode.
+- [02 - Persistence: Strategy-Aware Retrieval](02-persistence-strategy-aware-retrieval.md):
+  repository/query behavior for standard and explore candidate fetches using
+  the active indexing configuration.
+- [03 - Application: Retrieval Controls and Prompting](03-application-retrieval-controls-and-prompting.md):
+  `AnswerQuestion`, strategy-aware retrieval orchestration, metadata assembly,
+  and prompt branching for standard versus explore generation.
+- [04 - Interface: API and Query Page](04-interface-api-and-query-page.md):
+  Zod request/response updates, `POST /api/rag/ask` handler behavior, and the
+  PT-BR `/query` controls for top-k plus explicit explore reruns.
+- [05 - Integration and Review](05-integration-and-review.md):
+  end-to-end verification, doc sync, closeout checks, and the required
+  independent-review handoff packet.
+
 ## Business Rules
 
 - RN-01: `POST /api/rag/ask` accepts an optional `retrieval` object only in the
