@@ -1,9 +1,16 @@
 # Roadmap — AIA Insight
 
-**Current Milestone:** M1 — Data Foundation and Ingestion
-**Status:** Planning
+**Current Milestone:** M2 — Base RAG and Query Experience Evolution
+**Status:** Active reprioritization
 
 > Each phase of `starter.md` becomes a milestone. Features inside a milestone are demo-able increments. The first three milestones deliver the minimum functional DEMO.
+
+> Execution note (2026-04-22): the shared `/query` surface no longer moves
+> straight from F-03 Global RAG to F-04 Focused RAG. The current preferred
+> sequence is F-05 Query Controls and Explore -> F-06 Answer Traceability ->
+> F-07 Conversational Query -> then F-04 Focused RAG rebased on that richer
+> shell. F-06 intentionally pulls selected M3 explainability/observability work
+> forward onto `/query`.
 
 ---
 
@@ -14,7 +21,7 @@
 
 ### Features
 
-**Initial repository and infrastructure setup** — PLANNED
+**Initial repository and infrastructure setup** — COMPLETED
 
 - Next.js 15 + TypeScript strict + ESLint + Prettier
 - Drizzle + migrations + connection to Neon / local Postgres with pgvector
@@ -22,7 +29,7 @@
 - Environment variables and secrets (Service Account, DB URL)
 - Minimum CI (lint + typecheck + tests on PR)
 
-**Document Ingestion (Phase 1)** — PLANNED
+**Document Ingestion (Phase 1)** — COMPLETED
 
 - Google Drive integration via Service Account, fixed folder
 - Relational schema with governance fields (id, hash, origin, version, timestamps, status)
@@ -40,22 +47,30 @@
 
 ### Features
 
-**Chunking + Embeddings (Phase 2)** — PLANNED
+**Chunking + Embeddings (Phase 2)** — COMPLETED
 
 - Chunking strategy over `refined_text`
 - Embedding generation and storage in pgvector
 - Vector indexing with metadata (doc_id, chunk_index, version)
 
-**Global RAG (Phase 3)** — PLANNED
+**Global RAG (Phase 3)** — COMPLETED BASELINE
 
 - Multi-document question endpoint
 - Top-k retrieval + context assembly + generation
 - Answer with source list
 
-**Focused RAG (Phase 4)** — PLANNED
+**Query Controls + Explore (Phase 3A)** — PLANNED
+
+- Adjustable retrieval parameters on `/query`, especially top-k
+- Explicit explore mode for broad questions
+- Diversified multi-document retrieval without a second endpoint
+
+**Focused RAG (Phase 4)** — DEFERRED
 
 - Filter by specific document during retrieval
 - UI for selecting the target document
+- Must plug into the post-F-05/F-06 `/query` shell instead of the old
+  global-only page assumptions
 
 ---
 
@@ -65,16 +80,20 @@
 
 ### Features
 
-**Minimal XAI (Phase 5)** — PLANNED
+**Answer Traceability (Phases 5 + 6)** — PLANNED
 
-- Per-answer display of: source documents, chunks used, similarity scores
-- UI for inspecting retrieved passages
-
-**Basic observability (Phase 6)** — PLANNED
-
-- Question and answer logging
-- Metrics: tokens, estimated cost, latency
+- Persisted query traces for question, answer, sources, and safe failures
+- Related terms/themes derived from the question plus retrieved evidence
+- Metrics: input tokens, output tokens, estimated cost, latency
 - Model and prompt version recorded per request
+- UI for inspecting the current answer and persisted query runs
+
+**Conversational Query (Phase 6A)** — PLANNED
+
+- Chat on the shared `/query` surface
+- Persisted conversations and messages
+- Per-turn citations, related terms, usage, and cost
+- Transcript reload without losing governance visibility
 
 ---
 
@@ -99,7 +118,7 @@
 
 ## Future Considerations
 
-- More sophisticated interactive UI (streaming answers, conversation history)
+- More sophisticated interactive UI beyond F-07 (for example streaming turns)
 - Integration with external bases (e.g., Scielo, arXiv) beyond the fixed corpus
 - Automation of recurring analyses
 - Expansion to domains beyond EIA

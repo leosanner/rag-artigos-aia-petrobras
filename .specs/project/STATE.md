@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-04-21
-**Current Work:** M2 feature contracts are prepared as `F-02 / Chunking and Embeddings`, `F-03 / Global RAG`, and `F-04 / Focused RAG`
+**Last Updated:** 2026-04-22
+**Current Work:** `/query` evolution contracts are prepared as `F-05 / Query Controls and Explore`, `F-06 / Answer Traceability`, and `F-07 / Conversational Query`; `F-04 / Focused RAG` is deferred until the shared query shell is rebased on those contracts
 
 ---
 
 ## Recent Decisions
+
+### AD-013: `/query` evolves through controls, traceability, and conversation before focused retrieval (2026-04-22)
+
+**Decision:** The shared `/query` surface now evolves through four contracts: `F-05 / Query Controls and Explore`, `F-06 / Answer Traceability`, `F-07 / Conversational Query`, and only then `F-04 / Focused RAG`. `POST /api/rag/ask` remains the base single-turn endpoint and gains optional retrieval controls. F-06 introduces persisted query-run traces with usage/cost/audit data, and F-07 adds conversations/messages without creating a separate chat page.
+**Reason:** The current user need is not document scoping first; it is better control over global retrieval, stronger governance/audit visibility, and a more natural operator interaction model for broad questions. Pulling traceability forward also creates the right audited base for later chat.
+**Trade-off:** The project no longer follows the old straight-line `/query` sequence of F-03 -> F-04. Focused retrieval must be rebased on richer request/response contracts and a more capable page shell instead of the original global-only assumptions.
+**Impact:** `.specs/project/query-experience-evolution.md` becomes the sequence/guardrail document for `/query`. New implementation contracts now live in `.specs/features/F-05-query-controls-and-explore/spec.md`, `.specs/features/F-06-answer-traceability/spec.md`, and `.specs/features/F-07-conversational-query/spec.md`. `F-04 / Focused RAG` remains planned, but it is deferred and must plug into the F-05/F-06 trace and retrieval-controls model.
 
 ### AD-012: Shared RAG page route uses the English segment `/query` (2026-04-21)
 
@@ -130,9 +137,10 @@ _None for now._
 - [x] ~~Define concrete text-refinement strategy~~ — resolved in `F-01` as deterministic refinement without LLM calls
 - [x] ~~Break `F-01 / Document Ingestion` into small implementation blocks and execute with TDD~~ — completed by AD-010
 - [x] ~~Define M2 feature contracts and close base RAG planning decisions~~ — resolved by AD-011
-- [ ] Implement `F-02 / Chunking and Embeddings` with TDD against its spec
-- [ ] Implement `F-03 / Global RAG` with TDD against its spec
-- [ ] Implement `F-04 / Focused RAG` with TDD against its spec
+- [ ] Implement `F-05 / Query Controls and Explore` with TDD against its spec
+- [ ] Implement `F-06 / Answer Traceability` with TDD against its spec
+- [ ] Implement `F-07 / Conversational Query` with TDD against its spec
+- [ ] Rebase and implement `F-04 / Focused RAG` after the `/query` evolution contracts land
 - [ ] Choose a definitive project name (current placeholder: "AIA Insight")
 - [ ] M4 PoC: compare **Mastra** vs **Vercel AI SDK alone** on one pilot task from `starter.md` §3.6 — criteria: Next.js integration, observability out of the box, maintenance cost (AD-003)
 

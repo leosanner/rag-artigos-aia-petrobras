@@ -35,6 +35,11 @@ F-03 therefore returns both a human-facing answer and machine-readable source
 metadata. It intentionally avoids M3-level persistence and observability so the
 first RAG slice remains small enough to validate quickly.
 
+Later `/query` evolution is tracked in
+`.specs/project/query-experience-evolution.md` and the F-05/F-06/F-07 feature
+contracts; F-03 remains the baseline global single-turn slice for that shared
+surface.
+
 ## Implementation Blocks
 
 The feature should be implemented in the same small-block style used by F-01
@@ -192,7 +197,7 @@ for the current task:
 
 | Method | Route / Signature | Description |
 |--------|-------------------|-------------|
-| `GET` | `/query` | Portuguese global RAG page. F-04 later extends it with focused mode. |
+| `GET` | `/query` | Portuguese global RAG baseline page. Later query-evolution features extend the same route; focused mode remains F-04. |
 | `POST` | `/api/rag/ask` | Accepts `{ question, mode: "global" }`; returns `200` success, `400 invalid_request`, `502 generation_failed`, or `503 generation_unavailable`. |
 | Function | `AnswerQuestion.execute(input)` | Application service orchestrating retrieval, context assembly, citation validation, and generation. |
 | Function | `RetrieveChunks.search(input)` | Retrieval service for question embedding plus active-config vector search. |

@@ -2,6 +2,36 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(query): define `/query` evolution contracts and defer focused RAG
+
+Date: 2026-04-22
+
+Changed:
+
+- Added `.specs/project/query-experience-evolution.md` as the umbrella document
+  for the shared `/query` surface, locking the sequence, shared interfaces, and
+  invariants for controls, traceability, conversation, and later focused
+  retrieval.
+- Added `F-05 / Query Controls and Explore`, `F-06 / Answer Traceability`, and
+  `F-07 / Conversational Query` as new feature contracts.
+- Recorded `AD-013` to re-sequence `/query` work through controls,
+  traceability, and chat before rebasing `F-04 / Focused RAG`.
+- Updated `ROADMAP`, `STATE`, and the existing F-03/F-04 specs so the repo no
+  longer assumes the next `/query` change is the old global-only-to-focused jump.
+
+Files:
+
+- `.specs/project/query-experience-evolution.md`
+- `.specs/features/F-05-query-controls-and-explore/spec.md`
+- `.specs/features/F-06-answer-traceability/spec.md`
+- `.specs/features/F-07-conversational-query/spec.md`
+- `.specs/features/F-03-global-rag/spec.md`
+- `.specs/features/F-03-global-rag/04-interface-api-and-page.md`
+- `.specs/features/F-04-focused-rag/spec.md`
+- `.specs/project/ROADMAP.md`
+- `.specs/project/STATE.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(rag): rename consulta page route to query
 
 Date: 2026-04-21

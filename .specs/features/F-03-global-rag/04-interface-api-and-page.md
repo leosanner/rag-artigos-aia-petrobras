@@ -4,7 +4,9 @@
 
 Expose the global RAG workflow through validated API routes and a minimal
 Portuguese `/query` page while keeping retrieval and generation business
-logic in the application layer.
+logic in the application layer. This block defines the F-03 baseline for the
+shared route; later `/query` evolution is tracked separately in
+`.specs/project/query-experience-evolution.md`.
 
 ## Scope
 
@@ -21,7 +23,8 @@ logic in the application layer.
 **Out of scope:**
 
 - Retrieval SQL and generation orchestration (Blocks 02 and 03).
-- Focused-mode selectors and document listing; those are F-04.
+- Focused-mode selectors and later `/query` evolution beyond the F-03 baseline;
+  those start with F-05/F-06/F-07 and later F-04.
 - Auth, secrets, or operator-only bearer protection.
 - Streaming UI, chat history, observability, and agents.
 
@@ -92,5 +95,5 @@ safe error handling.
 
 - API and page tests pass.
 - All route response bodies are Zod-validated.
-- The page stays intentionally minimal and global-only so F-04 can extend the
-  same surface without reworking the base ask flow.
+- The page remains a valid F-03 baseline and later `/query` evolution can
+  extend the same surface without reworking the base ask flow.
