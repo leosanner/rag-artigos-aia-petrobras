@@ -31,8 +31,9 @@ calculation in the application layer.
 - RN-B04-02: Unauthorized or invalid ask requests remain unpersisted and return
   the same sanitized `401` or `400` response shapes as before.
 - RN-B04-03: Safe generation failures remain limited to `502
-  generation_failed` and `503 generation_unavailable`, without exposing trace
-  storage internals.
+  generation_failed` and `503 generation_unavailable`, while unexpected
+  internal ask-route failures return sanitized `500 { error: "technical_error"
+  }` bodies without exposing trace storage internals.
 - RN-B04-04: `GET /api/rag/query-runs` requires the same bearer secret pattern
   as `/api/rag/ask`; unauthorized reads return 401 before calling the
   application service.
@@ -58,11 +59,12 @@ calculation in the application layer.
   `ngramSize`, `frequency`, and `sourceCoverageCount`.
 - [x] RF-B04-03: Audit schemas cover latency plus embedding/generation
   usage/cost breakdown and total estimated cost.
-- [x] RF-B04-04: Error response schemas remain limited to sanitized
-  `invalid_request`, `unauthorized`, `generation_failed`, and
-  `generation_unavailable` shapes for the ask endpoint.
+- [x] RF-B04-04: Ask error response schemas cover only sanitized
+  `invalid_request`, `unauthorized`, `generation_failed`,
+  `generation_unavailable`, and `technical_error` shapes.
 - [x] RF-B04-05: `createRagAskHandler` returns the expanded success body on 200
-  and preserves existing safe status mapping on 400, 401, 502, and 503.
+  and preserves safe status mapping on 400, 401, 502, 503, and sanitized 500
+  for unexpected internal failures.
 - [x] RF-B04-06: `GET /api/rag/query-runs` returns recent run summaries in
   reverse chronological order on 200, returns 401 on missing or invalid bearer
   auth, and returns sanitized `500 { error: "technical_error" }` bodies on

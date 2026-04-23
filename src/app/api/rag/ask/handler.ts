@@ -9,6 +9,7 @@ import {
   ragGenerationFailedResponseSchema,
   ragGenerationUnavailableResponseSchema,
   ragInvalidRequestResponseSchema,
+  ragTechnicalErrorResponseSchema,
   ragUnauthorizedResponseSchema,
 } from "@/application/rag/schemas";
 
@@ -44,13 +45,13 @@ export function createRagAskHandler(deps: RagAskHandlerDeps) {
     try {
       rawResult = await deps.answerQuestion.execute(parsed.data);
     } catch {
-      return generationUnavailableResponse();
+      return technicalErrorResponse();
     }
 
     const parsedResult = answerQuestionResultSchema.safeParse(rawResult);
 
     if (!parsedResult.success) {
-      return generationFailedResponse();
+      return technicalErrorResponse();
     }
 
     const result = parsedResult.data;
@@ -59,7 +60,7 @@ export function createRagAskHandler(deps: RagAskHandlerDeps) {
       const body = ragAskSuccessResponseSchema.safeParse(result);
 
       if (!body.success) {
-        return generationFailedResponse();
+        return technicalErrorResponse();
       }
 
       return NextResponse.json(body.data, {
@@ -72,7 +73,11 @@ export function createRagAskHandler(deps: RagAskHandlerDeps) {
       return generationFailedResponse();
     }
 
-    return generationUnavailableResponse();
+    if (result.error === "generation_unavailable") {
+      return generationUnavailableResponse();
+    }
+
+    return technicalErrorResponse();
   };
 }
 
@@ -116,6 +121,17 @@ function generationUnavailableResponse(): Response {
 
   return NextResponse.json(body, {
     status: 503,
+    headers: NO_STORE_HEADERS,
+  });
+}
+
+function technicalErrorResponse(): Response {
+  const body = ragTechnicalErrorResponseSchema.parse({
+    error: "technical_error",
+  });
+
+  return NextResponse.json(body, {
+    status: 500,
     headers: NO_STORE_HEADERS,
   });
 }

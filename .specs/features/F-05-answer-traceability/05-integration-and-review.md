@@ -62,8 +62,9 @@ sync, and the required independent-review handoff.
   source snapshots, related-term persistence, reverse-chronological listing,
   and run-detail reads against real Postgres.
 - [x] RF-B05-03: Application tests prove normalized provider usage/cost
-  metadata, total-latency capture, success/no-evidence/failure persistence, and
-  unchanged safe error mapping.
+  metadata, total-latency capture, success/no-evidence/failure persistence,
+  safe generation-error mapping, and sanitized `technical_error` handling for
+  unexpected internal failures.
 - [x] RF-B05-04: Ask-route tests prove the expanded success body includes
   `traceId`, `relatedTerms`, and `audit`, while invalid and unauthorized
   requests remain unpersisted.
@@ -119,12 +120,16 @@ pnpm test
   passing test files and `364` passing tests.
 - The project test script prepared `aia_insight_test` and applied migrations
   before running Vitest.
-- Fresh independent reviews on new Codex threads identified four closeout
-  issues during implementation closeout: missing sanitized `500` audit-read
-  responses, stale persisted-history state after audit-read `401` responses in
-  `/query`, a missing persisted-run path for retrieval/embedding failures after
-  ask validation, and a stale Block 04 route contract. All four issues were
-  fixed before the final verification run.
+- Fresh independent reviews on new Codex threads identified and cleared
+  closeout issues during implementation closeout, including missing sanitized
+  `500` audit-read responses, stale persisted-history state after audit-read
+  `401` responses in `/query`, a missing persisted-run path for
+  retrieval/embedding failures after ask validation, stale F-05 route-contract
+  wording, and misclassified ask-route persistence failures that now return
+  sanitized `500 { error: "technical_error" }` bodies instead of being
+  reported as generation outages.
+- A final fresh independent review of the last ask-route and doc-sync diff
+  found no additional findings before this closeout was committed.
 - No additional project-contract docs were updated because the implementation
   did not materially change the F-05 behavior. The only project-doc changes in
   this closeout are the F-05 bookkeeping updates in `STATE.md` and
@@ -154,8 +159,9 @@ Suggested reviewer prompt:
 > `spec.md` and blocks 01-05 only. Prioritize the invariant that every
 > authorized, schema-valid ask attempt persists exactly one governed run,
 > deterministic related-term extraction, immutable source snapshots, normalized
-> usage/cost capture, unchanged sanitized error behavior from F-03/F-04, and
-> whether any F-06/F-07 scope leaked into F-05. Flag any mismatch between the
+> usage/cost capture, safe generation-error handling plus sanitized
+> `technical_error` handling for unexpected internal failures, and whether any
+> F-06/F-07 scope leaked into F-05. Flag any mismatch between the
 > implementation and the synced docs.
 
 Run the review on a fresh independent thread with only the packet above in

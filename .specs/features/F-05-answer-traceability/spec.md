@@ -136,9 +136,11 @@ the current task:
     then persists the run row plus related sources and related terms.
 11. On success, the route returns the answer payload with `traceId`,
     `relatedTerms`, and the audit metrics already attached.
-12. On a technical generation failure after validation, the service persists a
-    failed run with the safe error code and the route returns the same sanitized
-    error shape as before.
+12. On a technical retrieval or generation failure after validation, the
+    service persists a failed run with the safe error code and any source
+    snapshot already available. On unexpected internal route failures such as
+    trace-persistence or response-serialization problems, the route returns a
+    sanitized `500 { error: "technical_error" }` body without leaking internals.
 13. `/query` uses the success payload for the current audit panel and can call
     `GET /api/rag/query-runs` plus `GET /api/rag/query-runs/:id` for persisted
     run inspection.
@@ -191,8 +193,9 @@ the current task:
   related terms.
 - `src/infrastructure/ai/*` - normalized usage/cost metadata from embedding and
   generation adapters.
-- `src/app/api/rag/ask/*` - success-response trace data and unchanged sanitized
-  error mapping.
+- `src/app/api/rag/ask/*` - success-response trace data, safe generation-error
+  mapping, and sanitized `technical_error` handling for unexpected internal
+  failures.
 - `src/app/api/rag/query-runs/*` - recent-run and run-detail routes.
 - `src/app/query/page.tsx` - current-answer audit panel and persisted-run
   inspection UI.
@@ -213,8 +216,10 @@ the current task:
 1. A successful ask response includes `traceId`, related terms, and audit data
    for latency plus embedding/generation usage and cost.
 2. A no-evidence success persists a run with status `answered_no_evidence`.
-3. A generation failure after request validation persists a failed run and still
-   returns the existing sanitized HTTP error shape.
+3. A retrieval or generation failure after request validation persists a failed
+   run with the safe error code and source snapshot already available, while
+   unexpected internal route failures stay sanitized as `500 { error:
+   "technical_error" }`.
 4. Recent-run summaries can be listed in reverse chronological order without
    exposing prompts, secrets, or provider internals.
 5. Run detail returns the persisted question, answer or safe failure status,

@@ -2,6 +2,32 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - fix(rag): sanitize unexpected ask-route failures
+
+Date: 2026-04-23
+
+Changed:
+
+- Updated `POST /api/rag/ask` so unexpected internal failures such as
+  trace-persistence errors or invalid internal response payloads return
+  sanitized `500 { error: "technical_error" }` bodies instead of being
+  misreported as generation outages.
+- Added ask-handler coverage for thrown internal failures and invalid
+  application result payloads under the new `technical_error` mapping.
+- Synced the F-05 parent and interface closeout docs so they explicitly cover
+  retrieval-or-generation failure persistence plus the ask-route
+  `technical_error` path for unexpected internal failures.
+
+Files:
+
+- `src/application/rag/schemas.ts`
+- `src/app/api/rag/ask/handler.ts`
+- `src/app/api/rag/ask/handler.test.ts`
+- `.specs/features/F-05-answer-traceability/spec.md`
+- `.specs/features/F-05-answer-traceability/04-interface-api-audit-endpoints-and-query-page.md`
+- `.specs/features/F-05-answer-traceability/05-integration-and-review.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(rag): close F-05 verification and spec sync
 
 Date: 2026-04-23

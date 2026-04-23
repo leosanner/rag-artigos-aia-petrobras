@@ -274,6 +274,12 @@ export const ragGenerationUnavailableResponseSchema = z
   })
   .strip();
 
+export const ragTechnicalErrorResponseSchema = z
+  .object({
+    error: z.literal("technical_error"),
+  })
+  .strip();
+
 export type RagGenerationErrorResponse = z.infer<
   typeof ragGenerationErrorResponseSchema
 >;
@@ -286,10 +292,15 @@ export type RagGenerationUnavailableResponse = z.infer<
   typeof ragGenerationUnavailableResponseSchema
 >;
 
+export type RagTechnicalErrorResponse = z.infer<
+  typeof ragTechnicalErrorResponseSchema
+>;
+
 export const ragAskErrorResponseSchema = z.union([
   ragInvalidRequestResponseSchema,
   ragUnauthorizedResponseSchema,
   ragGenerationErrorResponseSchema,
+  ragTechnicalErrorResponseSchema,
 ]);
 
 export const ragAskResponseSchema = z.union([

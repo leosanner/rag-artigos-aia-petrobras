@@ -365,7 +365,7 @@ describe("POST /api/rag/ask handler", () => {
     expect(body).not.toHaveProperty("sources");
   });
 
-  it("sanitizes unexpected failures to generation_unavailable", async () => {
+  it("sanitizes unexpected failures to technical_error", async () => {
     const answerQuestion = buildAnswerQuestion(async () => {
       throw new Error(
         `raw provider error OPENAI_API_KEY=${OPENAI_API_KEY} DATABASE_URL=${DATABASE_URL}`,
@@ -384,14 +384,14 @@ describe("POST /api/rag/ask handler", () => {
     );
     const bodyText = await response.clone().text();
 
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ error: "generation_unavailable" });
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "technical_error" });
     expect(bodyText).not.toContain(OPENAI_API_KEY);
     expect(bodyText).not.toContain(DATABASE_URL);
     expect(bodyText).not.toContain("raw provider error");
   });
 
-  it("maps invalid application result payloads to generation_failed", async () => {
+  it("maps invalid application result payloads to technical_error", async () => {
     const answerQuestion = {
       execute: vi.fn().mockResolvedValue({
         kind: "answered",
@@ -412,8 +412,8 @@ describe("POST /api/rag/ask handler", () => {
       ),
     );
 
-    expect(response.status).toBe(502);
-    expect(await response.json()).toEqual({ error: "generation_failed" });
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "technical_error" });
   });
 
   it("does not leak the configured query secret in any response body", async () => {
