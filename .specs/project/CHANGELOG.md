@@ -2,6 +2,33 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(specs): split F-05 into implementation blocks
+
+Date: 2026-04-23
+
+Changed:
+
+- Expanded `F-05 / Answer Traceability` into the same 5-block implementation
+  structure already used by the earlier features so development can progress in
+  smaller, reviewable slices.
+- Added an `Implementation Blocks` section to the parent `F-05` contract,
+  linking domain, persistence, application, interface, and integration/review
+  child docs.
+- Added detailed block contracts for deterministic related terms and trace
+  status, query-run persistence and audit reads, the audited ask flow with
+  provider metrics, audit API/UI surfaces on `/query`, and final closeout plus
+  reviewer handoff.
+
+Files:
+
+- `.specs/features/F-05-answer-traceability/spec.md`
+- `.specs/features/F-05-answer-traceability/01-domain-related-terms-and-trace-status.md`
+- `.specs/features/F-05-answer-traceability/02-persistence-query-run-traces-and-audit-reads.md`
+- `.specs/features/F-05-answer-traceability/03-application-audited-ask-flow-and-provider-metrics.md`
+- `.specs/features/F-05-answer-traceability/04-interface-api-audit-endpoints-and-query-page.md`
+- `.specs/features/F-05-answer-traceability/05-integration-and-review.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(rag): close F-04 verification and spec sync
 
 Date: 2026-04-23

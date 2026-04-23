@@ -38,6 +38,18 @@ governance layer forward onto the query surface.
 This feature builds on the operator controls from F-04 and defines the audited
 turn model that later chat and focused retrieval must reuse.
 
+## Implementation Blocks
+
+The feature should be implemented in the same small-block style used by F-01
+through F-04. Read this overview first, then open only the block document
+needed for the current task:
+
+- [01 - Domain: Related Terms and Trace Status](01-domain-related-terms-and-trace-status.md): pure logic for deterministic related-term extraction, ranking, fallback behavior, and safe trace status/error vocabulary.
+- [02 - Persistence: Query-Run Traces and Audit Reads](02-persistence-query-run-traces-and-audit-reads.md): schema, repositories, immutable source/term snapshots, and recent/detail audit reads.
+- [03 - Application: Audited Ask Flow and Provider Metrics](03-application-audited-ask-flow-and-provider-metrics.md): provider-port expansion, latency/cost accounting, audited single-turn orchestration, and route-agnostic audit read services.
+- [04 - Interface: API Audit Endpoints and Query Page](04-interface-api-audit-endpoints-and-query-page.md): `POST /api/rag/ask` response expansion, audit read routes, Zod schemas, and `/query` audit UI.
+- [05 - Integration and Review](05-integration-and-review.md): end-to-end verification, doc sync, closeout commands, and independent-review handoff.
+
 ## Business Rules
 
 - RN-01: Every authorized, schema-valid `POST /api/rag/ask` attempt persists
