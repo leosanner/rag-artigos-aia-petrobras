@@ -2,6 +2,36 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(rag): close F-05 verification and spec sync
+
+Date: 2026-04-23
+
+Changed:
+
+- Marked the F-05 parent spec complete now that trace persistence, related
+  terms, usage/cost capture, audit endpoints, and `/query` inspection behavior
+  are all implemented and covered by the existing tests.
+- Synced F-05 Blocks 01 through 04 from planned requirements to implemented
+  requirements by flipping the domain, persistence, application, and interface
+  RF checklists.
+- Expanded F-05 Block 05 into the final closeout record with the exact local
+  verification commands and results, the review-packet diff basis, and the
+  note that no contract-changing project-doc updates were needed beyond
+  bookkeeping.
+- Updated `.specs/project/STATE.md` to mark F-05 complete and move the current
+  `/query` work forward to F-06.
+
+Files:
+
+- `.specs/features/F-05-answer-traceability/spec.md`
+- `.specs/features/F-05-answer-traceability/01-domain-related-terms-and-trace-status.md`
+- `.specs/features/F-05-answer-traceability/02-persistence-query-run-traces-and-audit-reads.md`
+- `.specs/features/F-05-answer-traceability/03-application-audited-ask-flow-and-provider-metrics.md`
+- `.specs/features/F-05-answer-traceability/04-interface-api-audit-endpoints-and-query-page.md`
+- `.specs/features/F-05-answer-traceability/05-integration-and-review.md`
+- `.specs/project/STATE.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(specs): split F-05 into implementation blocks
 
 Date: 2026-04-23

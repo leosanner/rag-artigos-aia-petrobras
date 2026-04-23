@@ -28,6 +28,18 @@ export type RetrieveChunksResult = {
   embedding: EmbeddingUsage;
 };
 
+export class RetrieveChunksFailure extends Error {
+  readonly cause: unknown;
+  readonly embedding: EmbeddingUsage | null;
+
+  constructor(cause: unknown, embedding: EmbeddingUsage | null) {
+    super("retrieve_chunks_failed");
+    this.name = "RetrieveChunksFailure";
+    this.cause = cause;
+    this.embedding = embedding;
+  }
+}
+
 export class RetrieveChunks {
   readonly embeddingModel: string;
   readonly chunkingVersion: string;
@@ -43,30 +55,37 @@ export class RetrieveChunks {
   }
 
   async search(input: RetrieveChunksInput): Promise<RetrieveChunksResult> {
-    const { embedding: queryEmbedding, usage } =
-      await this.questionEmbeddingProvider.embedQuestion(input.question);
-    const candidateTopK = getCandidateTopK(input.retrieval);
+    let embeddingUsage: EmbeddingUsage | null = null;
 
-    const matches = await this.chunksRepository.searchGlobal({
-      queryEmbedding,
-      topK: candidateTopK,
-      chunkingVersion: this.chunkingVersion,
-      embeddingModel: this.embeddingModel,
-    });
+    try {
+      const { embedding: queryEmbedding, usage } =
+        await this.questionEmbeddingProvider.embedQuestion(input.question);
+      embeddingUsage = usage;
+      const candidateTopK = getCandidateTopK(input.retrieval);
 
-    if (input.retrieval.strategy === "standard") {
+      const matches = await this.chunksRepository.searchGlobal({
+        queryEmbedding,
+        topK: candidateTopK,
+        chunkingVersion: this.chunkingVersion,
+        embeddingModel: this.embeddingModel,
+      });
+
+      if (input.retrieval.strategy === "standard") {
+        return {
+          matches,
+          embedding: usage,
+        };
+      }
+
       return {
-        matches,
+        matches: selectDiversifiedMatches({
+          matches,
+          topK: input.retrieval.topK,
+        }),
         embedding: usage,
       };
+    } catch (error) {
+      throw new RetrieveChunksFailure(error, embeddingUsage);
     }
-
-    return {
-      matches: selectDiversifiedMatches({
-        matches,
-        topK: input.retrieval.topK,
-      }),
-      embedding: usage,
-    };
   }
 }

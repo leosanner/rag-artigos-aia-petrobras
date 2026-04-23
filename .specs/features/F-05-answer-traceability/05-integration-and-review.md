@@ -2,7 +2,7 @@
 
 ## Goal
 
-Close F-05 as an implemented vertical after Blocks 01-04 land: verify
+Close F-05 as an implemented vertical now that Blocks 01-04 have landed: verify
 deterministic related terms, audited single-turn persistence, provider
 usage/cost capture, audit read endpoints, `/query` inspection behavior, doc
 sync, and the required independent-review handoff.
@@ -55,28 +55,28 @@ sync, and the required independent-review handoff.
 
 ## Functional Requirements
 
-- [ ] RF-B05-01: Domain tests prove deterministic related-term extraction,
+- [x] RF-B05-01: Domain tests prove deterministic related-term extraction,
   stable ranking, cap-at-8 behavior, question-only fallback, and the closed
   safe status/error vocabulary.
-- [ ] RF-B05-02: Repository tests prove transactional run creation, immutable
+- [x] RF-B05-02: Repository tests prove transactional run creation, immutable
   source snapshots, related-term persistence, reverse-chronological listing,
   and run-detail reads against real Postgres.
-- [ ] RF-B05-03: Application tests prove normalized provider usage/cost
+- [x] RF-B05-03: Application tests prove normalized provider usage/cost
   metadata, total-latency capture, success/no-evidence/failure persistence, and
   unchanged safe error mapping.
-- [ ] RF-B05-04: Ask-route tests prove the expanded success body includes
+- [x] RF-B05-04: Ask-route tests prove the expanded success body includes
   `traceId`, `relatedTerms`, and `audit`, while invalid and unauthorized
   requests remain unpersisted.
-- [ ] RF-B05-05: Audit-route tests prove recent-run and detail reads require
+- [x] RF-B05-05: Audit-route tests prove recent-run and detail reads require
   the bearer secret, validate ids, and return only sanitized bodies.
-- [ ] RF-B05-06: UI tests prove `/query` renders the current answer audit panel
+- [x] RF-B05-06: UI tests prove `/query` renders the current answer audit panel
   from the successful ask response and can inspect a persisted past run from the
   recent-runs list.
-- [ ] RF-B05-07: The parent `spec.md` and all F-05 block docs are synced to the
+- [x] RF-B05-07: The parent `spec.md` and all F-05 block docs are synced to the
   implemented behavior before the feature is considered complete.
-- [ ] RF-B05-08: Project docs are updated only if the implementation materially
+- [x] RF-B05-08: Project docs are updated only if the implementation materially
   changes the F-05 contract.
-- [ ] RF-B05-09: The closeout records the exact verification commands and any
+- [x] RF-B05-09: The closeout records the exact verification commands and any
   environment-specific caveats discovered during final checks.
 
 ## Verification Plan
@@ -95,11 +95,48 @@ pnpm typecheck
 pnpm test
 ```
 
+## Verification Record
+
+### Prerequisites
+
+- Local Postgres must be running on `127.0.0.1:5432`.
+- F-02, F-03, and F-04 paths must remain green as part of the full repository
+  checks.
+
+### Commands run on 2026-04-23
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+```
+
+### Results
+
+- `pnpm lint` passed.
+- `pnpm typecheck` passed.
+- `pnpm test` passed with local Postgres running. The suite finished with `54`
+  passing test files and `364` passing tests.
+- The project test script prepared `aia_insight_test` and applied migrations
+  before running Vitest.
+- Fresh independent reviews on new Codex threads identified four closeout
+  issues during implementation closeout: missing sanitized `500` audit-read
+  responses, stale persisted-history state after audit-read `401` responses in
+  `/query`, a missing persisted-run path for retrieval/embedding failures after
+  ask validation, and a stale Block 04 route contract. All four issues were
+  fixed before the final verification run.
+- No additional project-contract docs were updated because the implementation
+  did not materially change the F-05 behavior. The only project-doc changes in
+  this closeout are the F-05 bookkeeping updates in `STATE.md` and
+  `CHANGELOG.md`.
+- No `pnpm build` check was required for F-05 Block 05. The parent F-05
+  contract closes on `pnpm lint`, `pnpm typecheck`, and `pnpm test`.
+
 ## Reviewer Handoff Packet
 
 Provide the reviewer with:
 
-- The committed F-05 implementation diff.
+- The committed F-05 implementation diff from `git diff 48d9059..HEAD`.
 - Any uncommitted closeout doc diff after spec-sync edits land.
 - `.specs/features/F-05-answer-traceability/spec.md`
 - `.specs/features/F-05-answer-traceability/01-domain-related-terms-and-trace-status.md`
@@ -121,8 +158,8 @@ Suggested reviewer prompt:
 > whether any F-06/F-07 scope leaked into F-05. Flag any mismatch between the
 > implementation and the synced docs.
 
-The review remains pending until a fresh independent reviewer confirms the
-feature on a new thread with only the packet above in context.
+Run the review on a fresh independent thread with only the packet above in
+context; do not reuse the implementation conversation history.
 
 ## Done When
 

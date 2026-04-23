@@ -460,7 +460,8 @@ describe("/query page", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("clears the stored secret and shows a safe message on 401 when loading history", async () => {
+  it("clears persisted history, clears the stored secret, and shows a safe message on 401 when refreshing history", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(RUN_SUMMARIES));
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ error: "unauthorized" }, { status: 401 }),
     );
@@ -476,12 +477,31 @@ describe("/query page", () => {
       clickLoadHistory();
     });
 
-    expect(screen.getByText(/secret de consulta foi rejeitado/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: /quais tecnicas aparecem com maior frequencia\?/i,
+      }),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /atualizar historico/i }),
+      );
+    });
+
+    expect(
+      screen.getAllByText(/secret de consulta foi rejeitado/i).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole("button", {
+        name: /quais tecnicas aparecem com maior frequencia\?/i,
+      }),
+    ).not.toBeInTheDocument();
     expect(sessionStorage.getItem("query:secret")).toBeNull();
     expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe("");
   });
 
-  it("clears the stored secret and shows a safe message on 401 when loading run detail", async () => {
+  it("clears persisted history, clears the stored secret, and shows a safe message on 401 when loading run detail", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(RUN_SUMMARIES));
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ error: "unauthorized" }, { status: 401 }),
@@ -502,7 +522,14 @@ describe("/query page", () => {
       );
     });
 
-    expect(screen.getByText(/secret de consulta foi rejeitado/i)).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/secret de consulta foi rejeitado/i).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole("button", {
+        name: /quais tecnicas aparecem com maior frequencia\?/i,
+      }),
+    ).not.toBeInTheDocument();
     expect(sessionStorage.getItem("query:secret")).toBeNull();
     expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe("");
   });

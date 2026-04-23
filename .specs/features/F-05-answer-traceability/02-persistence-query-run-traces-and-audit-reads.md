@@ -40,28 +40,28 @@ repository-backed audit reads for recent runs and run detail.
 
 ## Functional Requirements
 
-- [ ] RF-B02-01: The database schema defines `rag_query_runs`,
+- [x] RF-B02-01: The database schema defines `rag_query_runs`,
   `rag_query_run_sources`, and `rag_query_run_related_terms`.
-- [ ] RF-B02-02: `rag_query_runs` stores question, nullable answer, safe
+- [x] RF-B02-02: `rag_query_runs` stores question, nullable answer, safe
   status/error, applied retrieval settings, prompt/model versions, latency, and
   normalized usage/cost totals.
-- [ ] RF-B02-03: `rag_query_run_sources` stores an immutable snapshot of every
+- [x] RF-B02-03: `rag_query_run_sources` stores an immutable snapshot of every
   selected source, including `sourceNumber`, document/chunk ids, document
   title, excerpt, score, version metadata, and `citedInAnswer`.
-- [ ] RF-B02-04: `rag_query_run_related_terms` stores up to 8 rows per run with
+- [x] RF-B02-04: `rag_query_run_related_terms` stores up to 8 rows per run with
   `rank`, `term`, `ngramSize`, `frequency`, and `sourceCoverageCount`.
-- [ ] RF-B02-05: Child rows cannot exist without a parent run, and deleting a
+- [x] RF-B02-05: Child rows cannot exist without a parent run, and deleting a
   run cascades to its source and related-term snapshots.
-- [ ] RF-B02-06: `RagQueryRunsRepository.create(input)` writes one run plus its
+- [x] RF-B02-06: `RagQueryRunsRepository.create(input)` writes one run plus its
   child snapshots in a single transaction.
-- [ ] RF-B02-07: `RagQueryRunsRepository.listRecent()` returns recent run
+- [x] RF-B02-07: `RagQueryRunsRepository.listRecent()` returns recent run
   summaries in reverse chronological order without loading full excerpts or
   related terms.
-- [ ] RF-B02-08: `RagQueryRunsRepository.getById(id)` returns one persisted run
+- [x] RF-B02-08: `RagQueryRunsRepository.getById(id)` returns one persisted run
   detail with sources and related terms, or `null` when the id does not exist.
-- [ ] RF-B02-09: Repository tests prove the read side returns stored source
+- [x] RF-B02-09: Repository tests prove the read side returns stored source
   snapshots and related-term rows instead of recomputing live retrieval.
-- [ ] RF-B02-10: Repository tests prove reverse-chronological listing and safe
+- [x] RF-B02-10: Repository tests prove reverse-chronological listing and safe
   persistence of both answered and failed run states.
 
 ## Module Contracts
@@ -136,4 +136,3 @@ chronological listing, and `getById(id)` detail loading.
 - The trace schema stores only governed run/source/term data.
 - Later application and interface blocks can write audited runs and read recent
   summaries/detail without recomputing retrieval state.
-

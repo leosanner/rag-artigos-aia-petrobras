@@ -72,6 +72,23 @@ type SelectedRunState = {
   error: LoadErrorKind | null;
 };
 
+function createInitialRecentRunsState(): RecentRunsState {
+  return {
+    status: "idle",
+    runs: [],
+    error: null,
+  };
+}
+
+function createInitialSelectedRunState(): SelectedRunState {
+  return {
+    status: "idle",
+    run: null,
+    runId: null,
+    error: null,
+  };
+}
+
 export default function QueryPage() {
   const [question, setQuestion] = useState("");
   const [secret, setSecret] = useState("");
@@ -80,17 +97,12 @@ export default function QueryPage() {
   const [currentAskResult, setCurrentAskResult] = useState<CurrentAskResult | null>(
     null,
   );
-  const [recentRunsState, setRecentRunsState] = useState<RecentRunsState>({
-    status: "idle",
-    runs: [],
-    error: null,
-  });
-  const [selectedRunState, setSelectedRunState] = useState<SelectedRunState>({
-    status: "idle",
-    run: null,
-    runId: null,
-    error: null,
-  });
+  const [recentRunsState, setRecentRunsState] = useState<RecentRunsState>(
+    createInitialRecentRunsState,
+  );
+  const [selectedRunState, setSelectedRunState] = useState<SelectedRunState>(
+    createInitialSelectedRunState,
+  );
 
   const trimmedQuestion = question.trim();
   const trimmedSecret = secret.trim();
@@ -124,15 +136,22 @@ export default function QueryPage() {
 
     if (value.length === 0) {
       sessionStorage.removeItem(SECRET_STORAGE_KEY);
+      resetPersistedAuditState();
       return;
     }
 
     sessionStorage.setItem(SECRET_STORAGE_KEY, value);
   }
 
+  function resetPersistedAuditState() {
+    setRecentRunsState(createInitialRecentRunsState());
+    setSelectedRunState(createInitialSelectedRunState());
+  }
+
   function clearSecret() {
     sessionStorage.removeItem(SECRET_STORAGE_KEY);
     setSecret("");
+    resetPersistedAuditState();
   }
 
   async function submitQuestion(strategy: QuerySubmissionStrategy) {
@@ -260,12 +279,13 @@ export default function QueryPage() {
 
     if (response.status === 401) {
       const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
+      const error = parsed.success ? "unauthorized" : "technical";
       clearSecret();
-      setRecentRunsState((current) => ({
-        ...current,
+      setRecentRunsState({
         status: "error",
-        error: parsed.success ? "unauthorized" : "technical",
-      }));
+        runs: [],
+        error,
+      });
       return;
     }
 
@@ -330,12 +350,18 @@ export default function QueryPage() {
 
     if (response.status === 401) {
       const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
+      const error = parsed.success ? "unauthorized" : "technical";
       clearSecret();
+      setRecentRunsState({
+        status: "error",
+        runs: [],
+        error,
+      });
       setSelectedRunState({
         status: "error",
         run: null,
         runId,
-        error: parsed.success ? "unauthorized" : "technical",
+        error,
       });
       return;
     }

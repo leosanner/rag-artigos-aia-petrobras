@@ -8,6 +8,7 @@ import {
 
 import type { EmbeddingUsage, GenerationUsage } from "./ports";
 import { AnswerQuestion } from "./answer-question";
+import { RetrieveChunksFailure } from "./retrieve-chunks";
 
 const GENERATION_MODEL = "gpt-4.1-mini";
 const EMBEDDING_MODEL = "text-embedding-3-large";
@@ -64,6 +65,8 @@ function createService(
     answer?: string;
     generationUsage?: GenerationUsage;
     generationError?: unknown;
+    retrievalError?: unknown;
+    createError?: unknown;
     nowMs?: () => number;
     createdRunId?: string;
   } = {},
@@ -84,10 +87,13 @@ function createService(
 
   const retrieveChunks = {
     embeddingModel: EMBEDDING_MODEL,
-    search: vi.fn().mockResolvedValue({
-      matches,
-      embedding: embeddingUsage,
-    }),
+    search:
+      overrides.retrievalError === undefined
+        ? vi.fn().mockResolvedValue({
+            matches,
+            embedding: embeddingUsage,
+          })
+        : vi.fn().mockRejectedValue(overrides.retrievalError),
   };
   const generationProvider = {
     generateAnswer:
@@ -99,10 +105,13 @@ function createService(
         : vi.fn().mockRejectedValue(overrides.generationError),
   };
   const runsRepository = {
-    create: vi.fn().mockResolvedValue({
-      id: overrides.createdRunId ?? CREATED_RUN_ID,
-      createdAt: new Date("2026-04-23T00:00:00.000Z"),
-    }),
+    create:
+      overrides.createError === undefined
+        ? vi.fn().mockResolvedValue({
+            id: overrides.createdRunId ?? CREATED_RUN_ID,
+            createdAt: new Date("2026-04-23T00:00:00.000Z"),
+          })
+        : vi.fn().mockRejectedValue(overrides.createError),
   };
 
   const service = new AnswerQuestion({
@@ -557,5 +566,89 @@ describe("AnswerQuestion", () => {
       ],
       relatedTerms: expectedRelatedTerms,
     });
+  });
+
+  it("persists a failed run when retrieval fails after validation and preserves known embedding audit data", async () => {
+    const nowMs = createNowMs(187);
+    const embeddingUsage = buildEmbeddingUsage({
+      inputTokens: 12,
+      estimatedCostUsd: 0.00000156,
+    });
+    const retrievalError = new RetrieveChunksFailure(
+      {
+        statusCode: 503,
+        message: "vector search unavailable",
+      },
+      embeddingUsage,
+    );
+    const { service, generationProvider, runsRepository } = createService({
+      retrievalError,
+      nowMs,
+    });
+    const question = "Quais abordagens aparecem com maior frequência?";
+
+    await expect(
+      service.execute({
+        question,
+        mode: "global",
+      }),
+    ).resolves.toEqual({
+      kind: "error",
+      error: "generation_unavailable",
+    });
+
+    expect(generationProvider.generateAnswer).not.toHaveBeenCalled();
+    expect(runsRepository.create).toHaveBeenCalledWith({
+      question,
+      answer: null,
+      mode: "global",
+      status: "generation_unavailable",
+      errorCode: "generation_unavailable",
+      topK: 6,
+      retrievalStrategy: "standard",
+      candidateTopK: 6,
+      promptVersion: PROMPT_VERSION,
+      generationModel: GENERATION_MODEL,
+      embeddingModel: EMBEDDING_MODEL,
+      latencyMs: 187,
+      embeddingInputTokens: embeddingUsage.inputTokens,
+      embeddingCostUsd: embeddingUsage.estimatedCostUsd,
+      generationInputTokens: null,
+      generationOutputTokens: null,
+      generationTotalTokens: null,
+      generationCostUsd: null,
+      totalCostUsd: embeddingUsage.estimatedCostUsd,
+      sources: [],
+      relatedTerms: extractRelatedTerms({
+        question,
+        sourceExcerpts: [],
+      }),
+    });
+    expect(nowMs).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects when trace persistence fails after a successful answer and does not reclassify the run as a generation failure", async () => {
+    const persistenceError = new Error("database unavailable");
+    const { service, generationProvider, runsRepository } = createService({
+      answer: "A síntese prioriza a segunda fonte [2].",
+      createError: persistenceError,
+    });
+
+    await expect(
+      service.execute({
+        question: "Quais abordagens aparecem com mais frequência?",
+        mode: "global",
+      }),
+    ).rejects.toThrow(/trace_persistence_failed/i);
+
+    expect(generationProvider.generateAnswer).toHaveBeenCalledTimes(1);
+    expect(runsRepository.create).toHaveBeenCalledTimes(1);
+    expect(runsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "answered",
+        errorCode: null,
+        answer: "A síntese prioriza a segunda fonte [2].",
+      }),
+    );
   });
 });

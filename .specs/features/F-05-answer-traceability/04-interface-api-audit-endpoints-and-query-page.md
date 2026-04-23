@@ -41,7 +41,8 @@ calculation in the application layer.
   does not exist.
 - RN-B04-06: All API response bodies are validated with Zod before
   serialization and remain free of secrets, raw prompts, stack traces, or raw
-  provider payloads.
+  provider payloads, including sanitized `500 { error: "technical_error" }`
+  responses on unexpected audit-read failures.
 - RN-B04-07: `/query` copy remains PT-BR by default.
 - RN-B04-08: `/query` renders the current-answer audit panel from the ask
   success payload itself and does not refetch that same run immediately after a
@@ -51,28 +52,30 @@ calculation in the application layer.
 
 ## Functional Requirements
 
-- [ ] RF-B04-01: `ragAskSuccessResponseSchema` extends the F-04 success shape
+- [x] RF-B04-01: `ragAskSuccessResponseSchema` extends the F-04 success shape
   with `traceId`, `relatedTerms`, and `audit`.
-- [ ] RF-B04-02: Related-term response schemas cover `rank`, `term`,
+- [x] RF-B04-02: Related-term response schemas cover `rank`, `term`,
   `ngramSize`, `frequency`, and `sourceCoverageCount`.
-- [ ] RF-B04-03: Audit schemas cover latency plus embedding/generation
+- [x] RF-B04-03: Audit schemas cover latency plus embedding/generation
   usage/cost breakdown and total estimated cost.
-- [ ] RF-B04-04: Error response schemas remain limited to sanitized
+- [x] RF-B04-04: Error response schemas remain limited to sanitized
   `invalid_request`, `unauthorized`, `generation_failed`, and
   `generation_unavailable` shapes for the ask endpoint.
-- [ ] RF-B04-05: `createRagAskHandler` returns the expanded success body on 200
+- [x] RF-B04-05: `createRagAskHandler` returns the expanded success body on 200
   and preserves existing safe status mapping on 400, 401, 502, and 503.
-- [ ] RF-B04-06: `GET /api/rag/query-runs` returns recent run summaries in
-  reverse chronological order on 200 and returns 401 on missing or invalid
-  bearer auth.
-- [ ] RF-B04-07: `GET /api/rag/query-runs/:id` returns 200 with one run detail,
-  400 for invalid ids, 401 for missing or invalid bearer auth, and 404 for
-  missing runs.
-- [ ] RF-B04-08: `/query` renders the current answer, current related terms,
+- [x] RF-B04-06: `GET /api/rag/query-runs` returns recent run summaries in
+  reverse chronological order on 200, returns 401 on missing or invalid bearer
+  auth, and returns sanitized `500 { error: "technical_error" }` bodies on
+  unexpected technical failures.
+- [x] RF-B04-07: `GET /api/rag/query-runs/:id` returns 200 with one run detail,
+  400 for invalid ids, 401 for missing or invalid bearer auth, 404 for missing
+  runs, and sanitized `500 { error: "technical_error" }` bodies on unexpected
+  technical failures.
+- [x] RF-B04-08: `/query` renders the current answer, current related terms,
   and current audit metrics immediately from the successful ask response.
-- [ ] RF-B04-09: `/query` renders a recent-runs list and can load a persisted
+- [x] RF-B04-09: `/query` renders a recent-runs list and can load a persisted
   run detail view with its sources, related terms, usage, latency, and cost.
-- [ ] RF-B04-10: `/query` continues to show safe PT-BR error messages and never
+- [x] RF-B04-10: `/query` continues to show safe PT-BR error messages and never
   renders raw provider or storage internals.
 
 ## Module Contracts

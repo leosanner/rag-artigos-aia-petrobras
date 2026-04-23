@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_CHUNKING_CONFIG } from "@/domain/chunking/hybrid-text-chunker";
 import type { RetrievedChunkMatch } from "@/domain/rag";
 
-import { RetrieveChunks } from "./retrieve-chunks";
+import { RetrieveChunks, RetrieveChunksFailure } from "./retrieve-chunks";
 
 const EMBEDDING_MODEL = "text-embedding-3-large";
 const DOCUMENT_A = "11111111-1111-4111-8111-111111111111";
@@ -184,5 +184,56 @@ describe("RetrieveChunks", () => {
         topK: 24,
       }),
     );
+  });
+
+  it("wraps repository failures and preserves any embedding audit already captured", async () => {
+    const queryEmbedding = [0.1, 0.2, 0.3];
+    const embeddingUsage = {
+      inputTokens: 16,
+      estimatedCostUsd: 0.00000208,
+    };
+    const repositoryError = {
+      statusCode: 503,
+      message: "vector search unavailable",
+    };
+    const questionEmbeddingProvider = {
+      embedQuestion: vi.fn().mockResolvedValue({
+        embedding: queryEmbedding,
+        usage: embeddingUsage,
+      }),
+    };
+    const chunksRepository = {
+      searchGlobal: vi.fn().mockRejectedValue(repositoryError),
+    };
+    const service = new RetrieveChunks({
+      questionEmbeddingProvider,
+      chunksRepository,
+      embeddingModel: EMBEDDING_MODEL,
+    });
+
+    await expect(
+      service.search({
+        question: "Quais linhas de pesquisa aparecem?",
+        retrieval: {
+          topK: 6,
+          strategy: "standard",
+        },
+      }),
+    ).rejects.toEqual(
+      expect.objectContaining({
+        name: "RetrieveChunksFailure",
+        cause: repositoryError,
+        embedding: embeddingUsage,
+      }),
+    );
+    await expect(
+      service.search({
+        question: "Quais linhas de pesquisa aparecem?",
+        retrieval: {
+          topK: 6,
+          strategy: "standard",
+        },
+      }),
+    ).rejects.toBeInstanceOf(RetrieveChunksFailure);
   });
 });

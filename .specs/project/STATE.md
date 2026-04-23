@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-04-23
-**Current Work:** `F-04 / Query Controls and Explore` is implemented and verified locally; `F-05 / Answer Traceability` is the next `/query` milestone, `F-06 / Conversational Query` follows it, and `F-07 / Focused RAG` remains deferred until the shared query shell is rebased on those contracts
+**Current Work:** `F-05 / Answer Traceability` is implemented and verified locally; `F-06 / Conversational Query` is the next `/query` milestone, and `F-07 / Focused RAG` remains deferred until the shared query shell is rebased on those contracts
 
 ---
 
@@ -145,7 +145,7 @@ _None for now._
 - [x] ~~Break `F-01 / Document Ingestion` into small implementation blocks and execute with TDD~~ — completed by AD-010
 - [x] ~~Define M2 feature contracts and close base RAG planning decisions~~ — resolved by AD-011
 - [x] ~~Implement `F-04 / Query Controls and Explore` with TDD against its spec~~ — completed by the F-04 Block 05 closeout and local verification on 2026-04-23
-- [ ] Implement `F-05 / Answer Traceability` with TDD against its spec
+- [x] ~~Implement `F-05 / Answer Traceability` with TDD against its spec~~ — completed by the F-05 Block 05 closeout and local verification on 2026-04-23
 - [ ] Implement `F-06 / Conversational Query` with TDD against its spec
 - [ ] Rebase and implement `F-07 / Focused RAG` after the `/query` evolution contracts land
 - [ ] Choose a definitive project name (current placeholder: "AIA Insight")

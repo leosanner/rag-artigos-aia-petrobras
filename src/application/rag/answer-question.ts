@@ -31,7 +31,7 @@ import type {
   RelatedTerm,
 } from "./schemas";
 import { answerQuestionResultSchema } from "./schemas";
-import type { RetrieveChunks } from "./retrieve-chunks";
+import { RetrieveChunksFailure, type RetrieveChunks } from "./retrieve-chunks";
 
 export type AnswerQuestionDeps = {
   retrieveChunks: Pick<RetrieveChunks, "search" | "embeddingModel">;
@@ -43,6 +43,20 @@ export type AnswerQuestionDeps = {
 };
 
 const NO_EVIDENCE_ANSWER = buildNoEvidenceAnswer();
+const ZERO_EMBEDDING_USAGE: EmbeddingUsage = {
+  inputTokens: 0,
+  estimatedCostUsd: 0,
+};
+
+export class TracePersistenceFailure extends Error {
+  readonly cause: unknown;
+
+  constructor(cause: unknown) {
+    super("trace_persistence_failed");
+    this.name = "TracePersistenceFailure";
+    this.cause = cause;
+  }
+}
 
 export class AnswerQuestion {
   private readonly retrieveChunks: Pick<
@@ -71,11 +85,46 @@ export class AnswerQuestion {
 
     const retrieval = normalizeRetrievalSettings(input.retrieval);
     const startedAtMs = this.nowMs();
-    const retrievalResult = await this.retrieveChunks.search({
-      question: input.question,
-      retrieval,
-    });
     const metadata = this.buildMetadata(retrieval);
+    let retrievalResult: Awaited<ReturnType<RetrieveChunks["search"]>>;
+
+    try {
+      retrievalResult = await this.retrieveChunks.search({
+        question: input.question,
+        retrieval,
+      });
+    } catch (error) {
+      const failureCode = toApplicationFailureCode(error);
+      const embedding =
+        error instanceof RetrieveChunksFailure && error.embedding !== null
+          ? error.embedding
+          : ZERO_EMBEDDING_USAGE;
+      const relatedTerms = extractRelatedTerms({
+        question: input.question,
+        sourceExcerpts: [],
+      });
+      const audit = this.buildAudit(startedAtMs, embedding, null);
+
+      await this.persistRun(
+        this.buildPersistInput({
+          question: input.question,
+          answer: null,
+          status: failureCode,
+          errorCode: failureCode,
+          metadata,
+          audit,
+          sources: [],
+          relatedTerms,
+          generation: null,
+        }),
+      );
+
+      return answerQuestionResultSchema.parse({
+        kind: "error",
+        error: failureCode,
+      });
+    }
+
     const { matches, embedding } = retrievalResult;
 
     if (matches.length === 0) {
@@ -84,7 +133,7 @@ export class AnswerQuestion {
         sourceExcerpts: [],
       });
       const audit = this.buildAudit(startedAtMs, embedding, null);
-      const persisted = await this.runsRepository.create(
+      const persisted = await this.persistRun(
         this.buildPersistInput({
           question: input.question,
           answer: NO_EVIDENCE_ANSWER,
@@ -117,6 +166,8 @@ export class AnswerQuestion {
     });
 
     let generation: GenerationUsage | null = null;
+    let answer: string;
+    let citedSourceNumbers: Set<number>;
 
     try {
       const result = await this.generationProvider.generateAnswer({
@@ -128,12 +179,12 @@ export class AnswerQuestion {
       });
       generation = result.usage;
 
-      const answer =
+      answer =
         result.answer.trim() === NO_EVIDENCE_ANSWER
           ? NO_EVIDENCE_ANSWER
           : result.answer;
 
-      const citedSourceNumbers =
+      citedSourceNumbers =
         answer === NO_EVIDENCE_ANSWER
           ? new Set<number>()
           : new Set(extractCitationNumbers(answer));
@@ -141,37 +192,11 @@ export class AnswerQuestion {
       if (answer !== NO_EVIDENCE_ANSWER) {
         assertValidCitationMarkers(answer, sources);
       }
-
-      const audit = this.buildAudit(startedAtMs, embedding, generation);
-      const persisted = await this.runsRepository.create(
-        this.buildPersistInput({
-          question: input.question,
-          answer,
-          status: "answered",
-          errorCode: null,
-          metadata,
-          audit,
-          sources: toPersistedSources(sources, citedSourceNumbers),
-          relatedTerms,
-          generation,
-        }),
-      );
-
-      return answerQuestionResultSchema.parse({
-        kind: "answered",
-        traceId: persisted.id,
-        answer,
-        mode: "global",
-        sources,
-        relatedTerms,
-        metadata,
-        audit,
-      });
     } catch (error) {
-      const failureCode = toApplicationGenerationFailureCode(error);
+      const failureCode = toApplicationFailureCode(error);
       const audit = this.buildAudit(startedAtMs, embedding, generation);
 
-      await this.runsRepository.create(
+      await this.persistRun(
         this.buildPersistInput({
           question: input.question,
           answer: null,
@@ -190,6 +215,32 @@ export class AnswerQuestion {
         error: failureCode,
       });
     }
+
+    const audit = this.buildAudit(startedAtMs, embedding, generation);
+    const persisted = await this.persistRun(
+      this.buildPersistInput({
+        question: input.question,
+        answer,
+        status: "answered",
+        errorCode: null,
+        metadata,
+        audit,
+        sources: toPersistedSources(sources, citedSourceNumbers),
+        relatedTerms,
+        generation,
+      }),
+    );
+
+    return answerQuestionResultSchema.parse({
+      kind: "answered",
+      traceId: persisted.id,
+      answer,
+      mode: "global",
+      sources,
+      relatedTerms,
+      metadata,
+      audit,
+    });
   }
 
   private buildMetadata(retrieval: RagRetrievalSettings): RagAnswerMetadata {
@@ -257,6 +308,16 @@ export class AnswerQuestion {
       relatedTerms: input.relatedTerms,
     };
   }
+
+  private async persistRun(
+    input: PersistRagQueryRunInput,
+  ): Promise<{ id: string; createdAt: Date }> {
+    try {
+      return await this.runsRepository.create(input);
+    } catch (error) {
+      throw new TracePersistenceFailure(error);
+    }
+  }
 }
 
 function toPersistedSources(
@@ -278,19 +339,21 @@ function toPersistedSources(
   }));
 }
 
-function toApplicationGenerationFailureCode(
+function toApplicationFailureCode(
   error: unknown,
 ): "generation_failed" | "generation_unavailable" {
-  if (error instanceof GenerationFailure) {
-    return toSafeGenerationFailureCode(error);
+  const failure = unwrapApplicationFailure(error);
+
+  if (failure instanceof GenerationFailure) {
+    return toSafeGenerationFailureCode(failure);
   }
 
-  const statusCode = extractStatusCode(error);
+  const statusCode = extractStatusCode(failure);
   if (statusCode === 429 || (statusCode !== null && statusCode >= 500)) {
     return "generation_unavailable";
   }
 
-  const message = extractMessage(error).toLowerCase();
+  const message = extractMessage(failure).toLowerCase();
   if (
     message.includes("rate limit") ||
     message.includes("timeout") ||
@@ -301,7 +364,15 @@ function toApplicationGenerationFailureCode(
     return "generation_unavailable";
   }
 
-  return toSafeGenerationFailureCode(error);
+  return toSafeGenerationFailureCode(failure);
+}
+
+function unwrapApplicationFailure(error: unknown): unknown {
+  if (error instanceof RetrieveChunksFailure) {
+    return error.cause;
+  }
+
+  return error;
 }
 
 function extractStatusCode(error: unknown): number | null {

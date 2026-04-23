@@ -256,4 +256,22 @@ describe("GET /api/rag/query-runs/:id handler", () => {
     expect(text).not.toContain("providerPayload");
     expect(text).not.toContain("secret");
   });
+
+  it("returns 500 with a sanitized body when loading one run fails unexpectedly", async () => {
+    const getRun: Pick<GetQueryRun, "execute"> = {
+      execute: vi.fn().mockRejectedValue(new Error("database unavailable")),
+    };
+    const handler = createRagQueryRunDetailHandler({
+      getRun,
+      secret: VALID_SECRET,
+    });
+
+    const response = await invoke(handler, RUN_ID, {
+      Authorization: `Bearer ${VALID_SECRET}`,
+    });
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toEqual({ error: "technical_error" });
+  });
 });

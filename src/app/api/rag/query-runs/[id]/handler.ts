@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { isAuthorizedIngestionSyncRequest } from "@/application/ingestion/authorize-ingestion-sync";
 import type { GetQueryRun } from "@/application/rag/get-query-run";
@@ -20,6 +21,11 @@ export type RagQueryRunDetailRouteContext = {
 };
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
+const technicalErrorResponseBodySchema = z
+  .object({
+    error: z.literal("technical_error"),
+  })
+  .strip();
 
 export function createRagQueryRunDetailHandler(
   deps: RagQueryRunDetailHandlerDeps,
@@ -41,30 +47,34 @@ export function createRagQueryRunDetailHandler(
       return invalidIdResponse();
     }
 
-    const run = await deps.getRun.execute(parsedId.data);
+    try {
+      const run = await deps.getRun.execute(parsedId.data);
 
-    if (!run) {
-      return notFoundResponse();
+      if (!run) {
+        return notFoundResponse();
+      }
+
+      const body = ragQueryRunDetailResponseSchema.parse({
+        id: run.id,
+        question: run.question,
+        answer: run.answer,
+        mode: run.mode,
+        status: run.status,
+        errorCode: run.errorCode,
+        sources: run.sources,
+        relatedTerms: run.relatedTerms,
+        metadata: run.metadata,
+        audit: run.audit,
+        createdAt: run.createdAt.toISOString(),
+      });
+
+      return NextResponse.json(body, {
+        status: 200,
+        headers: NO_STORE_HEADERS,
+      });
+    } catch {
+      return technicalErrorResponse();
     }
-
-    const body = ragQueryRunDetailResponseSchema.parse({
-      id: run.id,
-      question: run.question,
-      answer: run.answer,
-      mode: run.mode,
-      status: run.status,
-      errorCode: run.errorCode,
-      sources: run.sources,
-      relatedTerms: run.relatedTerms,
-      metadata: run.metadata,
-      audit: run.audit,
-      createdAt: run.createdAt.toISOString(),
-    });
-
-    return NextResponse.json(body, {
-      status: 200,
-      headers: NO_STORE_HEADERS,
-    });
   };
 }
 
@@ -97,6 +107,17 @@ function notFoundResponse(): Response {
 
   return NextResponse.json(body, {
     status: 404,
+    headers: NO_STORE_HEADERS,
+  });
+}
+
+function technicalErrorResponse(): Response {
+  const body = technicalErrorResponseBodySchema.parse({
+    error: "technical_error",
+  });
+
+  return NextResponse.json(body, {
+    status: 500,
     headers: NO_STORE_HEADERS,
   });
 }

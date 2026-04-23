@@ -111,4 +111,22 @@ describe("GET /api/rag/query-runs handler", () => {
     expect(text).not.toContain("OPENAI_API_KEY");
     expect(text).not.toContain("sk-secret");
   });
+
+  it("returns 500 with a sanitized body when listing runs fails unexpectedly", async () => {
+    const listRuns: Pick<ListQueryRuns, "execute"> = {
+      execute: vi.fn().mockRejectedValue(new Error("database unavailable")),
+    };
+    const handler = createRagQueryRunsHandler({
+      listRuns,
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      get({ Authorization: `Bearer ${VALID_SECRET}` }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toEqual({ error: "technical_error" });
+  });
 });

@@ -44,30 +44,30 @@ services for audit reads.
 
 ## Functional Requirements
 
-- [ ] RF-B03-01: `QuestionEmbeddingProvider.embedQuestion(question)` returns
+- [x] RF-B03-01: `QuestionEmbeddingProvider.embedQuestion(question)` returns
   `{ embedding, usage }`, where `usage` exposes normalized numeric token/cost
   data for the embedding call.
-- [ ] RF-B03-02: `GenerationProvider.generateAnswer(input)` returns
+- [x] RF-B03-02: `GenerationProvider.generateAnswer(input)` returns
   `{ answer, usage }`, where `usage` exposes normalized numeric token/cost data
   for the generation call.
-- [ ] RF-B03-03: `AnswerQuestion.execute(input)` measures total latency from
+- [x] RF-B03-03: `AnswerQuestion.execute(input)` measures total latency from
   before question embedding until the run is ready for response serialization.
-- [ ] RF-B03-04: After retrieval selects sources, `AnswerQuestion` derives
+- [x] RF-B03-04: After retrieval selects sources, `AnswerQuestion` derives
   related terms from the normalized question plus selected source excerpts
   before persisting the run.
-- [ ] RF-B03-05: The no-source path persists status `answered_no_evidence`,
+- [x] RF-B03-05: The no-source path persists status `answered_no_evidence`,
   skips generation, and records null or zero generation usage/cost fields.
-- [ ] RF-B03-06: The source-backed success path validates citations exactly as
+- [x] RF-B03-06: The source-backed success path validates citations exactly as
   F-03 requires, persists status `answered`, and returns `traceId`,
   `relatedTerms`, and audit metrics together with the answer payload.
-- [ ] RF-B03-07: Technical generation failures after request validation persist
-  one failed run with the safe failure code plus any already-selected sources
-  and related terms.
-- [ ] RF-B03-08: The audited ask flow does not persist unauthorized or
+- [x] RF-B03-07: Technical retrieval or generation failures after request
+  validation persist one failed run with the safe failure code plus any
+  already-selected sources and related terms already available for that run.
+- [x] RF-B03-08: The audited ask flow does not persist unauthorized or
   schema-invalid requests; the route boundary remains responsible for that.
-- [ ] RF-B03-09: Application services expose recent-run summaries and one
+- [x] RF-B03-09: Application services expose recent-run summaries and one
   run-detail lookup through repository-backed read use cases.
-- [ ] RF-B03-10: Unit tests prove usage/cost aggregation, latency capture,
+- [x] RF-B03-10: Unit tests prove usage/cost aggregation, latency capture,
   no-evidence persistence, failed-run persistence, and unchanged safe error
   mapping.
 
@@ -159,4 +159,3 @@ not make real OpenAI calls.
   thin.
 - Audit read services are reusable by the later interface block and by F-06
   without introducing a second generation pipeline.
-

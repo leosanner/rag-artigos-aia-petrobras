@@ -38,25 +38,25 @@ and application code.
 
 ## Functional Requirements
 
-- [ ] RF-B01-01: `extractRelatedTerms(input)` accepts normalized question text
+- [x] RF-B01-01: `extractRelatedTerms(input)` accepts normalized question text
   and zero or more source excerpts and returns at most 8 ranked terms.
-- [ ] RF-B01-02: When retrieved sources exist, extraction considers both the
+- [x] RF-B01-02: When retrieved sources exist, extraction considers both the
   question text and the selected source excerpts.
-- [ ] RF-B01-03: When no sources exist, extraction falls back to the question
+- [x] RF-B01-03: When no sources exist, extraction falls back to the question
   text alone and still returns a deterministic result set.
-- [ ] RF-B01-04: Each returned term includes `rank`, `term`, `ngramSize`,
+- [x] RF-B01-04: Each returned term includes `rank`, `term`, `ngramSize`,
   `frequency`, and `sourceCoverageCount`.
-- [ ] RF-B01-05: Duplicate occurrences collapse into one normalized term record
+- [x] RF-B01-05: Duplicate occurrences collapse into one normalized term record
   with aggregated frequency and source-coverage counts.
-- [ ] RF-B01-06: Ranking is deterministic for the same normalized inputs, with
+- [x] RF-B01-06: Ranking is deterministic for the same normalized inputs, with
   stable tie-breaking so repeated runs produce the same term order.
-- [ ] RF-B01-07: The domain exposes a closed `RagQueryRunStatus` type limited
+- [x] RF-B01-07: The domain exposes a closed `RagQueryRunStatus` type limited
   to `answered`, `answered_no_evidence`, `generation_failed`, and
   `generation_unavailable`.
-- [ ] RF-B01-08: Failure codes remain limited to the safe vocabulary
+- [x] RF-B01-08: Failure codes remain limited to the safe vocabulary
   `generation_failed` and `generation_unavailable`; success statuses carry no
   technical error detail.
-- [ ] RF-B01-09: Domain helpers remain pure and do not import Next.js, Drizzle,
+- [x] RF-B01-09: Domain helpers remain pure and do not import Next.js, Drizzle,
   repositories, provider SDKs, or `process.env`.
 
 ## Module Contracts
@@ -112,4 +112,3 @@ closed safe status/error vocabulary.
 - Related-term extraction remains pure and deterministic.
 - Later persistence and application blocks can reuse the same status/error
   vocabulary and related-term DTOs without reimplementing the rules.
-

@@ -40,9 +40,9 @@ turn model that later chat and focused retrieval must reuse.
 
 ## Implementation Blocks
 
-The feature should be implemented in the same small-block style used by F-01
-through F-04. Read this overview first, then open only the block document
-needed for the current task:
+This feature is implemented in the same small-block style used by F-01 through
+F-04. Read this overview first, then open only the block document needed for
+the current task:
 
 - [01 - Domain: Related Terms and Trace Status](01-domain-related-terms-and-trace-status.md): pure logic for deterministic related-term extraction, ranking, fallback behavior, and safe trace status/error vocabulary.
 - [02 - Persistence: Query-Run Traces and Audit Reads](02-persistence-query-run-traces-and-audit-reads.md): schema, repositories, immutable source/term snapshots, and recent/detail audit reads.
@@ -83,35 +83,35 @@ needed for the current task:
 
 ## Functional Requirements
 
-- [ ] RF-01: The database schema defines `rag_query_runs`,
+- [x] RF-01: The database schema defines `rag_query_runs`,
   `rag_query_run_sources`, and `rag_query_run_related_terms`.
-- [ ] RF-02: `rag_query_runs` stores question, nullable answer, safe
+- [x] RF-02: `rag_query_runs` stores question, nullable answer, safe
   status/error, applied retrieval settings, prompt/model versions, latency, and
   usage/cost metrics.
-- [ ] RF-03: `rag_query_run_sources` stores a snapshot of every selected source,
+- [x] RF-03: `rag_query_run_sources` stores a snapshot of every selected source,
   including source number, document/chunk ids, document title, excerpt, score,
   and version metadata.
-- [ ] RF-04: `rag_query_run_related_terms` stores up to 8 deterministic related
+- [x] RF-04: `rag_query_run_related_terms` stores up to 8 deterministic related
   terms with rank, n-gram size, frequency, and source-coverage count.
-- [ ] RF-05: The question-embedding provider returns both the embedding vector
+- [x] RF-05: The question-embedding provider returns both the embedding vector
   and normalized embedding usage/cost metadata.
-- [ ] RF-06: The generation provider returns the answer plus normalized
+- [x] RF-06: The generation provider returns the answer plus normalized
   generation usage/cost metadata.
-- [ ] RF-07: The ask application service measures total request latency and
+- [x] RF-07: The ask application service measures total request latency and
   persists one run record before serializing the response.
-- [ ] RF-08: Successful ask responses include `traceId`, `relatedTerms`, and an
+- [x] RF-08: Successful ask responses include `traceId`, `relatedTerms`, and an
   `audit` payload with latency and usage/cost breakdown.
-- [ ] RF-09: Technical failures after request validation persist a failed run
+- [x] RF-09: Technical failures after request validation persist a failed run
   with the safe error code and any source snapshot already available.
-- [ ] RF-10: `GET /api/rag/query-runs` returns recent run summaries in reverse
+- [x] RF-10: `GET /api/rag/query-runs` returns recent run summaries in reverse
   chronological order.
-- [ ] RF-11: `GET /api/rag/query-runs/:id` returns the persisted run detail with
+- [x] RF-11: `GET /api/rag/query-runs/:id` returns the persisted run detail with
   related terms, sources, and audit metrics.
-- [ ] RF-12: `/query` renders the current-answer audit panel without requiring a
+- [x] RF-12: `/query` renders the current-answer audit panel without requiring a
   second fetch after a successful ask response.
-- [ ] RF-13: `/query` can load a persisted run from the recent-runs list and
+- [x] RF-13: `/query` can load a persisted run from the recent-runs list and
   inspect its sources, related terms, usage, latency, and cost.
-- [ ] RF-14: Audit responses remain sanitized and contain no secrets, raw
+- [x] RF-14: Audit responses remain sanitized and contain no secrets, raw
   prompts, stack traces, or provider internals.
 
 ## System Flow
