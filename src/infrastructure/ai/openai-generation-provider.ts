@@ -77,7 +77,11 @@ export class OpenAiGenerationProvider implements GenerationProvider {
       const result = await this.generateTextFn({
         model: this.modelFactory(generationModel),
         system: buildSystemPrompt(input.promptVersion, input.retrievalStrategy),
-        prompt: buildUserPrompt(input.question, input.promptContext),
+        prompt: buildUserPrompt(
+          input.question,
+          input.promptContext,
+          input.conversationContext,
+        ),
       });
 
       const answer = result.text.trim();
@@ -156,10 +160,24 @@ function buildSystemPrompt(
   return baseInstructions.join("\n");
 }
 
-function buildUserPrompt(question: string, promptContext: string): string {
-  return [`Pergunta:\n${question}`, `Contexto numerado:\n${promptContext}`].join(
-    "\n\n",
-  );
+function buildUserPrompt(
+  question: string,
+  promptContext: string,
+  conversationContext?: {
+    transcript: string;
+  },
+): string {
+  const sections =
+    conversationContext === undefined
+      ? [`Pergunta:\n${question}`]
+      : [
+          `Historico da conversa:\n${conversationContext.transcript}`,
+          `Pergunta atual:\n${question}`,
+        ];
+
+  sections.push(`Contexto numerado:\n${promptContext}`);
+
+  return sections.join("\n\n");
 }
 
 function classifyGenerationFailure(error: unknown) {

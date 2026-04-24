@@ -133,6 +133,59 @@ describe("OpenAiGenerationProvider", () => {
     );
   });
 
+  it("includes the optional conversation transcript in the generation prompt without replacing the latest question", async () => {
+    const model = { provider: "openai", modelId: GENERATION_MODEL };
+    const modelFactory = vi.fn().mockReturnValue(model);
+    const generateText = vi.fn().mockResolvedValue({
+      text: "Resposta contextualizada [1].",
+      usage: {
+        inputTokens: 90,
+        outputTokens: 21,
+        totalTokens: 111,
+        inputTokenDetails: {
+          cacheReadTokens: 0,
+        },
+      },
+    });
+    const provider = new OpenAiGenerationProvider({
+      defaultGenerationModel: GENERATION_MODEL,
+      modelFactory,
+      generateText,
+    });
+
+    await expect(
+      provider.generateAnswer({
+        question: "Pergunta atual",
+        conversationContext: {
+          transcript: "User: Pergunta anterior\n\nAssistant: Resposta anterior [1].",
+        },
+        promptContext: "[1] Título: artigo.pdf\nChunk: 0\nTrecho:\nTexto",
+        promptVersion: PROMPT_VERSION,
+        generationModel: GENERATION_MODEL,
+        retrievalStrategy: "standard",
+      }),
+    ).resolves.toEqual({
+      answer: "Resposta contextualizada [1].",
+      usage: {
+        inputTokens: 90,
+        outputTokens: 21,
+        totalTokens: 111,
+        estimatedCostUsd: 0.0000696,
+      },
+    });
+
+    expect(generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining("Historico da conversa:\nUser: Pergunta anterior"),
+      }),
+    );
+    expect(generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining("Pergunta atual:\nPergunta atual"),
+      }),
+    );
+  });
+
   it("returns zeroed audit metrics for unknown or test generation models", async () => {
     const provider = new OpenAiGenerationProvider({
       defaultGenerationModel: "test-rag-generation-model",
