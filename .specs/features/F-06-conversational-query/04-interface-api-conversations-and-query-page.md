@@ -50,7 +50,8 @@ weakening the F-05 audit presentation.
 - [ ] RF-B04-03: `POST /api/rag/conversations/:id/messages` validates the
   user message content plus optional F-04 retrieval settings, requires the
   bearer secret, and returns the transcript slice produced by
-  `AppendConversationMessage`.
+  `AppendConversationMessage`, or a 404 when the use case returns
+  `status: "not_found"`.
 - [ ] RF-B04-04: On technical failure the messages endpoint returns the safe
   F-05 error DTO and does not include stack traces or raw provider bodies.
 - [ ] RF-B04-05: All three endpoints share the bearer-secret guard used by
@@ -85,6 +86,10 @@ export const AppendConversationMessageRequestSchema = z.object({
 ```
 
 ```ts
+export const ConversationNotFoundResponseSchema = z.object({
+  error: z.literal("not_found"),
+});
+
 export const ConversationDetailResponseSchema = z.object({
   id: z.string().uuid(),
   title: z.string().nullable(),
@@ -93,6 +98,19 @@ export const ConversationDetailResponseSchema = z.object({
   lastMessageAt: z.string().datetime().nullable(),
   messages: z.array(ConversationMessageResponseSchema),
 });
+
+export const AppendConversationMessageResponseSchema = z.union([
+  z.object({
+    status: z.enum(["answered", "answered_no_evidence"]),
+    userMessage: ConversationMessageResponseSchema,
+    assistantMessage: ConversationMessageResponseSchema,
+  }),
+  z.object({
+    status: z.enum(["generation_failed", "generation_unavailable"]),
+    userMessage: ConversationMessageResponseSchema,
+    errorCode: z.enum(["generation_failed", "generation_unavailable"]),
+  }),
+]);
 ```
 
 ## Key Modules
@@ -112,9 +130,9 @@ export const ConversationDetailResponseSchema = z.object({
   per-turn retrieval settings, single-turn regression)
 
 Route tests must cover: bearer-secret enforcement, Zod validation errors,
-successful DTOs, 404 for unknown conversation, safe failure shape for
-technical errors after validation. Page tests must cover URL-driven reload,
-transcript rendering, and assistant audit expansion.
+successful DTOs, 404 for unknown conversation on both GET and POST message,
+and safe failure shape for technical errors after validation. Page tests must
+cover URL-driven reload, transcript rendering, and assistant audit expansion.
 
 ## Done When
 

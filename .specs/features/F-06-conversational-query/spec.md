@@ -50,6 +50,9 @@ system.
 - RN-07: Conversation retrieval context uses the latest user message plus up to
   the four immediately preceding visible stored messages, concatenated in
   display order with role labels.
+- RN-07a: The persisted query-run `question` remains only the latest user
+  message; the concatenated transcript is auxiliary conversation context and
+  must not replace the governed question field.
 - RN-08: F-06 must not introduce hidden query rewriting, summarization, or any
   second retrieval query besides that explicit concatenated transcript context.
 - RN-09: Conversation endpoints require the same operator bearer secret pattern
@@ -101,7 +104,9 @@ system.
    retrieval context from the newest user message plus up to four immediately
    preceding stored messages with role labels.
 6. The route delegates to the same audited turn engine used by F-05, passing
-   the constructed retrieval context and the normalized retrieval settings.
+   the latest user message as the governed `question`, the constructed
+   transcript as optional conversation context, and the normalized retrieval
+   settings.
 7. If the turn succeeds or returns the no-evidence answer, the system persists
    an assistant message row linked to the returned `traceId`.
 8. If the turn fails technically after validation, the failed query run is still
@@ -144,7 +149,7 @@ system.
 | `POST` | `/api/rag/conversations/:id/messages` | Persists the user message and runs the assistant turn. |
 | `GET` | `/query?conversation=<id>` | Reloads an existing conversation in the shared operator UI. |
 | Function | `buildConversationRetrievalContext(input)` | Builds the retrieval context from the latest user message plus the previous four stored messages. |
-| Function | `AnswerQuestion.execute(input)` | Existing audited turn engine reused by chat. |
+| Function | `AnswerQuestion.execute(input)` | Existing audited turn engine reused by chat; it keeps the latest user message as `question` and accepts optional `conversationContext.transcript` for retrieval/generation grounding. |
 
 ### Key Modules
 
@@ -179,8 +184,10 @@ system.
    at most the previous four stored messages in display order.
 5. Technical failures after validation persist a failed trace run but do not
    create an assistant transcript row.
-6. Existing single-turn querying continues to work.
-7. `pnpm lint`, `pnpm typecheck`, and `pnpm test` pass after implementation.
+6. Unknown conversation ids surface as `404` at the interface layer via the
+   explicit application-level `not_found` result.
+7. Existing single-turn querying continues to work.
+8. `pnpm lint`, `pnpm typecheck`, and `pnpm test` pass after implementation.
 
 ## Decisions
 
@@ -190,6 +197,7 @@ system.
 | Reuse the existing audited turn engine | Build a chat-only answer path | Governance would drift immediately if chat had its own retrieval/generation stack. |
 | Link assistant messages to `traceId` | Duplicate full audit payload inside each message row | The trace tables already own the governed answer record and should remain the source of truth. |
 | Restore transcript via URL query param | Browser-only local state; opaque session id | URL-based reload is explicit, testable, and compatible with server-side reads. |
+| Keep the query-run `question` equal to the latest user message | Persist the full transcript as the run question | Audit readability and F-05 governance stay focused on the current turn while chat context remains auxiliary. |
 
 ## Reviewer Checklist
 
