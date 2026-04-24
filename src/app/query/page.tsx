@@ -3,12 +3,16 @@
 import { useEffect, useState } from "react";
 
 import {
+  appendConversationMessageResponseSchema,
+  conversationDetailResponseSchema,
+  createConversationResponseSchema,
   ragAskSuccessResponseSchema,
-  ragGenerationErrorResponseSchema,
   ragInvalidRequestResponseSchema,
   ragQueryRunDetailResponseSchema,
   ragQueryRunSummariesResponseSchema,
   ragUnauthorizedResponseSchema,
+  type ConversationDetailResponse,
+  type ConversationMessageResponse,
   type RagAnswerAudit,
   type RagAnswerMetadata,
   type RagAskSuccessResponse,
@@ -59,6 +63,14 @@ type CurrentAskResult = {
 
 type LoadErrorKind = "unauthorized" | "technical";
 
+type ConversationErrorKind = LoadErrorKind | "not_found";
+
+type ConversationState = {
+  status: "idle" | "loading" | "loaded" | "error";
+  conversation: ConversationDetailResponse | null;
+  error: ConversationErrorKind | null;
+};
+
 type RecentRunsState = {
   status: "idle" | "loading" | "loaded" | "error";
   runs: RagQueryRunSummaryResponse[];
@@ -89,6 +101,14 @@ function createInitialSelectedRunState(): SelectedRunState {
   };
 }
 
+function createInitialConversationState(): ConversationState {
+  return {
+    status: "idle",
+    conversation: null,
+    error: null,
+  };
+}
+
 export default function QueryPage() {
   const [question, setQuestion] = useState("");
   const [secret, setSecret] = useState("");
@@ -103,6 +123,13 @@ export default function QueryPage() {
   const [selectedRunState, setSelectedRunState] = useState<SelectedRunState>(
     createInitialSelectedRunState,
   );
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationState, setConversationState] = useState<ConversationState>(
+    createInitialConversationState,
+  );
+  const [expandedAuditMessageIds, setExpandedAuditMessageIds] = useState<
+    Set<string>
+  >(() => new Set());
 
   const trimmedQuestion = question.trim();
   const trimmedSecret = secret.trim();
@@ -123,13 +150,45 @@ export default function QueryPage() {
       : recentRunsState.status === "idle"
         ? "Carregar historico recente"
         : "Atualizar historico";
+  const conversationTitle =
+    conversationState.conversation?.title ??
+    (conversationId ? "Conversa sem titulo" : "Nenhuma conversa ativa");
+  const newConversationLabel =
+    conversationState.status === "loading" ? "Carregando..." : "Nova conversa";
 
   useEffect(() => {
     const stored = sessionStorage.getItem(SECRET_STORAGE_KEY);
+    const url = new URL(window.location.href);
+    const conversationParam = url.searchParams.get("conversation");
+
+    if (conversationParam) {
+      setConversationId(conversationParam);
+    }
+
     if (stored) {
       setSecret(stored);
     }
   }, []);
+
+  useEffect(() => {
+    if (
+      !conversationId ||
+      trimmedSecret.length === 0 ||
+      conversationState.status === "loading" ||
+      conversationState.conversation?.id === conversationId
+    ) {
+      return;
+    }
+
+    void loadConversation(conversationId, trimmedSecret);
+    // loadConversation mutates the state guarded above; including it would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    conversationId,
+    trimmedSecret,
+    conversationState.status,
+    conversationState.conversation?.id,
+  ]);
 
   function updateSecret(value: string) {
     setSecret(value);
@@ -137,6 +196,11 @@ export default function QueryPage() {
     if (value.length === 0) {
       sessionStorage.removeItem(SECRET_STORAGE_KEY);
       resetPersistedAuditState();
+      setConversationState((current) => ({
+        ...current,
+        status: current.conversation ? "loaded" : "idle",
+        error: null,
+      }));
       return;
     }
 
@@ -152,6 +216,11 @@ export default function QueryPage() {
     sessionStorage.removeItem(SECRET_STORAGE_KEY);
     setSecret("");
     resetPersistedAuditState();
+    setConversationState((current) => ({
+      ...current,
+      status: current.conversation ? "loaded" : "idle",
+      error: null,
+    }));
   }
 
   async function submitQuestion(strategy: QuerySubmissionStrategy) {
@@ -161,7 +230,15 @@ export default function QueryPage() {
 
     setAskState({ kind: "submitting", strategy });
 
-    const response = await fetchJson("/api/rag/ask", {
+    const activeConversationId = await ensureConversation();
+
+    if (!activeConversationId) {
+      return;
+    }
+
+    const response = await fetchJson(
+      `/api/rag/conversations/${activeConversationId}/messages`,
+      {
       method: "POST",
       cache: "no-store",
       headers: {
@@ -169,14 +246,14 @@ export default function QueryPage() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        question: trimmedQuestion,
-        mode: "global",
-        retrieval: {
+        content: trimmedQuestion,
+        retrievalSettings: {
           topK,
           strategy,
         },
       }),
-    });
+      },
+    );
 
     if (response.kind === "network_error") {
       setAskState({ kind: "technical_error" });
@@ -184,17 +261,29 @@ export default function QueryPage() {
     }
 
     if (response.status === 200) {
-      const parsed = ragAskSuccessResponseSchema.safeParse(response.body);
+      const parsed = appendConversationMessageResponseSchema.safeParse(
+        response.body,
+      );
 
       if (!parsed.success) {
         setAskState({ kind: "technical_error" });
         return;
       }
 
-      setCurrentAskResult({
-        question: trimmedQuestion,
-        response: parsed.data,
-      });
+      if (
+        parsed.data.status !== "answered" &&
+        parsed.data.status !== "answered_no_evidence"
+      ) {
+        setAskState({ kind: "technical_error" });
+        return;
+      }
+
+      appendTranscriptMessages([
+        parsed.data.userMessage,
+        parsed.data.assistantMessage,
+      ]);
+      setCurrentAskResult(toCurrentAskResult(parsed.data.assistantMessage));
+      setQuestion("");
       setAskState({ kind: "idle" });
       return;
     }
@@ -218,15 +307,238 @@ export default function QueryPage() {
       return;
     }
 
+    if (response.status === 404) {
+      setConversationState({
+        status: "error",
+        conversation: null,
+        error: "not_found",
+      });
+      setAskState({ kind: "technical_error" });
+      return;
+    }
+
     if (response.status === 502 || response.status === 503) {
-      const parsed = ragGenerationErrorResponseSchema.safeParse(response.body);
-      setAskState(
-        parsed.success ? { kind: "technical_error" } : { kind: "technical_error" },
+      const parsed = appendConversationMessageResponseSchema.safeParse(
+        response.body,
       );
+
+      if (parsed.success && "errorCode" in parsed.data) {
+        appendTranscriptMessages([parsed.data.userMessage]);
+      }
+
+      setAskState({ kind: "technical_error" });
       return;
     }
 
     setAskState({ kind: "technical_error" });
+  }
+
+  async function ensureConversation(): Promise<string | null> {
+    if (conversationId) {
+      return conversationId;
+    }
+
+    return createConversation();
+  }
+
+  async function createConversation(): Promise<string | null> {
+    if (trimmedSecret.length === 0) {
+      return null;
+    }
+
+    setConversationState({
+      status: "loading",
+      conversation: null,
+      error: null,
+    });
+
+    const response = await fetchJson("/api/rag/conversations", {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${trimmedSecret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (response.kind === "network_error") {
+      setConversationState({
+        status: "error",
+        conversation: null,
+        error: "technical",
+      });
+      setAskState({ kind: "technical_error" });
+      return null;
+    }
+
+    if (response.status === 201) {
+      const parsed = createConversationResponseSchema.safeParse(response.body);
+
+      if (!parsed.success) {
+        setConversationState({
+          status: "error",
+          conversation: null,
+          error: "technical",
+        });
+        setAskState({ kind: "technical_error" });
+        return null;
+      }
+
+      const conversation: ConversationDetailResponse = {
+        ...parsed.data,
+        messages: [],
+      };
+
+      setConversationId(parsed.data.id);
+      setConversationState({
+        status: "loaded",
+        conversation,
+        error: null,
+      });
+      setExpandedAuditMessageIds(new Set());
+      syncConversationUrl(parsed.data.id);
+
+      return parsed.data.id;
+    }
+
+    if (response.status === 401) {
+      const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
+      clearSecret();
+      setAskState(
+        parsed.success ? { kind: "unauthorized" } : { kind: "technical_error" },
+      );
+      return null;
+    }
+
+    setConversationState({
+      status: "error",
+      conversation: null,
+      error: "technical",
+    });
+    setAskState({ kind: "technical_error" });
+    return null;
+  }
+
+  async function startNewConversation() {
+    setAskState({ kind: "idle" });
+    setCurrentAskResult(null);
+    setQuestion("");
+    await createConversation();
+  }
+
+  async function loadConversation(id: string, secretValue = trimmedSecret) {
+    const effectiveSecret = secretValue.trim();
+
+    if (effectiveSecret.length === 0) {
+      return;
+    }
+
+    setConversationState((current) => ({
+      status: "loading",
+      conversation: current.conversation,
+      error: null,
+    }));
+
+    const response = await fetchJson(`/api/rag/conversations/${id}`, {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${effectiveSecret}`,
+      },
+    });
+
+    if (response.kind === "network_error") {
+      setConversationState({
+        status: "error",
+        conversation: null,
+        error: "technical",
+      });
+      return;
+    }
+
+    if (response.status === 200) {
+      const parsed = conversationDetailResponseSchema.safeParse(response.body);
+
+      if (!parsed.success) {
+        setConversationState({
+          status: "error",
+          conversation: null,
+          error: "technical",
+        });
+        return;
+      }
+
+      setConversationId(parsed.data.id);
+      setConversationState({
+        status: "loaded",
+        conversation: parsed.data,
+        error: null,
+      });
+      setExpandedAuditMessageIds(new Set());
+      syncConversationUrl(parsed.data.id);
+      return;
+    }
+
+    if (response.status === 401) {
+      const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
+      clearSecret();
+      setConversationState({
+        status: "error",
+        conversation: null,
+        error: parsed.success ? "unauthorized" : "technical",
+      });
+      return;
+    }
+
+    if (response.status === 404) {
+      setConversationState({
+        status: "error",
+        conversation: null,
+        error: "not_found",
+      });
+      return;
+    }
+
+    setConversationState({
+      status: "error",
+      conversation: null,
+      error: "technical",
+    });
+  }
+
+  function appendTranscriptMessages(messages: ConversationMessageResponse[]) {
+    setConversationState((current) => {
+      if (!current.conversation) {
+        return current;
+      }
+
+      return {
+        status: "loaded",
+        conversation: {
+          ...current.conversation,
+          lastMessageAt:
+            messages[messages.length - 1]?.createdAt ??
+            current.conversation.lastMessageAt,
+          messages: [...current.conversation.messages, ...messages],
+        },
+        error: null,
+      };
+    });
+  }
+
+  function toggleAudit(messageId: string) {
+    setExpandedAuditMessageIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+
+      return next;
+    });
   }
 
   async function loadRecentRuns() {
@@ -489,8 +801,70 @@ export default function QueryPage() {
             >
               Limpar secret
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                void startNewConversation();
+              }}
+              disabled={
+                trimmedSecret.length === 0 ||
+                conversationState.status === "loading" ||
+                isSubmitting
+              }
+              className={`${styles.btn} ${styles.btnSecondary}`}
+            >
+              {newConversationLabel}
+            </button>
           </div>
         </form>
+
+        <section className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <div>
+              <h2 className={styles.panelTitle}>Conversa</h2>
+              <p className={styles.panelCopy}>
+                {conversationTitle}
+                {conversationId ? ` :: ${conversationId.slice(0, 8)}` : ""}
+              </p>
+            </div>
+          </header>
+
+          {conversationState.error === "unauthorized" ? (
+            <StatusAlert kind="unauthorized" message={RAG_UNAUTHORIZED_MESSAGE} />
+          ) : null}
+
+          {conversationState.error === "technical" ? (
+            <StatusAlert kind="technical" message={RAG_TECHNICAL_ERROR_MESSAGE} />
+          ) : null}
+
+          {conversationState.error === "not_found" ? (
+            <StatusAlert
+              kind="technical"
+              message="Conversa nao encontrada ou indisponivel para recarga."
+            />
+          ) : null}
+
+          {conversationState.status === "loading" ? (
+            <p className={styles.emptyPanel}>Carregando conversa...</p>
+          ) : null}
+
+          {conversationState.conversation?.messages.length ? (
+            <ol className={styles.transcript}>
+              {conversationState.conversation.messages.map((message) => (
+                <ConversationMessageItem
+                  key={message.id}
+                  message={message}
+                  isAuditExpanded={expandedAuditMessageIds.has(message.id)}
+                  onToggleAudit={() => toggleAudit(message.id)}
+                />
+              ))}
+            </ol>
+          ) : conversationState.status !== "loading" ? (
+            <p className={styles.emptyPanel}>
+              Envie uma pergunta para criar ou continuar uma conversa auditavel.
+            </p>
+          ) : null}
+        </section>
 
         {askState.kind === "invalid_request" ? (
           <StatusAlert kind="invalid" message={RAG_INVALID_REQUEST_MESSAGE} />
@@ -749,6 +1123,73 @@ function StatusAlert({ kind, message }: StatusAlertProps) {
   );
 }
 
+type ConversationMessageItemProps = {
+  message: ConversationMessageResponse;
+  isAuditExpanded: boolean;
+  onToggleAudit: () => void;
+};
+
+function ConversationMessageItem({
+  message,
+  isAuditExpanded,
+  onToggleAudit,
+}: ConversationMessageItemProps) {
+  const isAssistant = message.role === "assistant";
+
+  return (
+    <li
+      className={`${styles.transcriptItem} ${
+        isAssistant ? styles.transcriptAssistant : styles.transcriptUser
+      }`}
+    >
+      <article className={styles.transcriptBubble}>
+        <header className={styles.transcriptHeader}>
+          <span>{isAssistant ? "Assistente" : "Operador"}</span>
+          <span>{formatTimestamp(message.createdAt)}</span>
+        </header>
+        <p className={styles.transcriptText}>{message.content}</p>
+
+        {isAssistant && message.trace ? (
+          <button
+            type="button"
+            onClick={onToggleAudit}
+            className={`${styles.btn} ${styles.btnSecondary} ${styles.auditToggle}`}
+          >
+            {isAuditExpanded ? "Ocultar auditoria" : "Ver auditoria"}
+          </button>
+        ) : null}
+      </article>
+
+      {isAssistant && message.trace && isAuditExpanded ? (
+        <section className={styles.conversationAudit}>
+          <AuditSummaryBlock
+            blockIndex="[ 01 ] Auditoria da mensagem"
+            metaLabel={`trace :: ${message.trace.id.slice(0, 8)}`}
+            traceId={message.trace.id}
+            question={message.trace.question}
+            metadata={message.trace.metadata}
+            audit={message.trace.audit}
+            status={message.trace.status}
+            errorCode={message.trace.errorCode}
+            createdAt={message.trace.createdAt}
+          />
+
+          <RelatedTermsBlock
+            blockIndex="[ 02 ] Termos da mensagem"
+            terms={message.trace.relatedTerms}
+          />
+
+          <SourcesBlock
+            blockIndex="[ 03 ] Fontes da mensagem"
+            sources={message.trace.sources}
+            showCitationFlags
+          />
+        </section>
+      ) : null}
+    </li>
+  );
+}
+
 type AuditSummaryBlockProps = {
   blockIndex: string;
   metaLabel: string;
@@ -949,6 +1390,41 @@ function readTopKInput(value: string): number {
     RAG_RETRIEVAL_MAX_TOP_K,
     Math.max(RAG_RETRIEVAL_MIN_TOP_K, parsed),
   );
+}
+
+function toCurrentAskResult(
+  assistantMessage: ConversationMessageResponse,
+): CurrentAskResult | null {
+  const trace = assistantMessage.trace;
+
+  if (!trace) {
+    return null;
+  }
+
+  const response = ragAskSuccessResponseSchema.safeParse({
+    traceId: trace.id,
+    answer: assistantMessage.content,
+    mode: trace.mode,
+    sources: trace.sources,
+    relatedTerms: trace.relatedTerms,
+    metadata: trace.metadata,
+    audit: trace.audit,
+  });
+
+  if (!response.success) {
+    return null;
+  }
+
+  return {
+    question: trace.question,
+    response: response.data,
+  };
+}
+
+function syncConversationUrl(conversationId: string): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set("conversation", conversationId);
+  window.history.pushState({}, "", url);
 }
 
 async function fetchJson(
