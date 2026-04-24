@@ -9,8 +9,11 @@ import QueryPage from "./page";
 
 const LONG_EXCERPT = `${"A".repeat(RAG_SOURCE_EXCERPT_PREVIEW_LENGTH)} trecho extra para truncar`;
 const SECRET = "query-secret-value";
+const CONVERSATION_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const CURRENT_TRACE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const RUN_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const MESSAGE_CREATED_AT = "2026-04-24T09:00:00.000Z";
+const ASSISTANT_CREATED_AT = "2026-04-24T09:00:01.000Z";
 
 const SUCCESS_RESPONSE = {
   traceId: CURRENT_TRACE_ID,
@@ -191,6 +194,86 @@ const FAILED_RUN_DETAIL = {
   createdAt: "2026-04-24T08:00:00.000Z",
 };
 
+const CREATE_CONVERSATION_RESPONSE = {
+  id: CONVERSATION_ID,
+  title: null,
+  createdAt: "2026-04-24T08:59:00.000Z",
+  updatedAt: "2026-04-24T08:59:00.000Z",
+  lastMessageAt: null,
+};
+
+type AskFixture = Omit<typeof SUCCESS_RESPONSE, "audit" | "metadata"> & {
+  audit: typeof SUCCESS_RESPONSE.audit | typeof NO_EVIDENCE_RESPONSE.audit;
+  metadata: Omit<typeof SUCCESS_RESPONSE.metadata, "retrievalStrategy"> & {
+    retrievalStrategy: "standard" | "explore";
+  };
+};
+
+function appendResponseFromAsk(
+  response: AskFixture,
+  question = "Quais tecnicas aparecem com mais frequencia?",
+  suffix: "1" | "2" = "1",
+) {
+  return {
+    status: response.sources.length === 0 ? "answered_no_evidence" : "answered",
+    userMessage: {
+      id:
+        suffix === "1"
+          ? "99999999-9999-4999-8999-999999999991"
+          : "99999999-9999-4999-8999-999999999992",
+      role: "user" as const,
+      content: question,
+      createdAt: MESSAGE_CREATED_AT,
+      trace: null,
+    },
+    assistantMessage: {
+      id:
+        suffix === "1"
+          ? "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee1"
+          : "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee2",
+      role: "assistant" as const,
+      content: response.answer,
+      createdAt: ASSISTANT_CREATED_AT,
+      trace: {
+        id: response.traceId,
+        question,
+        answer: response.answer,
+        mode: response.mode,
+        status:
+          response.sources.length === 0
+            ? ("answered_no_evidence" as const)
+            : ("answered" as const),
+        errorCode: null,
+        sources: response.sources.map((source) => ({
+          ...source,
+          citedInAnswer: true,
+        })),
+        relatedTerms: response.relatedTerms,
+        metadata: response.metadata,
+        audit: response.audit,
+        createdAt: ASSISTANT_CREATED_AT,
+      },
+    },
+  };
+}
+
+const CONVERSATION_DETAIL_RESPONSE = {
+  ...CREATE_CONVERSATION_RESPONSE,
+  title: "Quais tecnicas aparecem com maior frequencia?",
+  updatedAt: ASSISTANT_CREATED_AT,
+  lastMessageAt: ASSISTANT_CREATED_AT,
+  messages: [
+    appendResponseFromAsk(
+      SUCCESS_RESPONSE,
+      "Quais tecnicas aparecem com maior frequencia?",
+    ).userMessage,
+    appendResponseFromAsk(
+      SUCCESS_RESPONSE,
+      "Quais tecnicas aparecem com maior frequencia?",
+    ).assistantMessage,
+  ],
+};
+
 function jsonResponse(
   body: unknown,
   init: { status: number } = { status: 200 },
@@ -235,6 +318,10 @@ function clickLoadHistory(): void {
   );
 }
 
+function clickNewConversation(): void {
+  fireEvent.click(screen.getByRole("button", { name: /nova conversa/i }));
+}
+
 describe("/query page", () => {
   const fetchMock = vi.fn<
     (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
@@ -243,6 +330,7 @@ describe("/query page", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", fetchMock);
     sessionStorage.clear();
+    window.history.pushState({}, "", "/query");
     fetchMock.mockReset();
   });
 
@@ -271,16 +359,30 @@ describe("/query page", () => {
   });
 
   it("submits standard and explore queries with validated retrieval settings", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(SUCCESS_RESPONSE));
+    fetchMock.mockResolvedValueOnce(jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        appendResponseFromAsk(
+          SUCCESS_RESPONSE,
+          "Compare as abordagens metodologicas.",
+        ),
+      ),
+    );
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
-        ...SUCCESS_RESPONSE,
-        metadata: {
-          ...SUCCESS_RESPONSE.metadata,
-          topK: 8,
-          retrievalStrategy: "explore",
-          candidateTopK: 24,
-        },
+        ...appendResponseFromAsk(
+          {
+            ...SUCCESS_RESPONSE,
+            metadata: {
+              ...SUCCESS_RESPONSE.metadata,
+              topK: 8,
+              retrievalStrategy: "explore",
+              candidateTopK: 24,
+            },
+          },
+          "Compare as abordagens metodologicas.",
+          "2",
+        ),
       }),
     );
 
@@ -295,7 +397,21 @@ describe("/query page", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "/api/rag/ask",
+      "/api/rag/conversations",
+      expect.objectContaining({
+        method: "POST",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${SECRET}`,
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({}),
+      }),
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `/api/rag/conversations/${CONVERSATION_ID}/messages`,
       expect.objectContaining({
         method: "POST",
         cache: "no-store",
@@ -304,9 +420,8 @@ describe("/query page", () => {
           "Content-Type": "application/json",
         }),
         body: JSON.stringify({
-          question: "Compare as abordagens metodologicas.",
-          mode: "global",
-          retrieval: {
+          content: "Compare as abordagens metodologicas.",
+          retrievalSettings: {
             topK: 8,
             strategy: "standard",
           },
@@ -314,13 +429,15 @@ describe("/query page", () => {
       }),
     );
 
+    typeQuestion("Compare as abordagens metodologicas.");
+
     await act(async () => {
       clickExplore();
     });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      "/api/rag/ask",
+      3,
+      `/api/rag/conversations/${CONVERSATION_ID}/messages`,
       expect.objectContaining({
         method: "POST",
         cache: "no-store",
@@ -329,9 +446,8 @@ describe("/query page", () => {
           "Content-Type": "application/json",
         }),
         body: JSON.stringify({
-          question: "Compare as abordagens metodologicas.",
-          mode: "global",
-          retrieval: {
+          content: "Compare as abordagens metodologicas.",
+          retrievalSettings: {
             topK: 8,
             strategy: "explore",
           },
@@ -340,8 +456,11 @@ describe("/query page", () => {
     );
   });
 
-  it("renders the current answer audit from the ask success payload without an extra fetch", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(SUCCESS_RESPONSE));
+  it("renders the current answer audit from the conversation turn payload", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(appendResponseFromAsk(SUCCESS_RESPONSE)),
+    );
 
     render(<QueryPage />);
     typeSecret(SECRET);
@@ -351,8 +470,8 @@ describe("/query page", () => {
       clickSubmit();
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(SUCCESS_RESPONSE.answer)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByText(SUCCESS_RESPONSE.answer).length).toBeGreaterThan(0);
     expect(screen.getByText(CURRENT_TRACE_ID)).toBeInTheDocument();
     expect(
       screen.getAllByText(/classificacao supervisionada/i).length,
@@ -360,6 +479,8 @@ describe("/query page", () => {
     expect(screen.getByText(/US\$ 0\.00002063/i)).toBeInTheDocument();
     expect(screen.getAllByText(/123 ms/i).length).toBeGreaterThan(0);
     expect(screen.getByText("1. artigo-a.pdf")).toBeInTheDocument();
+    expect(screen.getByText(/operador/i)).toBeInTheDocument();
+    expect(screen.getByText(/assistente/i)).toBeInTheDocument();
     expect(
       screen.getAllByText(/quais tecnicas aparecem com mais frequencia\?/i)
         .length,
@@ -367,8 +488,72 @@ describe("/query page", () => {
     expect(screen.queryByText(/carregando historico auditado/i)).not.toBeInTheDocument();
   });
 
+  it("loads an existing conversation from the URL when a stored secret exists", async () => {
+    sessionStorage.setItem("query:secret", SECRET);
+    window.history.pushState({}, "", `/query?conversation=${CONVERSATION_ID}`);
+    fetchMock.mockResolvedValueOnce(jsonResponse(CONVERSATION_DETAIL_RESPONSE));
+
+    render(<QueryPage />);
+
+    expect(await screen.findByText(SUCCESS_RESPONSE.answer)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/rag/conversations/${CONVERSATION_ID}`,
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${SECRET}`,
+        }),
+      }),
+    );
+    expect(
+      screen.getAllByText(/Quais tecnicas aparecem com maior frequencia/i).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("starts a new conversation explicitly and syncs the URL", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }));
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+
+    await act(async () => {
+      clickNewConversation();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rag/conversations",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+    );
+    expect(window.location.search).toBe(`?conversation=${CONVERSATION_ID}`);
+    expect(screen.getByText(/Conversa sem titulo/i)).toBeInTheDocument();
+  });
+
+  it("expands assistant-message audit inside the transcript", async () => {
+    sessionStorage.setItem("query:secret", SECRET);
+    window.history.pushState({}, "", `/query?conversation=${CONVERSATION_ID}`);
+    fetchMock.mockResolvedValueOnce(jsonResponse(CONVERSATION_DETAIL_RESPONSE));
+
+    render(<QueryPage />);
+
+    expect(await screen.findByText(SUCCESS_RESPONSE.answer)).toBeInTheDocument();
+    expect(screen.queryByText(/\[ 03 \] Fontes da mensagem/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /ver auditoria/i }));
+
+    expect(screen.getByText(/\[ 01 \] Auditoria da mensagem/i)).toBeInTheDocument();
+    expect(screen.getByText(/\[ 03 \] Fontes da mensagem/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/citado :: sim/i).length).toBeGreaterThan(0);
+  });
+
   it("truncates long excerpts only in the rendered preview", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(SUCCESS_RESPONSE));
+    fetchMock.mockResolvedValueOnce(jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(appendResponseFromAsk(SUCCESS_RESPONSE, "Explique o contexto.")),
+    );
 
     render(<QueryPage />);
     typeSecret(SECRET);
@@ -385,7 +570,12 @@ describe("/query page", () => {
   });
 
   it("shows the no-evidence state, empty sources, and skipped generation audit", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(NO_EVIDENCE_RESPONSE));
+    fetchMock.mockResolvedValueOnce(jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        appendResponseFromAsk(NO_EVIDENCE_RESPONSE, "Existe evidencia suficiente?"),
+      ),
+    );
 
     render(<QueryPage />);
     typeSecret(SECRET);
@@ -396,8 +586,8 @@ describe("/query page", () => {
     });
 
     expect(
-      screen.getByText(/nao encontrei evidencias suficientes/i),
-    ).toBeInTheDocument();
+      screen.getAllByText(/nao encontrei evidencias suficientes/i).length,
+    ).toBeGreaterThan(0);
     expect(
       screen.getByText(/nenhuma fonte foi recuperada para esta pergunta/i),
     ).toBeInTheDocument();
@@ -572,6 +762,7 @@ describe("/query page", () => {
   });
 
   it("shows safe ask errors for invalid request, unauthorized, and technical failures", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }));
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ error: "invalid_request" }, { status: 400 }),
     );
@@ -589,6 +780,7 @@ describe("/query page", () => {
     ).toBeInTheDocument();
 
     unmount();
+    window.history.pushState({}, "", "/query");
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ error: "unauthorized" }, { status: 401 }),
     );
@@ -607,8 +799,20 @@ describe("/query page", () => {
     vi.unstubAllGlobals();
     vi.stubGlobal("fetch", fetchMock);
     fetchMock.mockReset();
+    window.history.pushState({}, "", "/query");
+    fetchMock.mockResolvedValueOnce(jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }));
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ error: "generation_failed" }, { status: 502 }),
+      jsonResponse(
+        {
+          status: "generation_failed",
+          userMessage: appendResponseFromAsk(
+            SUCCESS_RESPONSE,
+            "Pergunta valida outra vez",
+          ).userMessage,
+          errorCode: "generation_failed",
+        },
+        { status: 502 },
+      ),
     );
 
     render(<QueryPage />);
