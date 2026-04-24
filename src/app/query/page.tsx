@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   appendConversationMessageResponseSchema,
   conversationDetailResponseSchema,
   createConversationResponseSchema,
-  ragAskSuccessResponseSchema,
   ragInvalidRequestResponseSchema,
   ragQueryRunDetailResponseSchema,
   ragQueryRunSummariesResponseSchema,
@@ -15,7 +14,6 @@ import {
   type ConversationMessageResponse,
   type RagAnswerAudit,
   type RagAnswerMetadata,
-  type RagAskSuccessResponse,
   type RagQueryRunDetailResponse,
   type RagQueryRunSummaryResponse,
   type RelatedTerm,
@@ -55,11 +53,6 @@ type AskState =
   | { kind: "invalid_request" }
   | { kind: "unauthorized" }
   | { kind: "technical_error" };
-
-type CurrentAskResult = {
-  question: string;
-  response: RagAskSuccessResponse;
-};
 
 type LoadErrorKind = "unauthorized" | "technical";
 
@@ -114,9 +107,6 @@ export default function QueryPage() {
   const [secret, setSecret] = useState("");
   const [topK, setTopK] = useState(RAG_RETRIEVAL_DEFAULT_TOP_K);
   const [askState, setAskState] = useState<AskState>({ kind: "idle" });
-  const [currentAskResult, setCurrentAskResult] = useState<CurrentAskResult | null>(
-    null,
-  );
   const [recentRunsState, setRecentRunsState] = useState<RecentRunsState>(
     createInitialRecentRunsState,
   );
@@ -130,6 +120,21 @@ export default function QueryPage() {
   const [expandedAuditMessageIds, setExpandedAuditMessageIds] = useState<
     Set<string>
   >(() => new Set());
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const transcriptLength =
+    conversationState.conversation?.messages.length ?? 0;
+
+  useEffect(() => {
+    const node = transcriptEndRef.current;
+
+    if (!node) {
+      return;
+    }
+
+    if (typeof node.scrollIntoView === "function") {
+      node.scrollIntoView({ block: "end", behavior: "smooth" });
+    }
+  }, [transcriptLength, askState.kind]);
 
   const trimmedQuestion = question.trim();
   const trimmedSecret = secret.trim();
@@ -282,7 +287,7 @@ export default function QueryPage() {
         parsed.data.userMessage,
         parsed.data.assistantMessage,
       ]);
-      setCurrentAskResult(toCurrentAskResult(parsed.data.assistantMessage));
+      expandAudit(parsed.data.assistantMessage.id);
       setQuestion("");
       setAskState({ kind: "idle" });
       return;
@@ -422,7 +427,6 @@ export default function QueryPage() {
 
   async function startNewConversation() {
     setAskState({ kind: "idle" });
-    setCurrentAskResult(null);
     setQuestion("");
     await createConversation();
   }
@@ -537,6 +541,18 @@ export default function QueryPage() {
         next.add(messageId);
       }
 
+      return next;
+    });
+  }
+
+  function expandAudit(messageId: string) {
+    setExpandedAuditMessageIds((current) => {
+      if (current.has(messageId)) {
+        return current;
+      }
+
+      const next = new Set(current);
+      next.add(messageId);
       return next;
     });
   }
@@ -717,7 +733,7 @@ export default function QueryPage() {
           </aside>
         </header>
 
-        <form onSubmit={onSubmit} className={styles.form}>
+        <section className={styles.toolbar} aria-label="Controles da consulta">
           <div className={`${styles.field} ${styles.fieldSecret}`}>
             <label htmlFor="query-secret" className={styles.label}>
               <span>Secret de consulta</span>
@@ -734,25 +750,10 @@ export default function QueryPage() {
             />
           </div>
 
-          <div className={`${styles.field} ${styles.fieldQuestion}`}>
-            <label htmlFor="query-question" className={styles.label}>
-              <span>Pergunta</span>
-              <span className={styles.labelIndex}>[ 02 ]</span>
-            </label>
-            <textarea
-              id="query-question"
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-              rows={6}
-              placeholder="Ex.: Quais tecnicas aparecem com mais frequencia nos estudos?"
-              className={styles.textarea}
-            />
-          </div>
-
           <div className={`${styles.field} ${styles.fieldControls}`}>
             <label htmlFor="query-top-k" className={styles.label}>
               <span>Fontes recuperadas</span>
-              <span className={styles.labelIndex}>[ 03 ]</span>
+              <span className={styles.labelIndex}>[ 02 ]</span>
             </label>
             <div className={styles.controlRow}>
               <input
@@ -771,28 +772,7 @@ export default function QueryPage() {
             </div>
           </div>
 
-          <div className={styles.actions}>
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              className={`${styles.btn} ${
-                isStandardSubmitting ? styles.btnLoading : styles.btnPrimary
-              }`}
-            >
-              {standardButtonLabel}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                void submitQuestion("explore");
-              }}
-              disabled={!canSubmit}
-              className={`${styles.btn} ${
-                isExploreSubmitting ? styles.btnLoading : styles.btnExplore
-              }`}
-            >
-              {exploreButtonLabel}
-            </button>
+          <div className={styles.toolbarActions}>
             <button
               type="button"
               onClick={clearSecret}
@@ -816,9 +796,9 @@ export default function QueryPage() {
               {newConversationLabel}
             </button>
           </div>
-        </form>
+        </section>
 
-        <section className={styles.panel}>
+        <section className={`${styles.panel} ${styles.chatPanel}`}>
           <header className={styles.panelHeader}>
             <div>
               <h2 className={styles.panelTitle}>Conversa</h2>
@@ -864,63 +844,76 @@ export default function QueryPage() {
               Envie uma pergunta para criar ou continuar uma conversa auditavel.
             </p>
           ) : null}
-        </section>
 
-        {askState.kind === "invalid_request" ? (
-          <StatusAlert kind="invalid" message={RAG_INVALID_REQUEST_MESSAGE} />
-        ) : null}
+          <div ref={transcriptEndRef} aria-hidden="true" />
 
-        {askState.kind === "unauthorized" ? (
-          <StatusAlert kind="unauthorized" message={RAG_UNAUTHORIZED_MESSAGE} />
-        ) : null}
+          <div className={styles.composerWrap}>
+            {askState.kind === "invalid_request" ? (
+              <StatusAlert kind="invalid" message={RAG_INVALID_REQUEST_MESSAGE} />
+            ) : null}
 
-        {askState.kind === "technical_error" ? (
-          <StatusAlert kind="technical" message={RAG_TECHNICAL_ERROR_MESSAGE} />
-        ) : null}
+            {askState.kind === "unauthorized" ? (
+              <StatusAlert kind="unauthorized" message={RAG_UNAUTHORIZED_MESSAGE} />
+            ) : null}
 
-        {currentAskResult ? (
-          <section className={styles.result}>
-            <article className={styles.resultBlock}>
-              <header className={styles.blockHeader}>
-                <span className={styles.blockIndex}>[ 01 ] Resposta atual</span>
-                <span className={styles.blockMeta}>
-                  trace :: {currentAskResult.response.traceId.slice(0, 8)}
-                </span>
-              </header>
-              <div className={styles.blockBody}>
-                <p className={styles.subHeadline}>Pergunta auditada</p>
-                <p className={styles.questionSnapshot}>
-                  {currentAskResult.question}
-                </p>
-                <h2 className={styles.answerHeadline}>
-                  Sintese gerada com citacoes inline.
-                </h2>
-                <p className={styles.answerText}>
-                  {currentAskResult.response.answer}
-                </p>
+            {askState.kind === "technical_error" ? (
+              <StatusAlert kind="technical" message={RAG_TECHNICAL_ERROR_MESSAGE} />
+            ) : null}
+
+            <form onSubmit={onSubmit} className={styles.composer}>
+              <div className={`${styles.field} ${styles.fieldQuestion}`}>
+                <label htmlFor="query-question" className={styles.label}>
+                  <span>Pergunta</span>
+                  <span className={styles.labelIndex}>[ 03 ]</span>
+                </label>
+                <textarea
+                  id="query-question"
+                  value={question}
+                  onChange={(event) => setQuestion(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" &&
+                      !event.shiftKey &&
+                      !event.nativeEvent.isComposing
+                    ) {
+                      event.preventDefault();
+                      if (canSubmit) {
+                        void submitQuestion("standard");
+                      }
+                    }
+                  }}
+                  rows={3}
+                  placeholder="Ex.: Quais tecnicas aparecem com mais frequencia nos estudos?"
+                  className={styles.textarea}
+                />
               </div>
-            </article>
 
-            <AuditSummaryBlock
-              blockIndex="[ 02 ] Auditoria atual"
-              metaLabel={`latency :: ${currentAskResult.response.audit.latencyMs} ms`}
-              traceId={currentAskResult.response.traceId}
-              question={currentAskResult.question}
-              metadata={currentAskResult.response.metadata}
-              audit={currentAskResult.response.audit}
-            />
-
-            <RelatedTermsBlock
-              blockIndex="[ 03 ] Termos relacionados"
-              terms={currentAskResult.response.relatedTerms}
-            />
-
-            <SourcesBlock
-              blockIndex="[ 04 ] Fontes da resposta atual"
-              sources={currentAskResult.response.sources}
-            />
-          </section>
-        ) : null}
+              <div className={styles.composerActions}>
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  className={`${styles.btn} ${
+                    isStandardSubmitting ? styles.btnLoading : styles.btnPrimary
+                  }`}
+                >
+                  {standardButtonLabel}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void submitQuestion("explore");
+                  }}
+                  disabled={!canSubmit}
+                  className={`${styles.btn} ${
+                    isExploreSubmitting ? styles.btnLoading : styles.btnExplore
+                  }`}
+                >
+                  {exploreButtonLabel}
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
 
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
@@ -1390,35 +1383,6 @@ function readTopKInput(value: string): number {
     RAG_RETRIEVAL_MAX_TOP_K,
     Math.max(RAG_RETRIEVAL_MIN_TOP_K, parsed),
   );
-}
-
-function toCurrentAskResult(
-  assistantMessage: ConversationMessageResponse,
-): CurrentAskResult | null {
-  const trace = assistantMessage.trace;
-
-  if (!trace) {
-    return null;
-  }
-
-  const response = ragAskSuccessResponseSchema.safeParse({
-    traceId: trace.id,
-    answer: assistantMessage.content,
-    mode: trace.mode,
-    sources: trace.sources,
-    relatedTerms: trace.relatedTerms,
-    metadata: trace.metadata,
-    audit: trace.audit,
-  });
-
-  if (!response.success) {
-    return null;
-  }
-
-  return {
-    question: trace.question,
-    response: response.data,
-  };
 }
 
 function syncConversationUrl(conversationId: string): void {

@@ -146,13 +146,81 @@
   opacity: 0.6;
 }
 
-/* ---------------- Form ---------------- */
+/* ---------------- Toolbar + Composer ---------------- */
 
-.form {
+.toolbar {
   display: grid;
-  grid-template-columns: 1fr 1.6fr;
-  gap: 24px;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
   align-items: start;
+}
+
+.toolbarActions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.chatPanel {
+  display: grid;
+  gap: 20px;
+}
+
+.composerWrap {
+  display: grid;
+  gap: 14px;
+  position: sticky;
+  bottom: 18px;
+  z-index: 2;
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: end;
+  padding: 18px;
+  border: var(--border);
+  background: var(--paper);
+  box-shadow: var(--shadow-lg);
+}
+
+.composer .fieldQuestion {
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.composer .textarea {
+  min-height: 84px;
+}
+
+.composerActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 220px;
+}
+
+.composerActions .btn {
+  justify-content: center;
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .toolbar {
+    grid-template-columns: 1fr;
+  }
+  .composer {
+    grid-template-columns: 1fr;
+  }
+  .composerActions {
+    flex-direction: row;
+    min-width: 0;
+  }
+  .composerActions .btn {
+    flex: 1;
+  }
 }
 
 .field {
@@ -308,15 +376,6 @@
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.12em;
-}
-
-.actions {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  align-items: center;
-  margin-top: 4px;
 }
 
 .btn {
@@ -924,9 +983,6 @@
   }
   .panelHeader {
     align-items: start;
-  }
-  .form {
-    grid-template-columns: 1fr;
   }
   .sourceCard {
     grid-template-columns: 1fr;
