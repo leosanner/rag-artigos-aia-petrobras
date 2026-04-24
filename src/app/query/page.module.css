@@ -483,6 +483,72 @@
   opacity: 0.78;
 }
 
+/* ---------------- Conversation transcript ---------------- */
+
+.transcript {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.transcriptItem {
+  display: grid;
+  gap: 16px;
+}
+
+.transcriptBubble {
+  display: grid;
+  gap: 14px;
+  width: min(760px, 100%);
+  padding: 18px;
+  border: var(--border);
+  background: var(--paper);
+  box-shadow: var(--shadow-md);
+}
+
+.transcriptAssistant .transcriptBubble {
+  justify-self: start;
+  background: var(--paper);
+}
+
+.transcriptUser .transcriptBubble {
+  justify-self: end;
+  background: var(--lime);
+}
+
+.transcriptHeader {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.transcriptText {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.auditToggle {
+  justify-self: start;
+  padding: 10px 14px;
+  box-shadow: var(--shadow-sm);
+  font-size: 0.72rem;
+}
+
+.conversationAudit {
+  display: grid;
+  gap: 18px;
+}
+
 /* ---------------- Result ---------------- */
 
 .result {
