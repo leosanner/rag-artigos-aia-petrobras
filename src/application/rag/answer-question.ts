@@ -25,7 +25,7 @@ import type {
 } from "./ports";
 import type {
   AnswerQuestionResult,
-  GlobalRagAskInput,
+  AnswerQuestionInput,
   RagAnswerAudit,
   RagAnswerMetadata,
   RelatedTerm,
@@ -78,19 +78,21 @@ export class AnswerQuestion {
     this.nowMs = deps.nowMs ?? Date.now;
   }
 
-  async execute(input: GlobalRagAskInput): Promise<AnswerQuestionResult> {
+  async execute(input: AnswerQuestionInput): Promise<AnswerQuestionResult> {
     if (input.mode !== "global") {
       throw new Error("Unsupported RAG mode");
     }
 
     const retrieval = normalizeRetrievalSettings(input.retrieval);
+    const retrievalQuestion =
+      input.conversationContext?.transcript ?? input.question;
     const startedAtMs = this.nowMs();
     const metadata = this.buildMetadata(retrieval);
     let retrievalResult: Awaited<ReturnType<RetrieveChunks["search"]>>;
 
     try {
       retrievalResult = await this.retrieveChunks.search({
-        question: input.question,
+        question: retrievalQuestion,
         retrieval,
       });
     } catch (error) {
@@ -149,6 +151,7 @@ export class AnswerQuestion {
 
       return answerQuestionResultSchema.parse({
         kind: "answered",
+        status: "answered_no_evidence",
         traceId: persisted.id,
         answer: NO_EVIDENCE_ANSWER,
         mode: "global",
@@ -172,6 +175,7 @@ export class AnswerQuestion {
     try {
       const result = await this.generationProvider.generateAnswer({
         question: input.question,
+        conversationContext: input.conversationContext,
         promptContext,
         promptVersion: this.promptVersion,
         generationModel: this.generationModel,
@@ -233,6 +237,7 @@ export class AnswerQuestion {
 
     return answerQuestionResultSchema.parse({
       kind: "answered",
+      status: "answered",
       traceId: persisted.id,
       answer,
       mode: "global",
