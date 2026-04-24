@@ -60,6 +60,26 @@ p {
   line-height: 1.7;
 }
 
+.primary-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 0 18px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.primary-link:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 3px;
+}
+
 @media (max-width: 640px) {
   .shell {
     place-items: start;

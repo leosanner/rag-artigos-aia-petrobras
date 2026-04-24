@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="shell">
@@ -8,6 +10,9 @@ export default function Home() {
           O projeto comeca pela fundacao: Next.js, TypeScript, testes, banco
           local com pgvector e contratos de governanca para documentos.
         </p>
+        <Link className="primary-link" href="/query">
+          Acessar consulta RAG
+        </Link>
       </section>
     </main>
   );
