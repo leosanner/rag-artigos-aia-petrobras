@@ -15,6 +15,7 @@ const DATABASE_URL = "postgres://user:password@localhost:5432/app";
 function buildAnsweredResult(): AnswerQuestionResult {
   return {
     kind: "answered",
+    status: "answered",
     traceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     answer: "As tecnicas mais citadas sao segmentacao e classificacao [1].",
     mode: "global",

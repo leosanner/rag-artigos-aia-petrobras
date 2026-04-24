@@ -173,6 +173,7 @@ describe("AnswerQuestion", () => {
       }),
     ).resolves.toEqual({
       kind: "answered",
+      status: "answered_no_evidence",
       traceId: CREATED_RUN_ID,
       answer: buildNoEvidenceAnswer(),
       mode: "global",
@@ -272,6 +273,7 @@ describe("AnswerQuestion", () => {
 
     expect(result).toEqual({
       kind: "answered",
+      status: "answered",
       traceId: CREATED_RUN_ID,
       answer: "A síntese prioriza a segunda fonte [2].",
       mode: "global",
@@ -372,6 +374,7 @@ describe("AnswerQuestion", () => {
 
     expect(result).toMatchObject({
       kind: "answered",
+      status: "answered",
       metadata: {
         mode: "global",
         topK: 6,
@@ -412,6 +415,7 @@ describe("AnswerQuestion", () => {
 
     expect(result).toMatchObject({
       kind: "answered",
+      status: "answered",
       traceId: CREATED_RUN_ID,
       answer: buildNoEvidenceAnswer(),
       mode: "global",
@@ -566,6 +570,58 @@ describe("AnswerQuestion", () => {
       ],
       relatedTerms: expectedRelatedTerms,
     });
+  });
+
+  it("uses the conversation transcript for retrieval while keeping the latest user message as the persisted question", async () => {
+    const { service, retrieveChunks, generationProvider, runsRepository } =
+      createService({
+        answer: "Resposta contextualizada [1].",
+      });
+    const question = "E no turno seguinte?";
+    const transcript = [
+      "User: Pergunta anterior",
+      "Assistant: Resposta anterior [1].",
+      `User: ${question}`,
+    ].join("\n\n");
+
+    const result = await service.execute({
+      question,
+      mode: "global",
+      retrieval: {
+        topK: 7,
+        strategy: "standard",
+      },
+      conversationContext: {
+        transcript,
+      },
+    });
+
+    expect(result).toMatchObject({
+      kind: "answered",
+      status: "answered",
+      traceId: CREATED_RUN_ID,
+      answer: "Resposta contextualizada [1].",
+    });
+    expect(retrieveChunks.search).toHaveBeenCalledWith({
+      question: transcript,
+      retrieval: {
+        topK: 7,
+        strategy: "standard",
+      },
+    });
+    expect(generationProvider.generateAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        question,
+        conversationContext: {
+          transcript,
+        },
+      }),
+    );
+    expect(runsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        question,
+      }),
+    );
   });
 
   it("persists a failed run when retrieval fails after validation and preserves known embedding audit data", async () => {
