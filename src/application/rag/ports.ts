@@ -32,6 +32,9 @@ export type GenerationUsage = {
 
 export type GenerateAnswerInput = {
   question: string;
+  conversationContext?: {
+    transcript: string;
+  };
   promptContext: string;
   promptVersion: string;
   generationModel: string;

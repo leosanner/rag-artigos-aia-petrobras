@@ -37,6 +37,12 @@ export const globalRagAskInputSchema = z
 export const ragAskRequestSchema = globalRagAskInputSchema;
 
 export type GlobalRagAskInput = z.infer<typeof globalRagAskInputSchema>;
+export type AnswerQuestionConversationContext = {
+  transcript: string;
+};
+export type AnswerQuestionInput = GlobalRagAskInput & {
+  conversationContext?: AnswerQuestionConversationContext;
+};
 
 const ragSourceShape = {
   sourceNumber: z.number().int().positive(),
@@ -314,6 +320,7 @@ export type RagAskResponse = z.infer<typeof ragAskResponseSchema>;
 export const answerQuestionAnsweredResultSchema = z
   .object({
     kind: z.literal("answered"),
+    status: z.enum(["answered", "answered_no_evidence"]),
     traceId: z.string().uuid(),
     answer: z.string().min(1),
     mode: z.literal("global"),
