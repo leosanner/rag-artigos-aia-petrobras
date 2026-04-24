@@ -38,7 +38,7 @@ services for audit reads.
 | RN-07 | Persisted source snapshots must match the source list used for answer generation or no-evidence handling for that run. | The application persists the selected sources after numbering/citation validation. |
 | RN-09 | Related terms are extracted from the normalized question text plus retrieved source excerpts, ranked deterministically, and capped at 8 results. | The audited ask flow calls the block-01 extractor before persistence. |
 | RN-11 | Embedding and generation adapters must return normalized numeric usage and estimated-cost metadata to the application layer. | Provider ports expand here. |
-| RN-14 | F-05 stays single-turn; it does not introduce conversations or chat transcript state. | The audited flow extends `AnswerQuestion`; it does not create a second turn engine. |
+| RN-14 | F-05 stays single-turn; it does not introduce conversations or chat transcript state. | The audited flow extends `AnswerQuestion`; it does not create a second turn engine, even though the same engine may later accept optional internal conversation context when reused by F-06. |
 | INV-05 | Technical error responses must remain sanitized even when the failed run is persisted internally. | Persistence happens before response serialization, without leaking internals. |
 | INV-06 | F-05 must not introduce chat conversations or a second turn engine. | Audit reads and writes reuse the same single-turn application path. |
 
@@ -52,6 +52,10 @@ services for audit reads.
   for the generation call.
 - [x] RF-B03-03: `AnswerQuestion.execute(input)` measures total latency from
   before question embedding until the run is ready for response serialization.
+- [x] RF-B03-03a: `AnswerQuestion.execute(input)` may later accept optional
+  internal conversation context for F-06 reuse, while the F-05 route contract
+  remains single-turn and the persisted trace question remains the latest user
+  question.
 - [x] RF-B03-04: After retrieval selects sources, `AnswerQuestion` derives
   related terms from the normalized question plus selected source excerpts
   before persisting the run.
@@ -113,6 +117,7 @@ export interface GenerationProvider {
 ```ts
 export type AnswerQuestionAnsweredResult = {
   kind: "answered";
+  status: "answered" | "answered_no_evidence";
   traceId: string;
   answer: string;
   mode: "global";
@@ -156,6 +161,7 @@ not make real OpenAI calls.
 
 - Application and adapter tests pass without real provider calls.
 - `AnswerQuestion` owns the audited single-turn flow while route handlers stay
-  thin.
+  thin, while remaining reusable by F-06 through optional internal
+  conversation context.
 - Audit read services are reusable by the later interface block and by F-06
   without introducing a second generation pipeline.

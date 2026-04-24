@@ -181,7 +181,7 @@ the current task:
 | `GET` | `/api/rag/query-runs/:id` | Returns one persisted run with sources, related terms, and audit metrics. |
 | `GET` | `/query` | Renders the current-answer audit panel and recent-run inspection UI. |
 | Strategy | `QuestionEmbeddingProvider.embedQuestion(question)` | Returns `{ embedding, usage }` instead of only the embedding vector. |
-| Strategy | `GenerationProvider.generateAnswer(input)` | Returns `{ answer, usage }` instead of only the answer string. |
+| Strategy | `GenerationProvider.generateAnswer(input)` | Returns `{ answer, usage }` instead of only the answer string; the input may later carry optional internal conversation context when reused by F-06. |
 
 ### Key Modules
 
