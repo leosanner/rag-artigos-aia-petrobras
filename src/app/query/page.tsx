@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   appendConversationMessageResponseSchema,
@@ -120,21 +120,6 @@ export default function QueryPage() {
   const [expandedAuditMessageIds, setExpandedAuditMessageIds] = useState<
     Set<string>
   >(() => new Set());
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
-  const transcriptLength =
-    conversationState.conversation?.messages.length ?? 0;
-
-  useEffect(() => {
-    const node = transcriptEndRef.current;
-
-    if (!node) {
-      return;
-    }
-
-    if (typeof node.scrollIntoView === "function") {
-      node.scrollIntoView({ block: "end", behavior: "smooth" });
-    }
-  }, [transcriptLength, askState.kind]);
 
   const trimmedQuestion = question.trim();
   const trimmedSecret = secret.trim();
@@ -845,7 +830,6 @@ export default function QueryPage() {
             </p>
           ) : null}
 
-          <div ref={transcriptEndRef} aria-hidden="true" />
 
           <div className={styles.composerWrap}>
             {askState.kind === "invalid_request" ? (
