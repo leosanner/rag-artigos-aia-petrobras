@@ -16,9 +16,10 @@ introducing a chat-only pipeline.
 - Orchestration of user-message persistence, context construction, turn
   delegation, and assistant-row linkage.
 - Title assignment on the first user message.
+- Explicit `not_found` signaling for unknown conversation ids.
 - Safe error contract for technical failures after validation.
-- Tests first with fake providers and real repositories, same pattern as F-05
-  Block 03.
+- Tests first with a fake turn engine and real repositories, same integration
+  pattern used elsewhere in the application layer.
 
 **Out of scope:**
 
@@ -44,9 +45,11 @@ introducing a chat-only pipeline.
 ## Functional Requirements
 
 - [ ] RF-B03-01: `CreateConversation.execute()` writes an empty conversation
-  record and returns its id and timestamps.
+  record and returns its id, timestamps, `title: null`, and
+  `lastMessageAt: null`.
 - [ ] RF-B03-02: `GetConversationDetail.execute({ id })` returns the ordered
-  transcript with hydrated assistant traces, or a not-found signal for
+  transcript with hydrated assistant traces, or an explicit `not_found` signal
+  for
   unknown ids.
 - [ ] RF-B03-03: `AppendConversationMessage.execute` persists the incoming
   user message before any retrieval or generation call.
@@ -57,14 +60,18 @@ introducing a chat-only pipeline.
   messages and constructs retrieval context via
   `buildConversationRetrievalContext`.
 - [ ] RF-B03-06: The use case calls `AnswerQuestion.execute` with the
-  constructed context and the normalized F-04 retrieval settings; it does not
-  reimplement retrieval, ranking, or prompting.
+  latest user message as `question`, the constructed transcript as optional
+  `conversationContext.transcript`, and the normalized F-04 retrieval
+  settings; it does not reimplement retrieval, ranking, or prompting.
 - [ ] RF-B03-07: On `answered` or `answered_no_evidence` status, the use case
   appends an assistant row linked to the returned `traceId` and updates
   `lastMessageAt`.
 - [ ] RF-B03-08: On `generation_failed` or `generation_unavailable`, the use
   case returns the safe error response and does NOT append an assistant row.
-- [ ] RF-B03-09: The response DTO returns the transcript slice needed by
+- [ ] RF-B03-09: `lastMessageAt` is updated to the user-message timestamp as
+  soon as the user row is persisted and overwritten with the assistant
+  timestamp only when the assistant row is successfully persisted.
+- [ ] RF-B03-10: The response DTO returns the transcript slice needed by
   `/query` (created user message, optional assistant message with hydrated
   trace), never the raw provider payload.
 
@@ -79,6 +86,9 @@ export type AppendConversationMessageInput = {
 
 export type AppendConversationMessageOutput =
   | {
+      status: "not_found";
+    }
+  | {
       status: "answered" | "answered_no_evidence";
       userMessage: ConversationMessageResponse;
       assistantMessage: ConversationMessageResponse;
@@ -88,6 +98,17 @@ export type AppendConversationMessageOutput =
       userMessage: ConversationMessageResponse;
       errorCode: RagQueryRunErrorCode;
     };
+```
+
+```ts
+export type AnswerQuestionInput = {
+  question: string;
+  mode: "global";
+  retrieval?: RetrievalSettingsInput;
+  conversationContext?: {
+    transcript: string;
+  };
+};
 ```
 
 ```ts
@@ -126,10 +147,11 @@ Reuses:
 
 Tests must use real repositories with real Postgres (same pattern as F-05
 Block 03) plus a fake turn engine to inject each persisted-run status. They
-must cover: first-message title assignment, idempotent title on later
-messages, preserved transcript order, assistant linked to returned `traceId`,
-assistant row absent on failure, safe error DTO shape, and retrieval settings
-forwarded unchanged to `AnswerQuestion`.
+must cover: explicit `not_found`, first-message title assignment, idempotent
+title on later messages, preserved transcript order, assistant linked to
+returned `traceId`, assistant row absent on failure, `lastMessageAt` behavior
+for success and failure, and retrieval settings forwarded unchanged to
+`AnswerQuestion`.
 
 ## Done When
 
