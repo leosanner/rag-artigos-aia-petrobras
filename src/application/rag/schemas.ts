@@ -214,7 +214,88 @@ export type RagQueryRunDetailResponse = z.infer<
   typeof ragQueryRunDetailResponseSchema
 >;
 
+export const createConversationResponseSchema = z
+  .object({
+    id: z.string().uuid(),
+    title: z.string().nullable(),
+    createdAt: z.string().datetime({ offset: true }),
+    updatedAt: z.string().datetime({ offset: true }),
+    lastMessageAt: z.string().datetime({ offset: true }).nullable(),
+  })
+  .strip();
+
+export type CreateConversationResponse = z.infer<
+  typeof createConversationResponseSchema
+>;
+
+export const conversationMessageResponseSchema = z
+  .object({
+    id: z.string().uuid(),
+    role: z.enum(["user", "assistant"]),
+    content: z.string().min(1),
+    createdAt: z.string().datetime({ offset: true }),
+    trace: ragQueryRunDetailResponseSchema.nullable(),
+  })
+  .strip();
+
+export type ConversationMessageResponse = z.infer<
+  typeof conversationMessageResponseSchema
+>;
+
+export const conversationDetailResponseSchema =
+  createConversationResponseSchema.extend({
+    messages: z.array(conversationMessageResponseSchema),
+  });
+
+export type ConversationDetailResponse = z.infer<
+  typeof conversationDetailResponseSchema
+>;
+
+export const appendConversationMessageRequestSchema = z
+  .object({
+    content: z.string().trim().min(1),
+    retrievalSettings: ragRetrievalInputSchema.optional(),
+  })
+  .strict();
+
+export type AppendConversationMessageRequest = z.infer<
+  typeof appendConversationMessageRequestSchema
+>;
+
+export const appendConversationMessageResponseSchema = z.union([
+  z
+    .object({
+      status: z.enum(["answered", "answered_no_evidence"]),
+      userMessage: conversationMessageResponseSchema,
+      assistantMessage: conversationMessageResponseSchema,
+    })
+    .strip(),
+  z
+    .object({
+      status: z.enum(["generation_failed", "generation_unavailable"]),
+      userMessage: conversationMessageResponseSchema,
+      errorCode: z.enum(["generation_failed", "generation_unavailable"]),
+    })
+    .strip(),
+]);
+
+export type AppendConversationMessageResponse = z.infer<
+  typeof appendConversationMessageResponseSchema
+>;
+
 export const ragQueryRunIdParamSchema = z.string().uuid();
+
+export const conversationIdParamSchema = z.string().uuid();
+
+export const conversationNotFoundResponseSchema = z
+  .object({
+    error: z.literal("not_found"),
+  })
+  .strip();
+
+export type ConversationNotFoundResponse = z.infer<
+  typeof conversationNotFoundResponseSchema
+>;
 
 export const ragQueryRunInvalidIdResponseSchema = z
   .object({
