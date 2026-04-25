@@ -4,6 +4,7 @@ import {
   GENERATION_FAILURE_CODES,
   GenerationFailure,
   buildNoEvidenceAnswer,
+  isNoEvidenceAnswer,
   toSafeGenerationFailureCode,
 } from "./answer-rules";
 
@@ -12,6 +13,12 @@ describe("buildNoEvidenceAnswer", () => {
     expect(buildNoEvidenceAnswer()).toBe(
       "Não encontrei evidências suficientes nos documentos recuperados para responder com segurança.",
     );
+  });
+});
+
+describe("isNoEvidenceAnswer", () => {
+  it("matches the canonical insufficient-evidence answer", () => {
+    expect(isNoEvidenceAnswer(buildNoEvidenceAnswer())).toBe(true);
   });
 });
 
