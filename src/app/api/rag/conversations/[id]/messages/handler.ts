@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { NextResponse } from "next/server";
 
 import { isAuthorizedIngestionSyncRequest } from "@/application/ingestion/authorize-ingestion-sync";
@@ -11,6 +13,7 @@ import {
   ragTechnicalErrorResponseSchema,
   ragUnauthorizedResponseSchema,
 } from "@/application/rag/schemas";
+import { logRagError } from "@/infrastructure/observability/log-rag-error";
 
 import { toAppendConversationMessageHttpResponse } from "../../dto";
 
@@ -58,11 +61,14 @@ export function createRagConversationMessagesHandler(
       return invalidRequestResponse();
     }
 
+    const requestTraceId = randomUUID().slice(0, 8);
+
     try {
       const result = await deps.appendMessage.execute({
         conversationId: parsedId.data,
         userMessageContent: parsedBody.data.content,
         retrievalSettings: parsedBody.data.retrievalSettings,
+        requestTraceId,
       });
 
       if (result.status === "not_found") {
@@ -81,7 +87,12 @@ export function createRagConversationMessagesHandler(
         status,
         headers: NO_STORE_HEADERS,
       });
-    } catch {
+    } catch (error) {
+      logRagError(
+        "handler.append_message_failed",
+        { requestTraceId, conversationId: parsedId.data },
+        error,
+      );
       return technicalErrorResponse();
     }
   };

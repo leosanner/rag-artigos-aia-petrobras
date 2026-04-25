@@ -15,6 +15,7 @@ export type AppendConversationMessageInput = {
   conversationId: string;
   userMessageContent: string;
   retrievalSettings?: GlobalRagAskInput["retrieval"];
+  requestTraceId?: string;
 };
 
 export type AppendConversationMessageOutput =
@@ -112,6 +113,7 @@ export class AppendConversationMessage {
           previousStoredMessages,
         }),
       },
+      requestTraceId: input.requestTraceId,
     });
 
     if (turnResult.kind === "error") {

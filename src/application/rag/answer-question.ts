@@ -1,3 +1,4 @@
+import { logRagError } from "@/infrastructure/observability/log-rag-error";
 import {
   GenerationFailure,
   assertValidCitationMarkers,
@@ -97,6 +98,17 @@ export class AnswerQuestion {
       });
     } catch (error) {
       const failureCode = toApplicationFailureCode(error);
+      logRagError(
+        "answer.retrieval_failed",
+        {
+          requestTraceId: input.requestTraceId,
+          failureCode,
+          embeddingModel: this.retrieveChunks.embeddingModel,
+          retrievalStrategy: retrieval.strategy,
+          topK: retrieval.topK,
+        },
+        error,
+      );
       const embedding =
         error instanceof RetrieveChunksFailure && error.embedding !== null
           ? error.embedding
@@ -119,6 +131,7 @@ export class AnswerQuestion {
           relatedTerms,
           generation: null,
         }),
+        input.requestTraceId,
       );
 
       return answerQuestionResultSchema.parse({
@@ -147,6 +160,7 @@ export class AnswerQuestion {
           relatedTerms,
           generation: null,
         }),
+        input.requestTraceId,
       );
 
       return answerQuestionResultSchema.parse({
@@ -198,6 +212,17 @@ export class AnswerQuestion {
       }
     } catch (error) {
       const failureCode = toApplicationFailureCode(error);
+      logRagError(
+        "answer.generation_failed",
+        {
+          requestTraceId: input.requestTraceId,
+          failureCode,
+          generationModel: this.generationModel,
+          promptVersion: this.promptVersion,
+          sourcesCount: sources.length,
+        },
+        error,
+      );
       const audit = this.buildAudit(startedAtMs, embedding, generation);
 
       await this.persistRun(
@@ -212,6 +237,7 @@ export class AnswerQuestion {
           relatedTerms,
           generation,
         }),
+        input.requestTraceId,
       );
 
       return answerQuestionResultSchema.parse({
@@ -233,6 +259,7 @@ export class AnswerQuestion {
         relatedTerms,
         generation,
       }),
+      input.requestTraceId,
     );
 
     return answerQuestionResultSchema.parse({
@@ -316,10 +343,16 @@ export class AnswerQuestion {
 
   private async persistRun(
     input: PersistRagQueryRunInput,
+    requestTraceId: string | undefined,
   ): Promise<{ id: string; createdAt: Date }> {
     try {
       return await this.runsRepository.create(input);
     } catch (error) {
+      logRagError(
+        "answer.trace_persistence_failed",
+        { requestTraceId, status: input.status },
+        error,
+      );
       throw new TracePersistenceFailure(error);
     }
   }

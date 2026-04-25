@@ -127,6 +127,7 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
         topK: 8,
         strategy: "explore",
       },
+      requestTraceId: expect.any(String),
     });
   });
 
@@ -225,7 +226,7 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
     );
   });
 
-  it("returns 500 with a sanitized body on unexpected failure", async () => {
+  it("returns 500 with a sanitized body on unexpected failure and logs structured details", async () => {
     const appendMessage: Pick<AppendConversationMessage, "execute"> = {
       execute: vi.fn().mockRejectedValue(new Error("raw provider body")),
     };
@@ -233,6 +234,7 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
       appendMessage,
       secret: VALID_SECRET,
     });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const response = await handler(
       post({ content: "Pergunta" }, { Authorization: `Bearer ${VALID_SECRET}` }),
@@ -243,5 +245,17 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
     expect(response.status).toBe(500);
     expect(text).toBe(JSON.stringify({ error: "technical_error" }));
     expect(text).not.toContain("provider");
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(errorSpy.mock.calls[0]![0] as string) as Record<
+      string,
+      unknown
+    >;
+    expect(payload.event).toBe("handler.append_message_failed");
+    expect(payload.scope).toBe("rag");
+    expect(payload.conversationId).toBe(CONVERSATION_ID);
+    expect(typeof payload.requestTraceId).toBe("string");
+
+    errorSpy.mockRestore();
   });
 });

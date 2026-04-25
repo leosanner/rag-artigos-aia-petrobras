@@ -42,6 +42,7 @@ export type AnswerQuestionConversationContext = {
 };
 export type AnswerQuestionInput = GlobalRagAskInput & {
   conversationContext?: AnswerQuestionConversationContext;
+  requestTraceId?: string;
 };
 
 const ragSourceShape = {
