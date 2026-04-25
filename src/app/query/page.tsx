@@ -26,11 +26,15 @@ import {
 } from "@/domain/rag";
 
 import {
+  formatTechnicalErrorMessage,
   RAG_EMPTY_SOURCES_MESSAGE,
+  RAG_GENERATION_FAILED_MESSAGE,
+  RAG_GENERATION_UNAVAILABLE_MESSAGE,
   RAG_HISTORY_EMPTY_MESSAGE,
   RAG_HISTORY_ERROR_MESSAGE,
   RAG_HISTORY_IDLE_MESSAGE,
   RAG_INVALID_REQUEST_MESSAGE,
+  RAG_NETWORK_ERROR_MESSAGE,
   RAG_NO_GENERATION_AUDIT_MESSAGE,
   RAG_RUN_DETAIL_ERROR_MESSAGE,
   RAG_RUN_DETAIL_IDLE_MESSAGE,
@@ -52,7 +56,7 @@ type AskState =
   | { kind: "submitting"; strategy: QuerySubmissionStrategy }
   | { kind: "invalid_request" }
   | { kind: "unauthorized" }
-  | { kind: "technical_error" };
+  | { kind: "technical_error"; message: string };
 
 type LoadErrorKind = "unauthorized" | "technical";
 
@@ -246,7 +250,8 @@ export default function QueryPage() {
     );
 
     if (response.kind === "network_error") {
-      setAskState({ kind: "technical_error" });
+      console.error("[rag/query]", { phase: "submitQuestion", kind: "network_error" });
+      setAskState({ kind: "technical_error", message: RAG_NETWORK_ERROR_MESSAGE });
       return;
     }
 
@@ -256,7 +261,16 @@ export default function QueryPage() {
       );
 
       if (!parsed.success) {
-        setAskState({ kind: "technical_error" });
+        console.error("[rag/query]", {
+          phase: "submitQuestion",
+          status: response.status,
+          body: response.body,
+          parseError: true,
+        });
+        setAskState({
+          kind: "technical_error",
+          message: formatTechnicalErrorMessage(response.status),
+        });
         return;
       }
 
@@ -264,7 +278,15 @@ export default function QueryPage() {
         parsed.data.status !== "answered" &&
         parsed.data.status !== "answered_no_evidence"
       ) {
-        setAskState({ kind: "technical_error" });
+        console.error("[rag/query]", {
+          phase: "submitQuestion",
+          status: response.status,
+          body: response.body,
+        });
+        setAskState({
+          kind: "technical_error",
+          message: formatTechnicalErrorMessage(response.status),
+        });
         return;
       }
 
@@ -280,30 +302,61 @@ export default function QueryPage() {
 
     if (response.status === 400) {
       const parsed = ragInvalidRequestResponseSchema.safeParse(response.body);
+      console.error("[rag/query]", {
+        phase: "submitQuestion",
+        status: response.status,
+        body: response.body,
+      });
       setAskState(
         parsed.success
           ? { kind: "invalid_request" }
-          : { kind: "technical_error" },
+          : {
+              kind: "technical_error",
+              message: formatTechnicalErrorMessage(response.status),
+            },
       );
       return;
     }
 
     if (response.status === 401) {
       const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
+      console.error("[rag/query]", {
+        phase: "submitQuestion",
+        status: response.status,
+        body: response.body,
+      });
       clearSecret();
-      setAskState(
-        parsed.success ? { kind: "unauthorized" } : { kind: "technical_error" },
-      );
+      if (parsed.success) {
+        setAskState({ kind: "unauthorized" });
+        setConversationState((current) => ({
+          ...current,
+          status: current.conversation ? "loaded" : "idle",
+          error: "unauthorized",
+        }));
+      } else {
+        setAskState({
+          kind: "technical_error",
+          message: formatTechnicalErrorMessage(response.status),
+        });
+      }
       return;
     }
 
     if (response.status === 404) {
+      console.error("[rag/query]", {
+        phase: "submitQuestion",
+        status: response.status,
+        body: response.body,
+      });
       setConversationState({
         status: "error",
         conversation: null,
         error: "not_found",
       });
-      setAskState({ kind: "technical_error" });
+      setAskState({
+        kind: "technical_error",
+        message: formatTechnicalErrorMessage(response.status),
+      });
       return;
     }
 
@@ -316,11 +369,34 @@ export default function QueryPage() {
         appendTranscriptMessages([parsed.data.userMessage]);
       }
 
-      setAskState({ kind: "technical_error" });
+      console.error("[rag/query]", {
+        phase: "submitQuestion",
+        status: response.status,
+        body: response.body,
+      });
+
+      const errorCode =
+        parsed.success && "errorCode" in parsed.data ? parsed.data.errorCode : null;
+      const message =
+        errorCode === "generation_failed"
+          ? RAG_GENERATION_FAILED_MESSAGE
+          : errorCode === "generation_unavailable"
+            ? RAG_GENERATION_UNAVAILABLE_MESSAGE
+            : formatTechnicalErrorMessage(response.status);
+
+      setAskState({ kind: "technical_error", message });
       return;
     }
 
-    setAskState({ kind: "technical_error" });
+    console.error("[rag/query]", {
+      phase: "submitQuestion",
+      status: response.status,
+      body: response.body,
+    });
+    setAskState({
+      kind: "technical_error",
+      message: formatTechnicalErrorMessage(response.status),
+    });
   }
 
   async function ensureConversation(): Promise<string | null> {
@@ -353,12 +429,19 @@ export default function QueryPage() {
     });
 
     if (response.kind === "network_error") {
+      console.error("[rag/query]", {
+        phase: "createConversation",
+        kind: "network_error",
+      });
       setConversationState({
         status: "error",
         conversation: null,
         error: "technical",
       });
-      setAskState({ kind: "technical_error" });
+      setAskState({
+        kind: "technical_error",
+        message: RAG_NETWORK_ERROR_MESSAGE,
+      });
       return null;
     }
 
@@ -366,12 +449,21 @@ export default function QueryPage() {
       const parsed = createConversationResponseSchema.safeParse(response.body);
 
       if (!parsed.success) {
+        console.error("[rag/query]", {
+          phase: "createConversation",
+          status: response.status,
+          body: response.body,
+          parseError: true,
+        });
         setConversationState({
           status: "error",
           conversation: null,
           error: "technical",
         });
-        setAskState({ kind: "technical_error" });
+        setAskState({
+          kind: "technical_error",
+          message: formatTechnicalErrorMessage(response.status),
+        });
         return null;
       }
 
@@ -394,19 +486,47 @@ export default function QueryPage() {
 
     if (response.status === 401) {
       const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
+      console.error("[rag/query]", {
+        phase: "createConversation",
+        status: response.status,
+        body: response.body,
+      });
       clearSecret();
-      setAskState(
-        parsed.success ? { kind: "unauthorized" } : { kind: "technical_error" },
-      );
+      if (parsed.success) {
+        setAskState({ kind: "unauthorized" });
+        setConversationState({
+          status: "idle",
+          conversation: null,
+          error: "unauthorized",
+        });
+      } else {
+        setConversationState({
+          status: "idle",
+          conversation: null,
+          error: "technical",
+        });
+        setAskState({
+          kind: "technical_error",
+          message: formatTechnicalErrorMessage(response.status),
+        });
+      }
       return null;
     }
 
+    console.error("[rag/query]", {
+      phase: "createConversation",
+      status: response.status,
+      body: response.body,
+    });
     setConversationState({
       status: "error",
       conversation: null,
       error: "technical",
     });
-    setAskState({ kind: "technical_error" });
+    setAskState({
+      kind: "technical_error",
+      message: formatTechnicalErrorMessage(response.status),
+    });
     return null;
   }
 
@@ -438,6 +558,10 @@ export default function QueryPage() {
     });
 
     if (response.kind === "network_error") {
+      console.error("[rag/query]", {
+        phase: "loadConversation",
+        kind: "network_error",
+      });
       setConversationState({
         status: "error",
         conversation: null,
@@ -450,6 +574,12 @@ export default function QueryPage() {
       const parsed = conversationDetailResponseSchema.safeParse(response.body);
 
       if (!parsed.success) {
+        console.error("[rag/query]", {
+          phase: "loadConversation",
+          status: response.status,
+          body: response.body,
+          parseError: true,
+        });
         setConversationState({
           status: "error",
           conversation: null,
@@ -471,6 +601,11 @@ export default function QueryPage() {
 
     if (response.status === 401) {
       const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
+      console.error("[rag/query]", {
+        phase: "loadConversation",
+        status: response.status,
+        body: response.body,
+      });
       clearSecret();
       setConversationState({
         status: "error",
@@ -481,6 +616,11 @@ export default function QueryPage() {
     }
 
     if (response.status === 404) {
+      console.error("[rag/query]", {
+        phase: "loadConversation",
+        status: response.status,
+        body: response.body,
+      });
       setConversationState({
         status: "error",
         conversation: null,
@@ -489,6 +629,11 @@ export default function QueryPage() {
       return;
     }
 
+    console.error("[rag/query]", {
+      phase: "loadConversation",
+      status: response.status,
+      body: response.body,
+    });
     setConversationState({
       status: "error",
       conversation: null,
@@ -562,6 +707,10 @@ export default function QueryPage() {
     });
 
     if (response.kind === "network_error") {
+      console.error("[rag/query]", {
+        phase: "loadRecentRuns",
+        kind: "network_error",
+      });
       setRecentRunsState((current) => ({
         ...current,
         status: "error",
@@ -574,6 +723,12 @@ export default function QueryPage() {
       const parsed = ragQueryRunSummariesResponseSchema.safeParse(response.body);
 
       if (!parsed.success) {
+        console.error("[rag/query]", {
+          phase: "loadRecentRuns",
+          status: response.status,
+          body: response.body,
+          parseError: true,
+        });
         setRecentRunsState((current) => ({
           ...current,
           status: "error",
@@ -592,6 +747,11 @@ export default function QueryPage() {
 
     if (response.status === 401) {
       const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
+      console.error("[rag/query]", {
+        phase: "loadRecentRuns",
+        status: response.status,
+        body: response.body,
+      });
       const error = parsed.success ? "unauthorized" : "technical";
       clearSecret();
       setRecentRunsState({
@@ -602,6 +762,11 @@ export default function QueryPage() {
       return;
     }
 
+    console.error("[rag/query]", {
+      phase: "loadRecentRuns",
+      status: response.status,
+      body: response.body,
+    });
     setRecentRunsState((current) => ({
       ...current,
       status: "error",
@@ -630,6 +795,10 @@ export default function QueryPage() {
     });
 
     if (response.kind === "network_error") {
+      console.error("[rag/query]", {
+        phase: "loadRunDetail",
+        kind: "network_error",
+      });
       setSelectedRunState({
         status: "error",
         run: null,
@@ -643,6 +812,12 @@ export default function QueryPage() {
       const parsed = ragQueryRunDetailResponseSchema.safeParse(response.body);
 
       if (!parsed.success) {
+        console.error("[rag/query]", {
+          phase: "loadRunDetail",
+          status: response.status,
+          body: response.body,
+          parseError: true,
+        });
         setSelectedRunState({
           status: "error",
           run: null,
@@ -663,6 +838,11 @@ export default function QueryPage() {
 
     if (response.status === 401) {
       const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
+      console.error("[rag/query]", {
+        phase: "loadRunDetail",
+        status: response.status,
+        body: response.body,
+      });
       const error = parsed.success ? "unauthorized" : "technical";
       clearSecret();
       setRecentRunsState({
@@ -679,6 +859,11 @@ export default function QueryPage() {
       return;
     }
 
+    console.error("[rag/query]", {
+      phase: "loadRunDetail",
+      status: response.status,
+      body: response.body,
+    });
     setSelectedRunState({
       status: "error",
       run: null,
@@ -841,7 +1026,7 @@ export default function QueryPage() {
             ) : null}
 
             {askState.kind === "technical_error" ? (
-              <StatusAlert kind="technical" message={RAG_TECHNICAL_ERROR_MESSAGE} />
+              <StatusAlert kind="technical" message={askState.message} />
             ) : null}
 
             <form onSubmit={onSubmit} className={styles.composer}>

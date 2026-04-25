@@ -9,6 +9,20 @@ export const RAG_UNAUTHORIZED_MESSAGE =
 export const RAG_TECHNICAL_ERROR_MESSAGE =
   "Nao foi possivel consultar a base agora. Tente novamente em instantes.";
 
+export const RAG_GENERATION_FAILED_MESSAGE =
+  "A geracao da resposta falhou. Tente reformular a pergunta ou tentar novamente.";
+
+export const RAG_GENERATION_UNAVAILABLE_MESSAGE =
+  "Servico de geracao indisponivel no momento. Aguarde alguns instantes e tente de novo.";
+
+export const RAG_NETWORK_ERROR_MESSAGE =
+  "Falha de rede ao falar com o servidor. Verifique a conexao e tente novamente.";
+
+export function formatTechnicalErrorMessage(httpStatus: number | null): string {
+  const tail = httpStatus === null ? "" : ` [HTTP ${httpStatus}]`;
+  return `Erro tecnico ao consultar a base.${tail} Tente novamente em instantes.`;
+}
+
 export const RAG_EMPTY_SOURCES_MESSAGE =
   "Nenhuma fonte foi recuperada para esta pergunta.";
 
