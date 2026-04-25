@@ -7,6 +7,7 @@ import {
   extractCitationNumbers,
   extractRelatedTerms,
   getCandidateTopK,
+  isNoEvidenceAnswer,
   normalizeRetrievalSettings,
   toSafeGenerationFailureCode,
   type RagRetrievalSettings,
@@ -197,10 +198,11 @@ export class AnswerQuestion {
       });
       generation = result.usage;
 
-      answer =
-        result.answer.trim() === NO_EVIDENCE_ANSWER
-          ? NO_EVIDENCE_ANSWER
-          : result.answer;
+      const generatedAnswer = result.answer.trim();
+
+      answer = isNoEvidenceAnswer(generatedAnswer)
+        ? NO_EVIDENCE_ANSWER
+        : generatedAnswer;
 
       citedSourceNumbers =
         answer === NO_EVIDENCE_ANSWER
