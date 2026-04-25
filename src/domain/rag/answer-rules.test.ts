@@ -20,6 +20,25 @@ describe("isNoEvidenceAnswer", () => {
   it("matches the canonical insufficient-evidence answer", () => {
     expect(isNoEvidenceAnswer(buildNoEvidenceAnswer())).toBe(true);
   });
+
+  it("matches equivalent variants after normalizing case, accents, spacing, and ending punctuation", () => {
+    const variants = [
+      "nao encontrei evidencias suficientes nos documentos recuperados para responder com seguranca",
+      "  NÃO ENCONTREI EVIDÊNCIAS SUFICIENTES NOS DOCUMENTOS RECUPERADOS PARA RESPONDER COM SEGURANÇA! ",
+      "Não   encontrei evidências suficientes nos documentos recuperados para responder com segurança???",
+    ];
+
+    expect(variants.map(isNoEvidenceAnswer)).toEqual([true, true, true]);
+  });
+
+  it("rejects nearby but non-canonical wording", () => {
+    const negatives = [
+      "Não encontrei evidências suficientes para responder com segurança.",
+      "Resposta sem citação.",
+    ];
+
+    expect(negatives.map(isNoEvidenceAnswer)).toEqual([false, false]);
+  });
 });
 
 describe("GENERATION_FAILURE_CODES", () => {
