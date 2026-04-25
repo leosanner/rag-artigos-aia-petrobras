@@ -105,6 +105,7 @@ describe("OpenAiEmbeddingProvider", () => {
   });
 
   it("wraps raw provider failures without leaking provider details", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const provider = new OpenAiEmbeddingProvider({
       model: MODEL,
       embeddingDimensions: EMBEDDING_DIMENSIONS,
@@ -115,5 +116,13 @@ describe("OpenAiEmbeddingProvider", () => {
     await expect(provider.embedMany(["a"])).rejects.toMatchObject(
       new EmbeddingProviderError("embedding_failed"),
     );
+
+    const payload = JSON.parse(errorSpy.mock.calls[0]![0] as string) as Record<
+      string,
+      unknown
+    >;
+    expect(payload.event).toBe("ai.embedding_provider_failed");
+    expect(payload.model).toBe(MODEL);
+    errorSpy.mockRestore();
   });
 });

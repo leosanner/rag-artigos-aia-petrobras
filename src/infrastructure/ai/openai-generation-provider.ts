@@ -7,6 +7,7 @@ import type {
 } from "@/application/rag/ports";
 import { GenerationFailure, type RagRetrievalStrategy } from "@/domain/rag";
 import type { ServerEnv } from "@/env/server";
+import { logRagError } from "@/infrastructure/observability/log-rag-error";
 
 import { estimateOpenAiGenerationCostUsd } from "./openai-pricing";
 
@@ -111,6 +112,15 @@ export class OpenAiGenerationProvider implements GenerationProvider {
         },
       };
     } catch (error) {
+      logRagError(
+        "ai.generation_provider_failed",
+        {
+          model: generationModel,
+          promptVersion: input.promptVersion,
+          retrievalStrategy: input.retrievalStrategy,
+        },
+        error,
+      );
       throw new GenerationFailure(
         classifyGenerationFailure(error),
         classifyGenerationFailure(error),

@@ -223,6 +223,7 @@ describe("OpenAiGenerationProvider", () => {
   });
 
   it("maps transient provider failures to a sanitized generation_unavailable error", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const provider = new OpenAiGenerationProvider({
       defaultGenerationModel: GENERATION_MODEL,
       modelFactory: vi.fn().mockReturnValue({}),
@@ -244,9 +245,13 @@ describe("OpenAiGenerationProvider", () => {
       code: "generation_unavailable",
       message: "generation_unavailable",
     });
+
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 
   it("maps generic raw provider failures to sanitized generation_failed", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const provider = new OpenAiGenerationProvider({
       defaultGenerationModel: GENERATION_MODEL,
       modelFactory: vi.fn().mockReturnValue({}),
@@ -267,6 +272,14 @@ describe("OpenAiGenerationProvider", () => {
       code: "generation_failed",
       message: "generation_failed",
     });
+
+    const payload = JSON.parse(errorSpy.mock.calls[0]![0] as string) as Record<
+      string,
+      unknown
+    >;
+    expect(payload.event).toBe("ai.generation_provider_failed");
+    expect(payload.model).toBe(GENERATION_MODEL);
+    errorSpy.mockRestore();
   });
 
   it("creates the provider from validated env with explicit api-key wiring", async () => {

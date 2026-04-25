@@ -5,6 +5,7 @@ import type { EmbeddingProvider } from "@/application/indexing/ports";
 import type { QuestionEmbeddingProvider } from "@/application/rag/ports";
 import { IndexingError, type IndexingErrorCode } from "@/domain/indexing/errors";
 import type { ServerEnv } from "@/env/server";
+import { logRagError } from "@/infrastructure/observability/log-rag-error";
 
 import { estimateOpenAiEmbeddingCostUsd } from "./openai-pricing";
 
@@ -103,7 +104,12 @@ export class OpenAiEmbeddingProvider
         model: this.modelFactory(this.model),
         values: texts,
       });
-    } catch {
+    } catch (error) {
+      logRagError(
+        "ai.embedding_provider_failed",
+        { model: this.model, valuesCount: texts.length },
+        error,
+      );
       throw new EmbeddingProviderError("embedding_failed");
     }
 
