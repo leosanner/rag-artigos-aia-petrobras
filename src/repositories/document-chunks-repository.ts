@@ -5,6 +5,7 @@ import { cosineDistance } from "drizzle-orm/sql/functions/vector";
 import * as schema from "@/db/schema";
 import { documentChunks, documents, type DocumentChunk } from "@/db/schema";
 import type { RetrievedChunkMatch } from "@/domain/rag";
+import { logRagError } from "@/infrastructure/observability/log-rag-error";
 
 type DatabaseClient = NodePgDatabase<typeof schema>;
 
@@ -66,33 +67,47 @@ export class DocumentChunksRepository {
     );
     const score = sql<number>`1 - (${distance})`;
 
-    return this.db
-      .select({
-        chunkId: documentChunks.id,
-        documentId: documentChunks.documentId,
-        documentTitle: documents.title,
-        chunkIndex: documentChunks.chunkIndex,
-        excerpt: documentChunks.content,
-        score,
-        documentPipelineVersion: documents.pipelineVersion,
-        chunkingVersion: documentChunks.chunkingVersion,
-        embeddingModel: documentChunks.embeddingModel,
-      })
-      .from(documentChunks)
-      .innerJoin(documents, eq(documentChunks.documentId, documents.id))
-      .where(
-        and(
-          eq(documents.status, "processed"),
-          eq(documentChunks.chunkingVersion, input.chunkingVersion),
-          eq(documentChunks.embeddingModel, input.embeddingModel),
-        ),
-      )
-      .orderBy(
-        desc(score),
-        asc(documentChunks.documentId),
-        asc(documentChunks.chunkIndex),
-      )
-      .limit(input.topK);
+    try {
+      return await this.db
+        .select({
+          chunkId: documentChunks.id,
+          documentId: documentChunks.documentId,
+          documentTitle: documents.title,
+          chunkIndex: documentChunks.chunkIndex,
+          excerpt: documentChunks.content,
+          score,
+          documentPipelineVersion: documents.pipelineVersion,
+          chunkingVersion: documentChunks.chunkingVersion,
+          embeddingModel: documentChunks.embeddingModel,
+        })
+        .from(documentChunks)
+        .innerJoin(documents, eq(documentChunks.documentId, documents.id))
+        .where(
+          and(
+            eq(documents.status, "processed"),
+            eq(documentChunks.chunkingVersion, input.chunkingVersion),
+            eq(documentChunks.embeddingModel, input.embeddingModel),
+          ),
+        )
+        .orderBy(
+          desc(score),
+          asc(documentChunks.documentId),
+          asc(documentChunks.chunkIndex),
+        )
+        .limit(input.topK);
+    } catch (error) {
+      logRagError(
+        "retrieval.pgvector_query_failed",
+        {
+          embeddingDimensions: input.queryEmbedding.length,
+          embeddingModel: input.embeddingModel,
+          chunkingVersion: input.chunkingVersion,
+          topK: input.topK,
+        },
+        error,
+      );
+      throw error;
+    }
   }
 
   async deleteDocumentChunksForConfig(
