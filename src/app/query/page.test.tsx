@@ -793,7 +793,9 @@ describe("/query page", () => {
       clickSubmit();
     });
 
-    expect(screen.getByText(/secret de consulta foi rejeitado/i)).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/secret de consulta foi rejeitado/i).length,
+    ).toBeGreaterThanOrEqual(1);
 
     cleanup();
     vi.unstubAllGlobals();
@@ -825,9 +827,88 @@ describe("/query page", () => {
 
     expect(
       screen.getByText(
-        /nao foi possivel consultar a base agora\. tente novamente em instantes\./i,
+        /a geracao da resposta falhou\. tente reformular a pergunta ou tentar novamente\./i,
       ),
     ).toBeInTheDocument();
+  });
+
+  it("shows the dedicated generation_unavailable message on 503", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          status: "generation_unavailable",
+          userMessage: appendResponseFromAsk(SUCCESS_RESPONSE, "Pergunta indisp").userMessage,
+          errorCode: "generation_unavailable",
+        },
+        { status: 503 },
+      ),
+    );
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Pergunta indisp");
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    expect(
+      screen.getByText(/servico de geracao indisponivel no momento/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the HTTP status tail on unknown server errors", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: "boom" }, { status: 500 }));
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Pergunta com 500");
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    expect(screen.getByText(/\[HTTP 500\]/)).toBeInTheDocument();
+  });
+
+  it("shows the dedicated network-error message when fetch rejects", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }));
+    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Pergunta offline");
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    expect(
+      screen.getByText(/falha de rede ao falar com o servidor/i),
+    ).toBeInTheDocument();
+  });
+
+  it("surfaces 401 from createConversation in the chat panel and unsticks loading", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "unauthorized" }, { status: 401 }),
+    );
+    sessionStorage.setItem("query:secret", SECRET);
+
+    render(<QueryPage />);
+
+    await act(async () => {
+      clickNewConversation();
+    });
+
+    const alerts = screen.getAllByRole("alert");
+    const unauthorizedAlerts = alerts.filter((alert) =>
+      /secret de consulta foi rejeitado/i.test(alert.textContent ?? ""),
+    );
+    expect(unauthorizedAlerts.length).toBeGreaterThanOrEqual(2);
+
+    expect(screen.queryByText(/carregando conversa\.\.\./i)).not.toBeInTheDocument();
   });
 
   it("persists the secret in sessionStorage and lets the user clear it", () => {
