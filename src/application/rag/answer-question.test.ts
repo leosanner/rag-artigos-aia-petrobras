@@ -449,6 +449,54 @@ describe("AnswerQuestion", () => {
     );
   });
 
+  it("canonicalizes equivalent insufficient-evidence wording from generation as an answered run when sources exist", async () => {
+    const { service, runsRepository, generationUsage, matches } = createService({
+      answer:
+        "  nao encontrei evidencias suficientes nos documentos recuperados para responder com seguranca! ",
+    });
+    const question = "Há evidências suficientes para concluir algo?";
+
+    const result = await service.execute({
+      question,
+      mode: "global",
+    });
+
+    expect(result).toMatchObject({
+      kind: "answered",
+      status: "answered",
+      traceId: CREATED_RUN_ID,
+      answer: buildNoEvidenceAnswer(),
+      mode: "global",
+      sources: [
+        expect.objectContaining({ sourceNumber: 1 }),
+        expect.objectContaining({ sourceNumber: 2 }),
+      ],
+    });
+    expect(runsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "answered",
+        errorCode: null,
+        answer: buildNoEvidenceAnswer(),
+        sources: [
+          {
+            sourceNumber: 1,
+            ...matches[0],
+            citedInAnswer: false,
+          },
+          {
+            sourceNumber: 2,
+            ...matches[1],
+            citedInAnswer: false,
+          },
+        ],
+        generationInputTokens: generationUsage.inputTokens,
+        generationOutputTokens: generationUsage.outputTokens,
+        generationTotalTokens: generationUsage.totalTokens,
+        generationCostUsd: generationUsage.estimatedCostUsd,
+      }),
+    );
+  });
+
   it("persists a failed run with provider usage metrics when citation validation fails after generation", async () => {
     const generationUsage = buildGenerationUsage({
       inputTokens: 200,
