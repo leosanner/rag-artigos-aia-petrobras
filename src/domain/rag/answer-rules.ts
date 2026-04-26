@@ -5,8 +5,14 @@ export const GENERATION_FAILURE_CODES = Object.freeze([
 
 export type GenerationFailureCode = (typeof GENERATION_FAILURE_CODES)[number];
 const NO_EVIDENCE_ANSWER =
-  "Não encontrei evidências suficientes nos documentos recuperados para responder com segurança.";
+  "Não encontrei nada relacionado a essa pergunta na base de dados.";
 const NORMALIZED_NO_EVIDENCE_ANSWER = normalizeNoEvidenceAnswer(NO_EVIDENCE_ANSWER);
+const LEGACY_NO_EVIDENCE_ANSWERS = new Set([
+  "Não encontrei nada relacionado a essa pergunta na base.",
+  "Não encontrei nada relacionado a essa pergunta na base de dados consultada.",
+  "Não achei nada relacionado a essa pergunta na base de dados.",
+  "Não encontrei evidências suficientes nos documentos recuperados para responder com segurança.",
+].map(normalizeNoEvidenceAnswer));
 
 export class GenerationFailure extends Error {
   readonly code: GenerationFailureCode;
@@ -23,7 +29,12 @@ export function buildNoEvidenceAnswer(): string {
 }
 
 export function isNoEvidenceAnswer(answer: string): boolean {
-  return normalizeNoEvidenceAnswer(answer) === NORMALIZED_NO_EVIDENCE_ANSWER;
+  const normalizedAnswer = normalizeNoEvidenceAnswer(answer);
+
+  return (
+    normalizedAnswer === NORMALIZED_NO_EVIDENCE_ANSWER ||
+    LEGACY_NO_EVIDENCE_ANSWERS.has(normalizedAnswer)
+  );
 }
 
 export function toSafeGenerationFailureCode(

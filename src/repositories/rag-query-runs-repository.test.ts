@@ -237,8 +237,7 @@ describe("RagQueryRunsRepository", () => {
 
   it("persists an answered_no_evidence run without sources and maps null generation audit to null", async () => {
     const input = buildPersistInput({
-      answer:
-        "Nao encontrou evidencias suficientes nos documentos recuperados para responder com seguranca.",
+      answer: "Nao encontrei nada relacionado a essa pergunta na base de dados.",
       status: "answered_no_evidence",
       sources: [],
       relatedTerms: [

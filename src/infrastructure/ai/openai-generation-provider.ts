@@ -5,7 +5,11 @@ import type {
   GenerateAnswerInput,
   GenerationProvider,
 } from "@/application/rag/ports";
-import { GenerationFailure, type RagRetrievalStrategy } from "@/domain/rag";
+import {
+  GenerationFailure,
+  buildNoEvidenceAnswer,
+  type RagRetrievalStrategy,
+} from "@/domain/rag";
 import type { ServerEnv } from "@/env/server";
 import { logRagError } from "@/infrastructure/observability/log-rag-error";
 
@@ -158,7 +162,7 @@ function buildSystemPrompt(
     "Use apenas o contexto numerado fornecido como base factual da resposta.",
     "Toda afirmação factual apoiada nas fontes deve usar marcadores inline no formato [n].",
     "Nunca invente fontes, trechos ou citações.",
-    'Se o contexto não sustentar a resposta, diga claramente que "não encontrou evidências suficientes" nos documentos recuperados.',
+    `Se o contexto não sustentar a resposta, responda exatamente com: "${buildNoEvidenceAnswer()}".`,
   ];
 
   if (retrievalStrategy === "explore") {

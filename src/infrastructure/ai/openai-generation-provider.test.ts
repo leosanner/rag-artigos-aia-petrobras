@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { buildNoEvidenceAnswer } from "@/domain/rag";
+
 import {
   OpenAiGenerationProvider,
   createOpenAiGenerationProviderFromEnv,
@@ -70,9 +72,7 @@ describe("OpenAiGenerationProvider", () => {
     );
     expect(generateText).toHaveBeenCalledWith(
       expect.objectContaining({
-        system: expect.stringContaining(
-          "não encontrou evidências suficientes",
-        ),
+        system: expect.stringContaining(buildNoEvidenceAnswer()),
       }),
     );
     expect(generateText).toHaveBeenCalledWith(

@@ -11,7 +11,7 @@ import {
 describe("buildNoEvidenceAnswer", () => {
   it("returns the exact formal Portuguese insufficient-evidence answer", () => {
     expect(buildNoEvidenceAnswer()).toBe(
-      "Não encontrei evidências suficientes nos documentos recuperados para responder com segurança.",
+      "Não encontrei nada relacionado a essa pergunta na base de dados.",
     );
   });
 });
@@ -23,9 +23,19 @@ describe("isNoEvidenceAnswer", () => {
 
   it("matches equivalent variants after normalizing case, accents, spacing, and ending punctuation", () => {
     const variants = [
-      "nao encontrei evidencias suficientes nos documentos recuperados para responder com seguranca",
-      "  NÃO ENCONTREI EVIDÊNCIAS SUFICIENTES NOS DOCUMENTOS RECUPERADOS PARA RESPONDER COM SEGURANÇA! ",
-      "Não   encontrei evidências suficientes nos documentos recuperados para responder com segurança???",
+      "nao encontrei nada relacionado a essa pergunta na base de dados",
+      "  NÃO ENCONTREI NADA RELACIONADO A ESSA PERGUNTA NA BASE DE DADOS! ",
+      "Não   encontrei nada relacionado a essa pergunta na base de dados???",
+    ];
+
+    expect(variants.map(isNoEvidenceAnswer)).toEqual([true, true, true]);
+  });
+
+  it("matches approved legacy no-evidence wording so older prompt outputs do not become errors", () => {
+    const variants = [
+      "Não encontrei nada relacionado a essa pergunta na base.",
+      "Não encontrei nada relacionado a essa pergunta na base de dados consultada.",
+      "Não encontrei evidências suficientes nos documentos recuperados para responder com segurança.",
     ];
 
     expect(variants.map(isNoEvidenceAnswer)).toEqual([true, true, true]);
@@ -33,7 +43,7 @@ describe("isNoEvidenceAnswer", () => {
 
   it("rejects nearby but non-canonical wording", () => {
     const negatives = [
-      "Não encontrei evidências suficientes para responder com segurança.",
+      "Não encontrei nada relacionado a essa pergunta.",
       "Resposta sem citação.",
     ];
 
