@@ -200,9 +200,41 @@ export class AnswerQuestion {
 
       const generatedAnswer = result.answer.trim();
 
-      answer = isNoEvidenceAnswer(generatedAnswer)
-        ? NO_EVIDENCE_ANSWER
-        : generatedAnswer;
+      if (isNoEvidenceAnswer(generatedAnswer)) {
+        const noEvidenceRelatedTerms = extractRelatedTerms({
+          question: input.question,
+          sourceExcerpts: [],
+        });
+        const audit = this.buildAudit(startedAtMs, embedding, generation);
+        const persisted = await this.persistRun(
+          this.buildPersistInput({
+            question: input.question,
+            answer: NO_EVIDENCE_ANSWER,
+            status: "answered_no_evidence",
+            errorCode: null,
+            metadata,
+            audit,
+            sources: [],
+            relatedTerms: noEvidenceRelatedTerms,
+            generation,
+          }),
+          input.requestTraceId,
+        );
+
+        return answerQuestionResultSchema.parse({
+          kind: "answered",
+          status: "answered_no_evidence",
+          traceId: persisted.id,
+          answer: NO_EVIDENCE_ANSWER,
+          mode: "global",
+          sources: [],
+          relatedTerms: noEvidenceRelatedTerms,
+          metadata,
+          audit,
+        });
+      }
+
+      answer = generatedAnswer;
 
       citedSourceNumbers =
         answer === NO_EVIDENCE_ANSWER

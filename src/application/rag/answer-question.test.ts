@@ -402,11 +402,15 @@ describe("AnswerQuestion", () => {
     );
   });
 
-  it("accepts the canonical insufficient-evidence answer from generation as an answered run when sources exist", async () => {
+  it("returns answered_no_evidence with empty sources when generation says nothing is related to the base", async () => {
     const { service, runsRepository, generationUsage, matches } = createService({
       answer: buildNoEvidenceAnswer(),
     });
     const question = "Há evidências suficientes para concluir algo?";
+    const expectedRelatedTerms = extractRelatedTerms({
+      question,
+      sourceExcerpts: [],
+    });
 
     const result = await service.execute({
       question,
@@ -415,32 +419,20 @@ describe("AnswerQuestion", () => {
 
     expect(result).toMatchObject({
       kind: "answered",
-      status: "answered",
+      status: "answered_no_evidence",
       traceId: CREATED_RUN_ID,
       answer: buildNoEvidenceAnswer(),
       mode: "global",
-      sources: [
-        expect.objectContaining({ sourceNumber: 1 }),
-        expect.objectContaining({ sourceNumber: 2 }),
-      ],
+      sources: [],
+      relatedTerms: expectedRelatedTerms,
     });
     expect(runsRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        status: "answered",
+        status: "answered_no_evidence",
         errorCode: null,
         answer: buildNoEvidenceAnswer(),
-        sources: [
-          {
-            sourceNumber: 1,
-            ...matches[0],
-            citedInAnswer: false,
-          },
-          {
-            sourceNumber: 2,
-            ...matches[1],
-            citedInAnswer: false,
-          },
-        ],
+        sources: [],
+        relatedTerms: expectedRelatedTerms,
         generationInputTokens: generationUsage.inputTokens,
         generationOutputTokens: generationUsage.outputTokens,
         generationTotalTokens: generationUsage.totalTokens,
@@ -449,12 +441,16 @@ describe("AnswerQuestion", () => {
     );
   });
 
-  it("canonicalizes equivalent insufficient-evidence wording from generation as an answered run when sources exist", async () => {
+  it("canonicalizes legacy no-evidence wording from generation as answered_no_evidence instead of surfacing an error", async () => {
     const { service, runsRepository, generationUsage, matches } = createService({
       answer:
         "  nao encontrei evidencias suficientes nos documentos recuperados para responder com seguranca! ",
     });
     const question = "Há evidências suficientes para concluir algo?";
+    const expectedRelatedTerms = extractRelatedTerms({
+      question,
+      sourceExcerpts: [],
+    });
 
     const result = await service.execute({
       question,
@@ -463,32 +459,20 @@ describe("AnswerQuestion", () => {
 
     expect(result).toMatchObject({
       kind: "answered",
-      status: "answered",
+      status: "answered_no_evidence",
       traceId: CREATED_RUN_ID,
       answer: buildNoEvidenceAnswer(),
       mode: "global",
-      sources: [
-        expect.objectContaining({ sourceNumber: 1 }),
-        expect.objectContaining({ sourceNumber: 2 }),
-      ],
+      sources: [],
+      relatedTerms: expectedRelatedTerms,
     });
     expect(runsRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        status: "answered",
+        status: "answered_no_evidence",
         errorCode: null,
         answer: buildNoEvidenceAnswer(),
-        sources: [
-          {
-            sourceNumber: 1,
-            ...matches[0],
-            citedInAnswer: false,
-          },
-          {
-            sourceNumber: 2,
-            ...matches[1],
-            citedInAnswer: false,
-          },
-        ],
+        sources: [],
+        relatedTerms: expectedRelatedTerms,
         generationInputTokens: generationUsage.inputTokens,
         generationOutputTokens: generationUsage.outputTokens,
         generationTotalTokens: generationUsage.totalTokens,
