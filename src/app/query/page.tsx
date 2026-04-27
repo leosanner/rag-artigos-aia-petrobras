@@ -1506,7 +1506,7 @@ function ConversationAuditAside({ messages, onClose }: ConversationAuditAsidePro
           <section key={message.id} className={styles.conversationAudit}>
             <header className={styles.auditAsideHeader}>
               <span className={styles.subHeadline}>
-                // auditoria :: {message.trace.id.slice(0, 8)}
+                {`// auditoria :: ${message.trace.id.slice(0, 8)}`}
               </span>
               <button
                 type="button"

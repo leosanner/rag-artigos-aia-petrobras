@@ -403,7 +403,7 @@ describe("AnswerQuestion", () => {
   });
 
   it("returns answered_no_evidence with empty sources when generation says nothing is related to the base", async () => {
-    const { service, runsRepository, generationUsage, matches } = createService({
+    const { service, runsRepository, generationUsage } = createService({
       answer: buildNoEvidenceAnswer(),
     });
     const question = "Há evidências suficientes para concluir algo?";
@@ -442,7 +442,7 @@ describe("AnswerQuestion", () => {
   });
 
   it("canonicalizes legacy no-evidence wording from generation as answered_no_evidence instead of surfacing an error", async () => {
-    const { service, runsRepository, generationUsage, matches } = createService({
+    const { service, runsRepository, generationUsage } = createService({
       answer:
         "  nao encontrei evidencias suficientes nos documentos recuperados para responder com seguranca! ",
     });
