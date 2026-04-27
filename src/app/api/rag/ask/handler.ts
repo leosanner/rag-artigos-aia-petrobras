@@ -41,6 +41,10 @@ export function createRagAskHandler(deps: RagAskHandlerDeps) {
       return invalidRequestResponse();
     }
 
+    if (parsed.data.mode !== "global") {
+      return invalidRequestResponse();
+    }
+
     let rawResult: unknown;
     try {
       rawResult = await deps.answerQuestion.execute(parsed.data);

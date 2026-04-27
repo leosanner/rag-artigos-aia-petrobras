@@ -2,29 +2,23 @@ import { z } from "zod";
 
 import {
   EXPLORE_RETRIEVAL_MAX_CANDIDATES,
+  FocusedRagAskRequestSchema,
   RAG_QUERY_RUN_ERROR_CODES,
   RAG_QUERY_RUN_STATUSES,
   RAG_RETRIEVAL_MAX_TOP_K,
   RAG_RETRIEVAL_MIN_TOP_K,
+  RagRetrievalSettingsSchema,
+  RagRetrievalStrategySchema,
+  type FocusedRagAskRequest,
   type RagSource as DomainRagSource,
   type RagQueryRunErrorCode as DomainRagQueryRunErrorCode,
   type RagQueryRunStatus as DomainRagQueryRunStatus,
   type RelatedTerm as DomainRelatedTerm,
 } from "@/domain/rag";
 
-const ragRetrievalStrategySchema = z.enum(["standard", "explore"]);
+const ragRetrievalStrategySchema = RagRetrievalStrategySchema;
 
-export const ragRetrievalInputSchema = z
-  .object({
-    topK: z
-      .number()
-      .int()
-      .min(RAG_RETRIEVAL_MIN_TOP_K)
-      .max(RAG_RETRIEVAL_MAX_TOP_K)
-      .optional(),
-    strategy: ragRetrievalStrategySchema.optional(),
-  })
-  .strict();
+export const ragRetrievalInputSchema = RagRetrievalSettingsSchema;
 
 export const globalRagAskInputSchema = z
   .object({
@@ -34,7 +28,13 @@ export const globalRagAskInputSchema = z
   })
   .strict();
 
-export const ragAskRequestSchema = globalRagAskInputSchema;
+export const ragAskRequestSchema = z.discriminatedUnion("mode", [
+  globalRagAskInputSchema,
+  FocusedRagAskRequestSchema,
+]);
+
+export type RagAskRequest = z.infer<typeof ragAskRequestSchema>;
+export type FocusedRagAskInput = FocusedRagAskRequest;
 
 export type GlobalRagAskInput = z.infer<typeof globalRagAskInputSchema>;
 export type AnswerQuestionConversationContext = {
