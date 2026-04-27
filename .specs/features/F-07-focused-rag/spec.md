@@ -5,8 +5,8 @@
 **In scope:**
 - Extend the evolved RAG ask API to support questions scoped to one selected
   document.
-- Add document selection to `/query` on top of the post-F-04/F-05/F-06 shared
-  page shell.
+- Add document selection to `/query` on top of the post-F-04/F-05/F-08/F-06
+  shared page shell.
 - Add a read endpoint for documents that are processed and indexed enough to be
   selectable.
 - Apply a strict `documentId` filter during retrieval for focused mode.
@@ -28,9 +28,10 @@
 
 F-03 makes global RAG available over the full indexed corpus. Since then, the
 project has intentionally reprioritized `/query` so operator controls,
-traceability, and conversation can land before focused retrieval. F-07 remains
-the document-scoped extension of the same route, but it now has to plug into a
-richer query shell instead of the original global-only page assumptions.
+traceability, reranked retrieval, and conversation can land before focused
+retrieval. F-07 remains the document-scoped extension of the same route, but it
+now has to plug into a richer query shell instead of the original global-only
+page assumptions.
 
 Focused RAG should still be an extension of the base RAG flow, not a parallel
 pipeline. The primary retrieval difference is the document filter; the shared
@@ -43,15 +44,17 @@ retrieval-controls and trace model stay intact.
   retrieval-ready chunk.
 - RN-03: Focused retrieval must return chunks only from the selected document.
 - RN-04: Focused mode uses the same retrieval-controls model as global mode,
-  including `topK` in the range `3..12` and strategies `"standard"` or
-  `"explore"`.
+  including `topK` in the range `3..12` and strategies `"standard"`,
+  `"explore"`, and any later shared retrieval extensions already ratified
+  before focused implementation, including `rerank`.
 - RN-05: The UI must not offer `pending`, `failed`, or unindexed documents as
   selectable focused targets.
 - RN-06: If a requested `documentId` is unknown, not processed, or not indexed,
   the API returns a safe client error and does not call the generation
   provider.
-- RN-07: F-07 must not duplicate the shared generation logic or the F-05
-  traceability model.
+- RN-07: F-07 must not duplicate the shared generation logic, the F-05
+  traceability model, or the shared retrieval-strategy contract extended by
+  F-08.
 - RN-08: F-07 must not change the existing global request/response behavior.
 
 ## Functional Requirements
@@ -92,7 +95,7 @@ retrieval-controls and trace model stay intact.
 5. The page calls `POST /api/rag/ask` with
    `{ question, mode: "focused", documentId, retrieval? }`.
 6. The route validates the request and delegates to the same `AnswerQuestion`
-   service introduced in F-03 and later extended by F-04/F-05.
+   service introduced in F-03 and later extended by F-04/F-05/F-08.
 7. `AnswerQuestion` verifies that the selected document exists, is processed,
    and has retrieval-ready chunks.
 8. The retrieval service embeds the question, applies the shared retrieval
@@ -133,7 +136,7 @@ retrieval-controls and trace model stay intact.
 | `documents` | `id`, `title`, `status`, optional `authors`, `publication_year`, `doi` | Used for selector and selected-document validation. |
 | `document_chunks` | `document_id`, `chunk_index`, `embedding`, `content` | Queried with a strict `document_id` filter. |
 | `SelectableRagDocument` | `id`, `title`, `authors`, `publicationYear`, `doi`, `chunkCount`, `updatedAt` | API/UI DTO for focused selector. |
-| `FocusedRagRequest` | `question`, `mode`, `documentId`, optional `retrieval` | Extension of the shared ask request union after F-04. |
+| `FocusedRagRequest` | `question`, `mode`, `documentId`, optional `retrieval` | Extension of the shared ask request union after F-04 and F-08. |
 
 ### Endpoints / Interfaces (if applicable)
 
@@ -160,7 +163,7 @@ retrieval-controls and trace model stay intact.
 
 - **Prerequisite features:** F-02 Chunking and Embeddings; F-03 Global RAG;
   F-04 Query Controls and Explore; F-05 Answer Traceability;
-  F-06 Conversational Query.
+  F-08 Reranked Retrieval; F-06 Conversational Query.
 - **External packages added:** None.
 - **External services:** Postgres/pgvector, OpenAI API through the existing
   shared provider path.

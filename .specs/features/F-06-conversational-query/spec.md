@@ -13,7 +13,8 @@
 - Keep per-turn citations, sources, related terms, token usage, latency, and
   cost visible for assistant messages.
 - Support transcript reload through the `/query` URL.
-- Keep F-04 retrieval controls available for each conversation turn.
+- Keep the shared retrieval controls available for each conversation turn,
+  including the later F-08 rerank extension.
 - Add tests for conversation creation, message ordering, per-turn trace
   linkage, reload behavior, and regression of governance visibility.
 
@@ -27,8 +28,10 @@
 ## Context & Motivation
 
 After F-04 and F-05, `/query` already has operator-controlled retrieval and a
-governed trace model. The next user goal is to make that experience feel like a
-real conversation while preserving the same answer auditability.
+governed trace model. F-08 then extends that same retrieval contract with an
+explicit `rerank` strategy before conversation work continues. The next user
+goal is to make that experience feel like a real conversation while preserving
+the same answer auditability.
 
 This feature keeps `/query` as the single operator surface and makes chat a new
 interaction mode built on top of the same traceable turn engine, not a parallel
@@ -42,7 +45,8 @@ system.
 - RN-03: The first persisted user message sets the conversation title from the
   trimmed message content, truncated deterministically to 80 characters.
 - RN-04: `POST /api/rag/conversations/:id/messages` accepts a user message plus
-  the same optional retrieval settings defined by F-04.
+  the same optional retrieval settings defined by F-04 and later extended by
+  F-08.
 - RN-05: Each successful or no-evidence assistant reply must correspond to
   exactly one persisted `rag_query_runs` record and expose its `traceId`.
 - RN-06: Technical generation failures after message validation persist the
@@ -60,7 +64,8 @@ system.
 - RN-10: Reloading `/query?conversation=<id>` must restore the persisted
   transcript for that conversation.
 - RN-11: Single-turn `POST /api/rag/ask` remains supported; chat reuses the
-  same turn engine rather than replacing it.
+  same turn engine rather than replacing it, including any retrieval-strategy
+  extensions already defined by F-08.
 - RN-12: F-06 must not weaken citation validation, audit visibility, or safe
   error responses.
 
@@ -75,7 +80,7 @@ system.
 - [ ] RF-04: `POST /api/rag/conversations/:id/messages` persists the user
   message before running the assistant turn.
 - [ ] RF-05: The assistant turn reuses the F-05 audited turn engine and the
-  F-04 retrieval controls.
+  shared retrieval contract extended through F-08.
 - [ ] RF-06: The retrieval-context builder concatenates the newest user message
   plus up to four immediately preceding stored messages with explicit role
   labels.
@@ -166,7 +171,7 @@ system.
 ## Dependencies
 
 - **Prerequisite features:** F-04 Query Controls and Explore; F-05 Answer
-  Traceability.
+  Traceability; F-08 Reranked Retrieval.
 - **External packages added:** None.
 - **External services:** Postgres/pgvector, OpenAI API through the existing
   audited turn boundary.
