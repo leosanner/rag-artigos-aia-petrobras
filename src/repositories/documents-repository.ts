@@ -1,8 +1,8 @@
-import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import * as schema from "@/db/schema";
-import { documents, type Document } from "@/db/schema";
+import { documentChunks, documents, type Document } from "@/db/schema";
 import type { IngestionErrorCode } from "@/domain/documents/errors";
 import { transitionStatus } from "@/domain/documents/status";
 
@@ -17,6 +17,22 @@ export type CreatePendingDocumentInput = {
   fileHash: string;
   pipelineVersion: string;
 };
+
+export type SelectableDocumentRow = {
+  id: string;
+  title: string;
+  authors: string | null;
+  publicationYear: number | null;
+  doi: string | null;
+  chunkCount: number;
+  updatedAt: Date;
+};
+
+export type FocusedDocumentClassification =
+  | "ok"
+  | "not_found"
+  | "not_processed"
+  | "not_indexed";
 
 export class DocumentLifecycleError extends Error {
   constructor(message: string) {
@@ -54,6 +70,60 @@ export class DocumentsRepository {
       .limit(1);
 
     return document ?? null;
+  }
+
+  async listSelectableForFocusedRag(): Promise<SelectableDocumentRow[]> {
+    return this.db
+      .select({
+        id: documents.id,
+        title: documents.title,
+        authors: documents.authors,
+        publicationYear: documents.publicationYear,
+        doi: documents.doi,
+        chunkCount: sql<number>`cast(count(${documentChunks.id}) as integer)`,
+        updatedAt: documents.updatedAt,
+      })
+      .from(documents)
+      .innerJoin(documentChunks, eq(documentChunks.documentId, documents.id))
+      .where(eq(documents.status, "processed"))
+      .groupBy(
+        documents.id,
+        documents.title,
+        documents.authors,
+        documents.publicationYear,
+        documents.doi,
+        documents.updatedAt,
+      )
+      .orderBy(desc(documents.updatedAt), asc(documents.id));
+  }
+
+  async classifyForFocusedRag(
+    documentId: string,
+  ): Promise<FocusedDocumentClassification> {
+    const [document] = await this.db
+      .select({
+        status: documents.status,
+        chunkCount: sql<number>`cast(count(${documentChunks.id}) as integer)`,
+      })
+      .from(documents)
+      .leftJoin(documentChunks, eq(documentChunks.documentId, documents.id))
+      .where(eq(documents.id, documentId))
+      .groupBy(documents.id, documents.status)
+      .limit(1);
+
+    if (!document) {
+      return "not_found";
+    }
+
+    if (document.status !== "processed") {
+      return "not_processed";
+    }
+
+    if (document.chunkCount === 0) {
+      return "not_indexed";
+    }
+
+    return "ok";
   }
 
   async createPendingDocument(
