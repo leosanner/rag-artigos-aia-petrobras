@@ -32,6 +32,7 @@ export type ReplaceDocumentChunksInput = ChunkConfiguration & {
 export type SearchGlobalChunksInput = ChunkConfiguration & {
   queryEmbedding: number[];
   topK: number;
+  documentId?: string;
 };
 
 export class DocumentChunksRepository {
@@ -82,13 +83,7 @@ export class DocumentChunksRepository {
         })
         .from(documentChunks)
         .innerJoin(documents, eq(documentChunks.documentId, documents.id))
-        .where(
-          and(
-            eq(documents.status, "processed"),
-            eq(documentChunks.chunkingVersion, input.chunkingVersion),
-            eq(documentChunks.embeddingModel, input.embeddingModel),
-          ),
-        )
+        .where(buildSearchWhere(input))
         .orderBy(
           desc(score),
           asc(documentChunks.documentId),
@@ -155,5 +150,16 @@ function configWhere(documentId: string, config: ChunkConfiguration) {
     eq(documentChunks.documentId, documentId),
     eq(documentChunks.chunkingVersion, config.chunkingVersion),
     eq(documentChunks.embeddingModel, config.embeddingModel),
+  );
+}
+
+function buildSearchWhere(input: SearchGlobalChunksInput) {
+  return and(
+    eq(documents.status, "processed"),
+    eq(documentChunks.chunkingVersion, input.chunkingVersion),
+    eq(documentChunks.embeddingModel, input.embeddingModel),
+    input.documentId
+      ? eq(documentChunks.documentId, input.documentId)
+      : undefined,
   );
 }
