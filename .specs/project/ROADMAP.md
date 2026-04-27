@@ -5,12 +5,14 @@
 
 > Each phase of `starter.md` becomes a milestone. Features inside a milestone are demo-able increments. The first three milestones deliver the minimum functional DEMO.
 
-> Execution note (2026-04-22): the shared `/query` surface no longer moves
+> Execution note (2026-04-26): the shared `/query` surface no longer moves
 > straight from F-03 Global RAG to Focused RAG. The current preferred
 > sequence is F-04 Query Controls and Explore -> F-05 Answer Traceability ->
-> F-06 Conversational Query -> then F-07 Focused RAG rebased on that richer
-> shell. F-05 intentionally pulls selected M3 explainability/observability work
-> forward onto `/query`.
+> F-08 Reranked Retrieval -> F-06 Conversational Query -> then F-07 Focused
+> RAG rebased on that richer shell. F-05 intentionally pulls selected M3
+> explainability/observability work forward onto `/query`, and F-08 becomes
+> the next retrieval-evolution prerequisite before conversation and focused
+> retrieval continue.
 
 ---
 
@@ -59,17 +61,28 @@
 - Top-k retrieval + context assembly + generation
 - Answer with source list
 
-**Query Controls + Explore (Phase 3A)** — PLANNED
+**Query Controls + Explore (Phase 3A)** — COMPLETED
 
 - Adjustable retrieval parameters on `/query`, especially top-k
 - Explicit explore mode for broad questions
 - Diversified multi-document retrieval without a second endpoint
 
+**Reranked Retrieval (Phase 3B)** — PLANNED
+
+- Explicit `rerank` strategy on the shared `POST /api/rag/ask` and `/query`
+  retrieval contract
+- Larger first-pass candidate set followed by second-pass reranking before
+  generation
+- Auditable reranking metadata, reranking failure states, and source-level
+  retrieval/rerank score evidence
+- Becomes the retrieval-contract prerequisite for later F-06 conversation work
+  and the eventual F-07 focused flow
+
 **Focused RAG (Phase 4)** — DEFERRED
 
 - Filter by specific document during retrieval
 - UI for selecting the target document
-- Must plug into the post-F-04/F-05 `/query` shell instead of the old
+- Must plug into the post-F-04/F-05/F-08 `/query` shell instead of the old
   global-only page assumptions
 
 ---
@@ -80,7 +93,7 @@
 
 ### Features
 
-**Answer Traceability (Phases 5 + 6)** — PLANNED
+**Answer Traceability (Phases 5 + 6)** — COMPLETED EARLY
 
 - Persisted query traces for question, answer, sources, and safe failures
 - Related terms/themes derived from the question plus retrieved evidence
@@ -94,6 +107,8 @@
 - Persisted conversations and messages
 - Per-turn citations, related terms, usage, and cost
 - Transcript reload without losing governance visibility
+- Must reuse the evolved retrieval contract after F-08, not the earlier
+  pre-rerank strategy model
 
 ---
 
