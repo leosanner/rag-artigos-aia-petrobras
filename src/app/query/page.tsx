@@ -46,6 +46,137 @@ import styles from "./page.module.css";
 
 const SECRET_STORAGE_KEY = "query:secret";
 
+// ---------------------------------------------------------------------------
+// Mock visual para iteracao de design — ativar com ?mock=1 na URL.
+// Nao afeta testes nem fluxo real (so e injetado se a query string contiver mock=1).
+// Remover quando o trabalho de estilo terminar.
+// ---------------------------------------------------------------------------
+const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
+  const metadata: RagAnswerMetadata = {
+    mode: "global",
+    topK: 6,
+    retrievalStrategy: "standard",
+    candidateTopK: 24,
+    promptVersion: "rag.global.v1",
+    generationModel: "gpt-4.1-mini",
+    embeddingModel: "text-embedding-3-large",
+  };
+  const audit: RagAnswerAudit = {
+    latencyMs: 2430,
+    embedding: { inputTokens: 24, estimatedCostUsd: 0.00000312 },
+    generation: {
+      inputTokens: 1820,
+      outputTokens: 312,
+      totalTokens: 2132,
+      estimatedCostUsd: 0.00021048,
+    },
+    totalCostUsd: 0.0002136,
+  };
+
+  return {
+    id: "00000000-0000-0000-0000-0000000000aa",
+    title: "Tecnicas recorrentes em AIA",
+    createdAt: "2026-04-26T12:00:00.000Z",
+    updatedAt: "2026-04-26T12:04:32.000Z",
+    lastMessageAt: "2026-04-26T12:04:32.000Z",
+    messages: [
+      {
+        id: "11111111-1111-1111-1111-111111111111",
+        role: "user",
+        content:
+          "Quais tecnicas de machine learning aparecem com mais frequencia nos estudos de Avaliacao de Impacto Ambiental?",
+        createdAt: "2026-04-26T12:00:10.000Z",
+        trace: null,
+      },
+      {
+        id: "22222222-2222-2222-2222-222222222222",
+        role: "assistant",
+        content:
+          "As tecnicas mais recorrentes nos artigos analisados sao Random Forest e Support Vector Machines para classificacao supervisionada [1], seguidas por redes convolucionais aplicadas a sensoriamento remoto [2]. Estudos mais recentes combinam ensembles com features derivadas de indices espectrais [3].",
+        createdAt: "2026-04-26T12:00:32.000Z",
+        trace: {
+          id: "33333333-3333-3333-3333-333333333333",
+          question:
+            "Quais tecnicas de machine learning aparecem com mais frequencia nos estudos de Avaliacao de Impacto Ambiental?",
+          answer:
+            "As tecnicas mais recorrentes nos artigos analisados sao Random Forest e Support Vector Machines para classificacao supervisionada [1], seguidas por redes convolucionais aplicadas a sensoriamento remoto [2].",
+          mode: "global",
+          status: "answered",
+          errorCode: null,
+          metadata,
+          audit,
+          createdAt: "2026-04-26T12:00:32.000Z",
+          relatedTerms: [
+            { rank: 1, term: "random forest", ngramSize: 2, frequency: 18, sourceCoverageCount: 9 },
+            { rank: 2, term: "sensoriamento remoto", ngramSize: 2, frequency: 14, sourceCoverageCount: 8 },
+            { rank: 3, term: "classificacao supervisionada", ngramSize: 2, frequency: 11, sourceCoverageCount: 6 },
+            { rank: 4, term: "support vector machine", ngramSize: 3, frequency: 9, sourceCoverageCount: 5 },
+          ],
+          sources: [
+            {
+              sourceNumber: 1,
+              chunkId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+              documentId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+              documentTitle: "Machine learning para AIA - revisao sistematica (2022).pdf",
+              chunkIndex: 4,
+              excerpt:
+                "Entre os 31 estudos revisados, Random Forest aparece em 19 trabalhos como classificador principal, frequentemente comparado a SVM em cenarios de cobertura do solo.",
+              score: 0.87,
+              documentPipelineVersion: "ingest-v1",
+              chunkingVersion: "chunk-v1",
+              embeddingModel: "text-embedding-3-large",
+              citedInAnswer: true,
+            },
+            {
+              sourceNumber: 2,
+              chunkId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+              documentId: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+              documentTitle: "CNNs aplicadas a imagens Sentinel-2 em estudos de impacto.pdf",
+              chunkIndex: 7,
+              excerpt:
+                "A arquitetura U-Net foi usada para segmentar areas degradadas com IoU medio de 0.78, superando metodos baseados em indices espectrais isolados.",
+              score: 0.81,
+              documentPipelineVersion: "ingest-v1",
+              chunkingVersion: "chunk-v1",
+              embeddingModel: "text-embedding-3-large",
+              citedInAnswer: true,
+            },
+            {
+              sourceNumber: 3,
+              chunkId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+              documentId: "ffffffff-ffff-ffff-ffff-ffffffffffff",
+              documentTitle: "Ensembles e indices espectrais em monitoramento ambiental.pdf",
+              chunkIndex: 2,
+              excerpt:
+                "Modelos do tipo gradient boosting alimentados por NDVI, NDWI e EVI superaram baselines tradicionais em 4 das 6 bacias estudadas.",
+              score: 0.74,
+              documentPipelineVersion: "ingest-v1",
+              chunkingVersion: "chunk-v1",
+              embeddingModel: "text-embedding-3-large",
+              citedInAnswer: false,
+            },
+          ],
+        },
+      },
+      {
+        id: "44444444-4444-4444-4444-444444444444",
+        role: "user",
+        content: "E quanto a metricas de avaliacao? Quais sao reportadas com mais frequencia?",
+        createdAt: "2026-04-26T12:04:10.000Z",
+        trace: null,
+      },
+      {
+        id: "55555555-5555-5555-5555-555555555555",
+        role: "assistant",
+        content:
+          "As metricas mais reportadas sao acuracia global e kappa para classificacao [1], alem de IoU e F1-score nos trabalhos baseados em CNN [2]. Estudos com forte componente de validacao de campo tambem reportam matriz de confusao por classe.",
+        createdAt: "2026-04-26T12:04:32.000Z",
+        trace: null,
+      },
+    ],
+  };
+})();
+
 type QuerySubmissionStrategy = Extract<
   RagRetrievalStrategy,
   "standard" | "explore"
@@ -149,11 +280,36 @@ export default function QueryPage() {
     (conversationId ? "Conversa sem titulo" : "Nenhuma conversa ativa");
   const newConversationLabel =
     conversationState.status === "loading" ? "Carregando..." : "Nova conversa";
+  const expandedAuditMessages = (conversationState.conversation?.messages ?? [])
+    .filter(
+      (
+        message,
+      ): message is ConversationMessageResponse & {
+        trace: NonNullable<ConversationMessageResponse["trace"]>;
+      } =>
+        message.role === "assistant" &&
+        message.trace !== null &&
+        expandedAuditMessageIds.has(message.id),
+    );
 
   useEffect(() => {
     const stored = sessionStorage.getItem(SECRET_STORAGE_KEY);
     const url = new URL(window.location.href);
     const conversationParam = url.searchParams.get("conversation");
+    const mockParam = url.searchParams.get("mock");
+
+    if (mockParam === "1") {
+      setConversationId(MOCK_CONVERSATION.id);
+      setConversationState({
+        status: "loaded",
+        conversation: MOCK_CONVERSATION,
+        error: null,
+      });
+      // Start with auditorias closed so the chat opens centered; the user
+      // shifts the layout by clicking "Ver auditoria".
+      setExpandedAuditMessageIds(new Set());
+      return;
+    }
 
     if (conversationParam) {
       setConversationId(conversationParam);
@@ -968,6 +1124,13 @@ export default function QueryPage() {
           </div>
         </section>
 
+        <div className={styles.chatLayout}>
+        {expandedAuditMessages.length > 0 ? (
+          <ConversationAuditAside
+            messages={expandedAuditMessages}
+            onClose={(messageId) => toggleAudit(messageId)}
+          />
+        ) : null}
         <section className={`${styles.panel} ${styles.chatPanel}`}>
           <header className={styles.panelHeader}>
             <div>
@@ -1083,6 +1246,7 @@ export default function QueryPage() {
             </form>
           </div>
         </section>
+        </div>
 
         <section className={styles.panel}>
           <header className={styles.panelHeader}>
@@ -1322,33 +1486,62 @@ function ConversationMessageItem({
         ) : null}
       </article>
 
-      {isAssistant && message.trace && isAuditExpanded ? (
-        <section className={styles.conversationAudit}>
-          <AuditSummaryBlock
-            blockIndex="[ 01 ] Auditoria da mensagem"
-            metaLabel={`trace :: ${message.trace.id.slice(0, 8)}`}
-            traceId={message.trace.id}
-            question={message.trace.question}
-            metadata={message.trace.metadata}
-            audit={message.trace.audit}
-            status={message.trace.status}
-            errorCode={message.trace.errorCode}
-            createdAt={message.trace.createdAt}
-          />
-
-          <RelatedTermsBlock
-            blockIndex="[ 02 ] Termos da mensagem"
-            terms={message.trace.relatedTerms}
-          />
-
-          <SourcesBlock
-            blockIndex="[ 03 ] Fontes da mensagem"
-            sources={message.trace.sources}
-            showCitationFlags
-          />
-        </section>
-      ) : null}
     </li>
+  );
+}
+
+type ConversationAuditAsideProps = {
+  messages: Array<
+    ConversationMessageResponse & {
+      trace: NonNullable<ConversationMessageResponse["trace"]>;
+    }
+  >;
+  onClose: (messageId: string) => void;
+};
+
+function ConversationAuditAside({ messages, onClose }: ConversationAuditAsideProps) {
+  return (
+    <aside className={styles.auditAside} aria-label="Auditoria da conversa">
+      {messages.map((message) => (
+          <section key={message.id} className={styles.conversationAudit}>
+            <header className={styles.auditAsideHeader}>
+              <span className={styles.subHeadline}>
+                // auditoria :: {message.trace.id.slice(0, 8)}
+              </span>
+              <button
+                type="button"
+                onClick={() => onClose(message.id)}
+                className={`${styles.btn} ${styles.btnSecondary} ${styles.auditToggle}`}
+              >
+                Fechar
+              </button>
+            </header>
+
+            <AuditSummaryBlock
+              blockIndex="[ 01 ] Auditoria da mensagem"
+              metaLabel={`trace :: ${message.trace.id.slice(0, 8)}`}
+              traceId={message.trace.id}
+              question={message.trace.question}
+              metadata={message.trace.metadata}
+              audit={message.trace.audit}
+              status={message.trace.status}
+              errorCode={message.trace.errorCode}
+              createdAt={message.trace.createdAt}
+            />
+
+            <RelatedTermsBlock
+              blockIndex="[ 02 ] Termos da mensagem"
+              terms={message.trace.relatedTerms}
+            />
+
+            <SourcesBlock
+              blockIndex="[ 03 ] Fontes da mensagem"
+              sources={message.trace.sources}
+              showCitationFlags
+            />
+        </section>
+      ))}
+    </aside>
   );
 }
 
