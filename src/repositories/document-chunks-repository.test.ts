@@ -782,6 +782,264 @@ describe("DocumentChunksRepository", () => {
     expect(match?.documentPipelineVersion).toBe("f01-2.0.0");
   });
 
+  it("applies a strict document filter before score ordering", async () => {
+    await insertDocument(db, {
+      id: OTHER_DOCUMENT_ID,
+      title: "Documento B.pdf",
+    });
+    await insertDocument(db, {
+      id: THIRD_DOCUMENT_ID,
+      title: "Documento C.pdf",
+    });
+
+    await repository.replaceDocumentChunks({
+      documentId: DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "Global best chunk that must stay hidden.",
+          contentHash: "global-best-hidden",
+          estimatedTokens: 3,
+          embedding: directionalVector(1, 0, 0),
+        },
+      ],
+    });
+    await repository.replaceDocumentChunks({
+      documentId: OTHER_DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "Focused chunk one",
+          contentHash: "focused-one",
+          estimatedTokens: 3,
+          embedding: directionalVector(0.8, 0.6, 0),
+        },
+        {
+          chunkIndex: 1,
+          content: "Focused chunk two",
+          contentHash: "focused-two",
+          estimatedTokens: 3,
+          embedding: directionalVector(0.6, 0.8, 0),
+        },
+      ],
+    });
+    await repository.replaceDocumentChunks({
+      documentId: THIRD_DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "Another strong chunk that must stay hidden.",
+          contentHash: "third-strong-hidden",
+          estimatedTokens: 3,
+          embedding: directionalVector(0.9, 0.436, 0),
+        },
+      ],
+    });
+
+    const matches = await repository.searchGlobal({
+      queryEmbedding: directionalVector(1, 0, 0),
+      topK: 5,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+      documentId: OTHER_DOCUMENT_ID,
+    });
+
+    expect(matches).toHaveLength(2);
+    expect(
+      matches.map((match) => ({
+        documentId: match.documentId,
+        chunkIndex: match.chunkIndex,
+        excerpt: match.excerpt,
+      })),
+    ).toEqual([
+      {
+        documentId: OTHER_DOCUMENT_ID,
+        chunkIndex: 0,
+        excerpt: "Focused chunk one",
+      },
+      {
+        documentId: OTHER_DOCUMENT_ID,
+        chunkIndex: 1,
+        excerpt: "Focused chunk two",
+      },
+    ]);
+  });
+
+  it("ignores stale configs and models inside the requested document", async () => {
+    await repository.replaceDocumentChunks({
+      documentId: DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "Active focused chunk",
+          contentHash: "active-focused",
+          estimatedTokens: 3,
+          embedding: directionalVector(0.8, 0.6, 0),
+        },
+      ],
+    });
+    await repository.replaceDocumentChunks({
+      documentId: DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: "hybrid-v0-700-100",
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 1,
+          content: "Stale config chunk that must stay hidden.",
+          contentHash: "stale-focused",
+          estimatedTokens: 3,
+          embedding: directionalVector(1, 0, 0),
+        },
+      ],
+    });
+    await repository.replaceDocumentChunks({
+      documentId: DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: "text-embedding-3-small",
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 2,
+          content: "Other model chunk that must stay hidden.",
+          contentHash: "other-model-focused",
+          estimatedTokens: 3,
+          embedding: directionalVector(1, 0, 0),
+        },
+      ],
+    });
+
+    const matches = await repository.searchGlobal({
+      queryEmbedding: directionalVector(1, 0, 0),
+      topK: 5,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+      documentId: DOCUMENT_ID,
+    });
+
+    expect(matches.map((match) => match.excerpt)).toEqual([
+      "Active focused chunk",
+    ]);
+  });
+
+  it("returns an empty array when the requested document is not processed", async () => {
+    await insertDocument(db, {
+      id: NON_PROCESSED_DOCUMENT_ID,
+      title: "Documento pendente.pdf",
+      status: "pending",
+    });
+    await repository.replaceDocumentChunks({
+      documentId: NON_PROCESSED_DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "Pending chunk that must stay hidden.",
+          contentHash: "pending-focused-hidden",
+          estimatedTokens: 3,
+          embedding: directionalVector(1, 0, 0),
+        },
+      ],
+    });
+
+    await expect(
+      repository.searchGlobal({
+        queryEmbedding: directionalVector(1, 0, 0),
+        topK: 5,
+        chunkingVersion: CHUNKING_VERSION,
+        embeddingModel: EMBEDDING_MODEL,
+        documentId: NON_PROCESSED_DOCUMENT_ID,
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("returns an empty array when the requested document has no active-config chunks", async () => {
+    await insertDocument(db, {
+      id: OTHER_DOCUMENT_ID,
+      title: "Documento B.pdf",
+    });
+
+    await repository.replaceDocumentChunks({
+      documentId: DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "Another document active chunk",
+          contentHash: "another-document-active",
+          estimatedTokens: 3,
+          embedding: directionalVector(1, 0, 0),
+        },
+      ],
+    });
+    await repository.replaceDocumentChunks({
+      documentId: OTHER_DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: "hybrid-v0-700-100",
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 0,
+          content: "Focused stale chunk",
+          contentHash: "focused-stale",
+          estimatedTokens: 3,
+          embedding: directionalVector(1, 0, 0),
+        },
+      ],
+    });
+    await repository.replaceDocumentChunks({
+      documentId: OTHER_DOCUMENT_ID,
+      documentPipelineVersion: pipelineVersion,
+      chunkingVersion: CHUNKING_VERSION,
+      embeddingModel: "text-embedding-3-small",
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      chunks: [
+        {
+          chunkIndex: 1,
+          content: "Focused other-model chunk",
+          contentHash: "focused-other-model",
+          estimatedTokens: 3,
+          embedding: directionalVector(1, 0, 0),
+        },
+      ],
+    });
+
+    await expect(
+      repository.searchGlobal({
+        queryEmbedding: directionalVector(1, 0, 0),
+        topK: 5,
+        chunkingVersion: CHUNKING_VERSION,
+        embeddingModel: EMBEDDING_MODEL,
+        documentId: OTHER_DOCUMENT_ID,
+      }),
+    ).resolves.toEqual([]);
+  });
+
   it("returns an empty array when no retrieval-ready chunks exist for the active config", async () => {
     await insertDocument(db, {
       id: OTHER_DOCUMENT_ID,
