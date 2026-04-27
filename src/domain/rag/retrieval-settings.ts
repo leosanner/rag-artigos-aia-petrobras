@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type RagRetrievalStrategy = "standard" | "explore";
 
 export type RagRetrievalSettings = {
@@ -12,6 +14,20 @@ export const RAG_RETRIEVAL_MAX_TOP_K = 12;
 export const RAG_RETRIEVAL_DEFAULT_TOP_K = 6;
 export const RAG_RETRIEVAL_DEFAULT_STRATEGY = "standard";
 export const EXPLORE_RETRIEVAL_MAX_CANDIDATES = 24;
+
+export const RagRetrievalStrategySchema = z.enum(["standard", "explore"]);
+
+export const RagRetrievalSettingsSchema = z
+  .object({
+    topK: z
+      .number()
+      .int()
+      .min(RAG_RETRIEVAL_MIN_TOP_K)
+      .max(RAG_RETRIEVAL_MAX_TOP_K)
+      .optional(),
+    strategy: RagRetrievalStrategySchema.optional(),
+  })
+  .strict();
 
 export const DEFAULT_RAG_RETRIEVAL_SETTINGS = Object.freeze({
   topK: RAG_RETRIEVAL_DEFAULT_TOP_K,
