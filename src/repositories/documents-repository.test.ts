@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Pool } from "pg";
 import { beforeAll, beforeEach, afterAll, describe, expect, it } from "vitest";
 
-import { documents, type DocumentStatus } from "@/db/schema";
+import { documentChunks, documents, type DocumentStatus } from "@/db/schema";
 import { createTestDatabase, resetTestDatabase } from "@/test/db";
 
 import {
@@ -26,6 +26,11 @@ const BETA_ID = "33333333-3333-4333-8333-333333333333";
 const PENDING_ID = "44444444-4444-4444-8444-444444444444";
 const FAILED_ID = "55555555-5555-4555-8555-555555555555";
 const BLANK_REFINED_TEXT_ID = "66666666-6666-4666-8666-666666666666";
+const INDEXED_RECENT_ID = "77777777-7777-4777-8777-777777777777";
+const INDEXED_OLDER_ID = "88888888-8888-4888-8888-888888888888";
+const PROCESSED_UNINDEXED_ID = "99999999-9999-4999-8999-999999999999";
+const UNKNOWN_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const EMBEDDING_DIMENSIONS = 3072;
 
 async function insertDocumentForIndexing(
   db: TestDatabase,
@@ -41,6 +46,28 @@ async function insertDocumentForIndexing(
     rawText: input.status === "processed" ? "raw text" : null,
     refinedText: input.refinedText ?? null,
     updatedAt: input.updatedAt,
+  });
+}
+
+async function insertDocumentChunk(
+  db: TestDatabase,
+  input: {
+    documentId: string;
+    chunkIndex: number;
+    content: string;
+  },
+): Promise<void> {
+  await db.insert(documentChunks).values({
+    documentId: input.documentId,
+    chunkIndex: input.chunkIndex,
+    content: input.content,
+    contentHash: `hash-${input.documentId}-${input.chunkIndex}`,
+    estimatedTokens: 5,
+    documentPipelineVersion: "f02-b02-test",
+    chunkingVersion: "hybrid-v1-900-150",
+    embeddingModel: "text-embedding-3-large",
+    embeddingDimensions: EMBEDDING_DIMENSIONS,
+    embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.1),
   });
 }
 
@@ -259,5 +286,195 @@ describe("DocumentsRepository", () => {
     expect(found?.status).toBe("processed");
     expect(found?.refinedText).toBe("   ");
     expect(after).toEqual(before);
+  });
+
+  it("lists only processed documents with at least one chunk for focused rag in updated-at descending order", async () => {
+    const recentUpdatedAt = new Date("2026-03-01T12:00:00.000Z");
+    const olderUpdatedAt = new Date("2026-02-01T12:00:00.000Z");
+
+    await db.insert(documents).values([
+      {
+        id: INDEXED_RECENT_ID,
+        title: "indexed-recent.pdf",
+        driveFileId: `drive-${INDEXED_RECENT_ID}`,
+        fileHash: `hash-${INDEXED_RECENT_ID}`,
+        pipelineVersion: "f02-b02-test",
+        status: "processed",
+        doi: "10.1000/recent",
+        authors: "Alice; Bob",
+        publicationYear: 2024,
+        rawText: "raw text",
+        refinedText: "refined text",
+        updatedAt: recentUpdatedAt,
+      },
+      {
+        id: INDEXED_OLDER_ID,
+        title: "indexed-older.pdf",
+        driveFileId: `drive-${INDEXED_OLDER_ID}`,
+        fileHash: `hash-${INDEXED_OLDER_ID}`,
+        pipelineVersion: "f02-b02-test",
+        status: "processed",
+        doi: null,
+        authors: null,
+        publicationYear: null,
+        rawText: "raw text",
+        refinedText: "refined text",
+        updatedAt: olderUpdatedAt,
+      },
+      {
+        id: PROCESSED_UNINDEXED_ID,
+        title: "processed-unindexed.pdf",
+        driveFileId: `drive-${PROCESSED_UNINDEXED_ID}`,
+        fileHash: `hash-${PROCESSED_UNINDEXED_ID}`,
+        pipelineVersion: "f02-b02-test",
+        status: "processed",
+        rawText: "raw text",
+        refinedText: "refined text",
+        updatedAt: new Date("2026-01-01T12:00:00.000Z"),
+      },
+      {
+        id: PENDING_ID,
+        title: "pending.pdf",
+        driveFileId: `drive-${PENDING_ID}`,
+        fileHash: `hash-${PENDING_ID}`,
+        pipelineVersion: "f02-b02-test",
+        status: "pending",
+        rawText: null,
+        refinedText: null,
+        updatedAt: new Date("2026-04-01T12:00:00.000Z"),
+      },
+      {
+        id: FAILED_ID,
+        title: "failed.pdf",
+        driveFileId: `drive-${FAILED_ID}`,
+        fileHash: `hash-${FAILED_ID}`,
+        pipelineVersion: "f02-b02-test",
+        status: "failed",
+        rawText: "raw text",
+        refinedText: null,
+        updatedAt: new Date("2026-05-01T12:00:00.000Z"),
+      },
+    ]);
+
+    await insertDocumentChunk(db, {
+      documentId: INDEXED_RECENT_ID,
+      chunkIndex: 0,
+      content: "recent chunk 1",
+    });
+    await insertDocumentChunk(db, {
+      documentId: INDEXED_RECENT_ID,
+      chunkIndex: 1,
+      content: "recent chunk 2",
+    });
+    await insertDocumentChunk(db, {
+      documentId: INDEXED_OLDER_ID,
+      chunkIndex: 0,
+      content: "older chunk",
+    });
+    await insertDocumentChunk(db, {
+      documentId: PENDING_ID,
+      chunkIndex: 0,
+      content: "pending chunk",
+    });
+    await insertDocumentChunk(db, {
+      documentId: FAILED_ID,
+      chunkIndex: 0,
+      content: "failed chunk",
+    });
+
+    const rows = await repository.listSelectableForFocusedRag();
+
+    expect(rows).toEqual([
+      {
+        id: INDEXED_RECENT_ID,
+        title: "indexed-recent.pdf",
+        authors: "Alice; Bob",
+        publicationYear: 2024,
+        doi: "10.1000/recent",
+        chunkCount: 2,
+        updatedAt: recentUpdatedAt,
+      },
+      {
+        id: INDEXED_OLDER_ID,
+        title: "indexed-older.pdf",
+        authors: null,
+        publicationYear: null,
+        doi: null,
+        chunkCount: 1,
+        updatedAt: olderUpdatedAt,
+      },
+    ]);
+  });
+
+  it("classifies documents for focused rag in a single safe vocabulary", async () => {
+    await db.insert(documents).values([
+      {
+        id: INDEXED_RECENT_ID,
+        title: "indexed.pdf",
+        driveFileId: `drive-${INDEXED_RECENT_ID}`,
+        fileHash: `hash-${INDEXED_RECENT_ID}`,
+        pipelineVersion: "f02-b02-test",
+        status: "processed",
+        rawText: "raw text",
+        refinedText: "refined text",
+      },
+      {
+        id: PROCESSED_UNINDEXED_ID,
+        title: "processed-unindexed.pdf",
+        driveFileId: `drive-${PROCESSED_UNINDEXED_ID}`,
+        fileHash: `hash-${PROCESSED_UNINDEXED_ID}`,
+        pipelineVersion: "f02-b02-test",
+        status: "processed",
+        rawText: "raw text",
+        refinedText: "refined text",
+      },
+      {
+        id: PENDING_ID,
+        title: "pending.pdf",
+        driveFileId: `drive-${PENDING_ID}`,
+        fileHash: `hash-${PENDING_ID}`,
+        pipelineVersion: "f02-b02-test",
+        status: "pending",
+        rawText: null,
+        refinedText: null,
+      },
+      {
+        id: FAILED_ID,
+        title: "failed.pdf",
+        driveFileId: `drive-${FAILED_ID}`,
+        fileHash: `hash-${FAILED_ID}`,
+        pipelineVersion: "f02-b02-test",
+        status: "failed",
+        rawText: "raw text",
+        refinedText: null,
+      },
+    ]);
+
+    await insertDocumentChunk(db, {
+      documentId: INDEXED_RECENT_ID,
+      chunkIndex: 0,
+      content: "indexed chunk",
+    });
+    await insertDocumentChunk(db, {
+      documentId: PENDING_ID,
+      chunkIndex: 0,
+      content: "pending chunk",
+    });
+
+    await expect(
+      repository.classifyForFocusedRag(INDEXED_RECENT_ID),
+    ).resolves.toBe("ok");
+    await expect(
+      repository.classifyForFocusedRag(PROCESSED_UNINDEXED_ID),
+    ).resolves.toBe("not_indexed");
+    await expect(repository.classifyForFocusedRag(PENDING_ID)).resolves.toBe(
+      "not_processed",
+    );
+    await expect(repository.classifyForFocusedRag(FAILED_ID)).resolves.toBe(
+      "not_processed",
+    );
+    await expect(repository.classifyForFocusedRag(UNKNOWN_ID)).resolves.toBe(
+      "not_found",
+    );
   });
 });
