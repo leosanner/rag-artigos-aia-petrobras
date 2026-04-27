@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-04-23
-**Current Work:** `F-05 / Answer Traceability` is implemented and verified locally; `F-06 / Conversational Query` is the next `/query` milestone, and `F-07 / Focused RAG` remains deferred until the shared query shell is rebased on those contracts
+**Last Updated:** 2026-04-26
+**Current Work:** `F-08 / Reranked Retrieval` is now the next `/query` milestone at the contract/planning stage; `F-06 / Conversational Query` and `F-07 / Focused RAG` remain deferred until they rebase on the evolved `F-04`/`F-05`/`F-08` retrieval and trace contract
 
 ---
 
 ## Recent Decisions
+
+### AD-015: Reranked retrieval becomes the next shared `/query` retrieval contract before conversation and focused retrieval (2026-04-26)
+
+**Decision:** Add `F-08 / Reranked Retrieval` as a new standalone feature contract after `F-05`. The shared ask request now needs a third explicit strategy, `rerank`, alongside `standard` and `explore`. `rerank` reuses the bounded candidate-expansion policy from `explore` (`candidateTopK = min(24, topK * 3)`), inserts a second-pass reranking provider behind its own interface, records reranking metadata/audit in traces, and introduces dedicated safe failure codes `reranking_failed` and `reranking_unavailable`.
+**Reason:** The current product request is a governed retrieval strategy that can inspect a wider first-pass candidate set and then choose the most relevant chunks for the query before generation. `F-04` intentionally left second-model reranking out of scope, and `F-05` now provides the audit foundation needed to make reranking inspectable instead of opaque. Making this a separate contract keeps the strategy explicit and prevents `explore` from being overloaded with a different product intent.
+**Trade-off:** The shared retrieval contract grows again before `F-06` and `F-07` are implemented. Future conversation and focused-retrieval work must now rebase on `F-08` in addition to the earlier `F-04`/`F-05` contracts, and the concrete reranker provider/model remains intentionally open until implementation time.
+**Impact:** Added `.specs/features/F-08-reranked-retrieval/spec.md`. Updated `.specs/project/query-experience-evolution.md`, `.specs/project/ROADMAP.md`, and `.specs/project/STATE.md` so the preferred `/query` sequence is now `F-04 -> F-05 -> F-08 -> F-06 -> F-07`. The root guidance doc (`CLAUDE.md`, surfaced through the `AGENTS.md` symlink) and the planned `F-06`/`F-07` feature specs now need to treat F-08 as the latest shared retrieval contract whenever they refer to future `/query` work.
 
 ### AD-014: Query-evolution feature ids are renumbered to keep the roadmap sequence contiguous (2026-04-22)
 
@@ -146,8 +153,9 @@ _None for now._
 - [x] ~~Define M2 feature contracts and close base RAG planning decisions~~ — resolved by AD-011
 - [x] ~~Implement `F-04 / Query Controls and Explore` with TDD against its spec~~ — completed by the F-04 Block 05 closeout and local verification on 2026-04-23
 - [x] ~~Implement `F-05 / Answer Traceability` with TDD against its spec~~ — completed by the F-05 Block 05 closeout and local verification on 2026-04-23
-- [ ] Implement `F-06 / Conversational Query` with TDD against its spec
-- [ ] Rebase and implement `F-07 / Focused RAG` after the `/query` evolution contracts land
+- [ ] Implement `F-08 / Reranked Retrieval` with TDD against its spec
+- [ ] Implement `F-06 / Conversational Query` with TDD against its spec after `F-08` lands
+- [ ] Rebase and implement `F-07 / Focused RAG` after the `/query` evolution contracts land, including `F-08`
 - [ ] Choose a definitive project name (current placeholder: "AIA Insight")
 - [ ] M4 PoC: compare **Mastra** vs **Vercel AI SDK alone** on one pilot task from `starter.md` §3.6 — criteria: Next.js integration, observability out of the box, maintenance cost (AD-003)
 

@@ -2,6 +2,36 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(rag): define the F-08 reranked retrieval contract
+
+Date: 2026-04-26
+
+Changed:
+
+- Added `.specs/features/F-08-reranked-retrieval/spec.md` as the new standalone
+  contract for the explicit `rerank` strategy on the shared global `/query`
+  flow and `POST /api/rag/ask`.
+- Updated `.specs/project/query-experience-evolution.md` so the `/query`
+  sequence now recognizes `rerank` as the next retrieval-evolution step after
+  F-05 and before the future F-06/F-07 work.
+- Updated `.specs/project/ROADMAP.md` and `.specs/project/STATE.md` so F-08 is
+  recorded as the next milestone in the shared retrieval contract, with
+  conversation and focused retrieval rebasing on it later.
+- Synced the root guidance docs and planned future feature contracts so their
+  future `/query` references now treat F-08 as part of the shared retrieval
+  surface.
+
+Files:
+
+- `.specs/features/F-08-reranked-retrieval/spec.md`
+- `.specs/project/query-experience-evolution.md`
+- `.specs/project/ROADMAP.md`
+- `.specs/project/STATE.md`
+- `.specs/project/CHANGELOG.md`
+- `.specs/features/F-06-conversational-query/spec.md`
+- `.specs/features/F-07-focused-rag/spec.md`
+- `CLAUDE.md`
+
 ## (unreleased) - fix(rag): sanitize unexpected ask-route failures
 
 Date: 2026-04-23
