@@ -37,6 +37,33 @@ Focused RAG should still be an extension of the base RAG flow, not a parallel
 pipeline. The primary retrieval difference is the document filter; the shared
 retrieval-controls and trace model stay intact.
 
+## Implementation Blocks
+
+This feature is implemented in the same small-block style used by F-01
+through F-06. Read this overview first, then open only the block document
+needed for the current task:
+
+- [01 - Domain: Focused Mode and Selectable Document](01-domain-focused-mode-and-selectable-document.md):
+  pure types and Zod schemas for the focused ask request, the
+  `SelectableRagDocument` DTO, and the safe `FocusedDocumentRejectionReason`
+  vocabulary; reuse of F-04/F-08 retrieval settings.
+- [02 - Persistence: Selectable Documents and Document-Scoped Retrieval](02-persistence-document-scoped-retrieval.md):
+  selector query for processed-and-indexed documents, classifier read for
+  rejection reasons, and a strict `document_id` filter on the existing
+  vector search.
+- [03 - Application: ListRagDocuments and Focused AnswerQuestion](03-application-list-documents-and-focused-answer.md):
+  selector use case and focused branch on `AnswerQuestion`, reusing the
+  shared retrieval, rerank, generation, citation, related-term, and trace
+  pipeline.
+- [04 - Interface: Documents API, Ask Extension, and `/query` Page](04-interface-api-and-query-page.md):
+  `GET /api/rag/documents` route, focused variant on `POST /api/rag/ask`
+  with sanitized 404/422 mapping, and the `/query` mode toggle plus
+  document picker on the shared shell.
+- [05 - Integration and Review](05-integration-and-review.md):
+  end-to-end verification across global / focused / rerank / conversation,
+  doc sync, closeout commands, and the required independent-review
+  handoff packet.
+
 ## Business Rules
 
 - RN-01: Focused RAG requires a valid `documentId`.
