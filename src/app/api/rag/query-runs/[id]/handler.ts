@@ -59,6 +59,7 @@ export function createRagQueryRunDetailHandler(
         question: run.question,
         answer: run.answer,
         mode: run.mode,
+        documentId: run.documentId,
         status: run.status,
         errorCode: run.errorCode,
         sources: run.sources,

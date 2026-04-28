@@ -82,6 +82,7 @@ function toRagRunDetailHttpResponse(trace: RagRunDetail) {
     question: trace.question,
     answer: trace.answer,
     mode: trace.mode,
+    documentId: trace.documentId,
     status: trace.status,
     errorCode: trace.errorCode,
     sources: trace.sources,

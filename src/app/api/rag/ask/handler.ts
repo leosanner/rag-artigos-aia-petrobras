@@ -73,12 +73,14 @@ export function createRagAskHandler(deps: RagAskHandlerDeps) {
       });
     }
 
-    if (result.error === "generation_failed") {
-      return generationFailedResponse();
-    }
+    if (result.kind === "error") {
+      if (result.error === "generation_failed") {
+        return generationFailedResponse();
+      }
 
-    if (result.error === "generation_unavailable") {
-      return generationUnavailableResponse();
+      if (result.error === "generation_unavailable") {
+        return generationUnavailableResponse();
+      }
     }
 
     return technicalErrorResponse();
