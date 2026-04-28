@@ -1064,6 +1064,29 @@
   gap: 10px;
 }
 
+.auditAside .sourceActionRow {
+  margin-top: 10px;
+}
+
+.auditAside .sourceActionButton {
+  width: auto;
+  min-height: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--aside-rule-strong);
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--aside-indigo);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.auditAside .sourceActionButton:hover {
+  transform: none;
+  box-shadow: none;
+  background: rgba(70, 82, 211, 0.08);
+}
+
 /* Source chips: tinted pills, color-coded. */
 .auditAside .sourceChip {
   min-height: 0;
@@ -1379,6 +1402,10 @@
   word-break: break-word;
 }
 
+.sourceContent {
+  min-width: 0;
+}
+
 .sourceExcerpt {
   margin: 0;
   font-size: 0.94rem;
@@ -1409,6 +1436,16 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.sourceActionRow {
+  margin-top: 16px;
+}
+
+.sourceActionButton {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
 }
 
 .emptySources {
