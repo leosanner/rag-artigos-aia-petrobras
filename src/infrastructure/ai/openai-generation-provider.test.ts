@@ -10,6 +10,12 @@ import {
 const GENERATION_MODEL = "gpt-4.1-mini";
 const PROMPT_VERSION = "f04-global-rag-v1";
 
+async function* streamChunks(chunks: string[]) {
+  for (const chunk of chunks) {
+    yield chunk;
+  }
+}
+
 describe("OpenAiGenerationProvider", () => {
   it("generates an answer with normalized usage and estimated cost", async () => {
     const model = { provider: "openai", modelId: GENERATION_MODEL };
@@ -220,6 +226,117 @@ describe("OpenAiGenerationProvider", () => {
         estimatedCostUsd: 0,
       },
     });
+  });
+
+  it("streams text deltas, accumulates the final answer, and returns normalized usage", async () => {
+    const model = { provider: "openai", modelId: GENERATION_MODEL };
+    const modelFactory = vi.fn().mockReturnValue(model);
+    const onTextDelta = vi.fn();
+    const streamText = vi.fn().mockReturnValue({
+      textStream: streamChunks(["Resposta", " em", " stream", " [1]."]),
+      text: Promise.resolve("Resposta em stream [1]."),
+      usage: Promise.resolve({
+        inputTokens: 91,
+        outputTokens: 18,
+        totalTokens: 109,
+        inputTokenDetails: {
+          cacheReadTokens: 9,
+        },
+      }),
+    });
+    const provider = new OpenAiGenerationProvider({
+      defaultGenerationModel: GENERATION_MODEL,
+      modelFactory,
+      streamText,
+    });
+
+    await expect(
+      provider.streamAnswer({
+        question: "O que os documentos dizem?",
+        promptContext: "[1] Título: artigo.pdf\nChunk: 0\nTrecho:\nTexto",
+        promptVersion: PROMPT_VERSION,
+        generationModel: GENERATION_MODEL,
+        retrievalStrategy: "standard",
+        onTextDelta,
+      }),
+    ).resolves.toEqual({
+      answer: "Resposta em stream [1].",
+      usage: {
+        inputTokens: 91,
+        outputTokens: 18,
+        totalTokens: 109,
+        estimatedCostUsd: 0.0000625,
+      },
+    });
+
+    expect(onTextDelta).toHaveBeenCalledTimes(4);
+    expect(onTextDelta).toHaveBeenNthCalledWith(1, "Resposta");
+    expect(streamText).toHaveBeenCalledWith({
+      model,
+      system: expect.stringContaining("Responda sempre em português do Brasil."),
+      prompt: expect.stringContaining("Pergunta:\nO que os documentos dizem?"),
+    });
+  });
+
+  it("rejects an empty streamed answer with a sanitized generation_failed error", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const provider = new OpenAiGenerationProvider({
+      defaultGenerationModel: GENERATION_MODEL,
+      modelFactory: vi.fn().mockReturnValue({}),
+      streamText: vi.fn().mockReturnValue({
+        textStream: streamChunks(["   ", "\n"]),
+        text: Promise.resolve("   "),
+        usage: Promise.resolve({
+          inputTokens: 10,
+          outputTokens: 1,
+          totalTokens: 11,
+        }),
+      }),
+    });
+
+    await expect(
+      provider.streamAnswer({
+        question: "Pergunta",
+        promptContext: "[1] Fonte",
+        promptVersion: PROMPT_VERSION,
+        generationModel: GENERATION_MODEL,
+        retrievalStrategy: "standard",
+      }),
+    ).rejects.toMatchObject({
+      code: "generation_failed",
+      message: "generation_failed",
+    });
+
+    errorSpy.mockRestore();
+  });
+
+  it("maps transient provider failures during streaming to generation_unavailable", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const provider = new OpenAiGenerationProvider({
+      defaultGenerationModel: GENERATION_MODEL,
+      modelFactory: vi.fn().mockReturnValue({}),
+      streamText: vi.fn(() => {
+        throw {
+          statusCode: 503,
+          message: "temporarily unavailable",
+        };
+      }),
+    });
+
+    await expect(
+      provider.streamAnswer({
+        question: "Pergunta",
+        promptContext: "[1] Fonte",
+        promptVersion: PROMPT_VERSION,
+        generationModel: GENERATION_MODEL,
+        retrievalStrategy: "standard",
+      }),
+    ).rejects.toMatchObject({
+      code: "generation_unavailable",
+      message: "generation_unavailable",
+    });
+
+    errorSpy.mockRestore();
   });
 
   it("maps transient provider failures to a sanitized generation_unavailable error", async () => {
