@@ -1,11 +1,42 @@
 # State
 
 **Last Updated:** 2026-04-28
-**Current Work:** `F-07 / Focused RAG` Block 05 implementation closeout has landed (integration test + doc sync + lint/typecheck/test). `F-08 / Reranked Retrieval` remains the next `/query` retrieval contract, and Block 05 of F-07 has explicitly deferred the focused `rerank` verification sub-step until F-08 ships. Independent review of F-07 is still pending — a fresh reviewer agent must approve before F-07 is treated as fully reviewed (per CLAUDE.md).
+**Current Work:** `F-10 / Streaming Query UX` implementation has landed on the conversation transport and `/query`, including SSE event negotiation, live source reveal, and token-by-token answer rendering. `F-08 / Reranked Retrieval` still remains the oldest open shared `/query` retrieval contract, while independent reviews of both `F-07` and `F-10` are still pending — each must use a fresh reviewer thread per `CLAUDE.md`.
 
 ---
 
 ## Recent Decisions
+
+### AD-017: Streaming is introduced first on the conversation transport, not on the ask endpoint (2026-04-28)
+
+**Decision:** Implement `F-10 / Streaming Query UX` only on
+`POST /api/rag/conversations/:id/messages` through SSE negotiation on the same
+route. The handler keeps the current JSON conversation response as a fallback
+for non-stream clients, while `POST /api/rag/ask` remains unchanged and
+JSON-only in this first streaming cut. Live source events expose only the final
+selected answer sources, the streamed path persists the user row first and the
+assistant row only after final answer validation plus trace persistence, and
+mid-stream safe failures surface as `error` SSE events under HTTP 200.
+**Reason:** The user need is specifically the `/query` chat UX: show retrieval
+progress, show the governed source list in real time, and let the answer text
+appear progressively without creating a parallel chat engine or widening the
+transport change to every query endpoint at once. Upgrading the existing
+conversation route keeps the blast radius smaller and lets the UI reuse the
+same persisted transcript/trace model after completion.
+**Trade-off:** Streaming is not yet uniform across the whole RAG surface.
+Single-turn ask requests still wait for the full response, and reconnect/resume
+semantics remain out of scope. The review packet must pay attention to the
+pre-stream JSON failure vs mid-stream SSE `error` split so that transport
+behavior stays intentional instead of accidental.
+**Impact:** Added
+`.specs/features/F-10-streaming-query-ux/spec.md` plus Blocks 01-05. Extended
+`AnswerQuestion` with a streamed execution path, added
+`StreamConversationMessage`, extended `GenerationProvider` and the OpenAI
+adapter with `streamAnswer(...)`, negotiated SSE in
+`src/app/api/rag/conversations/[id]/messages/handler.ts`, updated
+`src/app/query/page.tsx` with a transient streaming assistant bubble, and added
+streaming route/UI/integration coverage including
+`src/app/api/rag/streaming-query.integration.test.ts`.
 
 ### AD-016: F-07 Focused RAG is implemented before F-08 with rerank verification deferred (2026-04-28)
 
@@ -146,7 +177,8 @@ _None for now._
 ## Deferred Ideas
 
 - [ ] Automated answer-quality evaluation (ragas/evals) — Captured during: initial roadmap
-- [ ] Streaming answers in the frontend — Captured during: initial roadmap
+- [ ] Stream reconnect/resume semantics for interrupted conversation SSE turns — Captured during: F-10 closeout
+- [ ] Inline clickable citation markers in the chat transcript — Captured during: F-09 and F-10 closeout
 - [ ] Pipeline-versioned batch reprocessing — Captured during: initial roadmap
 - [ ] Integration with external sources (Scielo, arXiv) — Captured during: initial roadmap
 
@@ -163,7 +195,9 @@ _None for now._
 - [ ] Implement `F-08 / Reranked Retrieval` with TDD against its spec — when this lands, also re-open Block 05 RF-B05-02 #6 in F-07 to add focused `rerank` integration coverage
 - [x] ~~Implement `F-06 / Conversational Query`~~ — completed before F-07 closeout (see git history)
 - [x] ~~Implement `F-07 / Focused RAG`~~ — Block 05 implementation closeout completed on 2026-04-28 (AD-016); independent review still pending
+- [x] ~~Implement `F-10 / Streaming Query UX` on the conversation path~~ — completed on 2026-04-28 (AD-017); independent review still pending
 - [ ] Independent review of `F-07 / Focused RAG` by a fresh reviewer agent (per CLAUDE.md) — required before F-07 is marked reviewed
+- [ ] Independent review of `F-10 / Streaming Query UX` by a fresh reviewer agent (per CLAUDE.md) — required before F-10 is marked reviewed
 - [ ] Choose a definitive project name (current placeholder: "AIA Insight")
 - [ ] M4 PoC: compare **Mastra** vs **Vercel AI SDK alone** on one pilot task from `starter.md` §3.6 — criteria: Next.js integration, observability out of the box, maintenance cost (AD-003)
 
