@@ -276,7 +276,7 @@
 }
 
 .fieldQuestion::after {
-  content: "INPUT // GLOBAL";
+  content: "INPUT // QUERY";
   position: absolute;
   top: -12px;
   right: 16px;
@@ -296,6 +296,42 @@
   background: var(--paper-deep);
 }
 
+.fieldMode,
+.fieldFocusedDocument {
+  position: relative;
+  background: var(--paper-deep);
+}
+
+.fieldMode::after {
+  content: "MODE";
+  position: absolute;
+  top: -12px;
+  right: 16px;
+  padding: 3px 10px;
+  background: var(--blue);
+  color: var(--paper);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  border: var(--border);
+}
+
+.fieldFocusedDocument::after {
+  content: "FOCUS";
+  position: absolute;
+  top: -12px;
+  right: 16px;
+  padding: 3px 10px;
+  background: var(--lime);
+  color: var(--ink);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  border: var(--border);
+}
+
 .fieldControls::after {
   content: "TOP-K";
   position: absolute;
@@ -309,6 +345,42 @@
   font-weight: 600;
   letter-spacing: 0.18em;
   border: var(--border);
+}
+
+.modeFieldset {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.modeOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.modeOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: var(--border);
+  background: var(--paper);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.modeOption input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
 }
 
 .label {
@@ -330,6 +402,7 @@
 }
 
 .input,
+.select,
 .textarea {
   width: 100%;
   padding: 14px 16px;
@@ -348,6 +421,12 @@
   letter-spacing: 0.2em;
 }
 
+.select {
+  appearance: none;
+  letter-spacing: 0;
+  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
+}
+
 .numberInput {
   max-width: 160px;
   letter-spacing: 0;
@@ -362,12 +441,14 @@
 }
 
 .input::placeholder,
+.select::placeholder,
 .textarea::placeholder {
   color: var(--ink);
   opacity: 0.32;
 }
 
 .input:focus,
+.select:focus,
 .textarea:focus {
   transform: translate(-2px, -2px);
   box-shadow: 4px 4px 0 0 var(--ink);
@@ -393,6 +474,43 @@
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.12em;
+}
+
+.inlineNote {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.45;
+  opacity: 0.82;
+}
+
+.inlineActionRow {
+  display: grid;
+  gap: 12px;
+}
+
+.documentSummary {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: var(--border);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+}
+
+.documentSummaryTitle {
+  margin: 0;
+  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.documentSummaryMeta {
+  margin: 0;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.78;
 }
 
 .btn {

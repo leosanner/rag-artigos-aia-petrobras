@@ -18,6 +18,18 @@ export const RAG_GENERATION_UNAVAILABLE_MESSAGE =
 export const RAG_NETWORK_ERROR_MESSAGE =
   "Falha de rede ao falar com o servidor. Verifique a conexao e tente novamente.";
 
+export const RAG_FOCUSED_DOCUMENT_NOT_FOUND_MESSAGE =
+  "Documento nao encontrado ou indisponivel para foco.";
+
+export const RAG_FOCUSED_DOCUMENT_NOT_FOCUSABLE_MESSAGE =
+  "Documento ainda nao esta pronto para consulta focada.";
+
+export const RAG_FOCUSED_DOCUMENTS_ERROR_MESSAGE =
+  "Nao foi possivel carregar os documentos focaveis agora. Tente novamente em instantes.";
+
+export const RAG_FOCUSED_DOCUMENTS_EMPTY_MESSAGE =
+  "Nenhum documento pronto para consulta focada foi encontrado.";
+
 export function formatTechnicalErrorMessage(httpStatus: number | null): string {
   const tail = httpStatus === null ? "" : ` [HTTP ${httpStatus}]`;
   return `Erro tecnico ao consultar a base.${tail} Tente novamente em instantes.`;
