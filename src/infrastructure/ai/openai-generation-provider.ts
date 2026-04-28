@@ -1,9 +1,13 @@
 import { createOpenAI, openai } from "@ai-sdk/openai";
-import { generateText as aiGenerateText } from "ai";
+import {
+  generateText as aiGenerateText,
+  streamText as aiStreamText,
+} from "ai";
 
 import type {
   GenerateAnswerInput,
   GenerationProvider,
+  StreamAnswerInput,
 } from "@/application/rag/ports";
 import {
   GenerationFailure,
@@ -31,6 +35,23 @@ type GenerateTextFn = (input: {
   };
 }>;
 
+type StreamTextFn = (input: {
+  model: unknown;
+  system: string;
+  prompt: string;
+}) => {
+  textStream: AsyncIterable<string>;
+  usage: PromiseLike<{
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    inputTokenDetails?: {
+      cacheReadTokens?: number;
+    };
+  }>;
+  text: PromiseLike<string>;
+};
+
 type ModelFactory = (model: string) => unknown;
 type OpenAiProviderFactory = (options?: { apiKey?: string }) => {
   chat(modelId: string): unknown;
@@ -40,23 +61,28 @@ export type OpenAiGenerationProviderDeps = {
   defaultGenerationModel?: string;
   modelFactory?: ModelFactory;
   generateText?: GenerateTextFn;
+  streamText?: StreamTextFn;
 };
 
 export type OpenAiGenerationProviderFactoryDeps = {
   createProvider?: OpenAiProviderFactory;
   generateText?: GenerateTextFn;
+  streamText?: StreamTextFn;
 };
 
 export class OpenAiGenerationProvider implements GenerationProvider {
   private readonly defaultGenerationModel?: string;
   private readonly modelFactory: ModelFactory;
   private readonly generateTextFn: GenerateTextFn;
+  private readonly streamTextFn: StreamTextFn;
 
   constructor(deps: OpenAiGenerationProviderDeps = {}) {
     this.defaultGenerationModel = deps.defaultGenerationModel;
     this.modelFactory = deps.modelFactory ?? ((model) => openai.chat(model));
     this.generateTextFn =
       deps.generateText ?? (aiGenerateText as unknown as GenerateTextFn);
+    this.streamTextFn =
+      deps.streamText ?? (aiStreamText as unknown as StreamTextFn);
   }
 
   async generateAnswer(input: GenerateAnswerInput): Promise<{
@@ -94,30 +120,82 @@ export class OpenAiGenerationProvider implements GenerationProvider {
         throw new GenerationFailure("generation_failed", "generation_failed");
       }
 
-      const inputTokens = result.usage?.inputTokens ?? 0;
-      const outputTokens = result.usage?.outputTokens ?? 0;
-      const totalTokens =
-        result.usage?.totalTokens ?? inputTokens + outputTokens;
-      const cachedInputTokens =
-        result.usage?.inputTokenDetails?.cacheReadTokens ?? 0;
-
       return {
         answer,
-        usage: {
-          inputTokens,
-          outputTokens,
-          totalTokens,
-          estimatedCostUsd: estimateOpenAiGenerationCostUsd({
-            model: generationModel,
-            inputTokens,
-            cachedInputTokens,
-            outputTokens,
-          }),
-        },
+        usage: toGenerationUsage(generationModel, result.usage ?? {}),
       };
     } catch (error) {
       logRagError(
         "ai.generation_provider_failed",
+        {
+          model: generationModel,
+          promptVersion: input.promptVersion,
+          retrievalStrategy: input.retrievalStrategy,
+        },
+        error,
+      );
+      throw new GenerationFailure(
+        classifyGenerationFailure(error),
+        classifyGenerationFailure(error),
+      );
+    }
+  }
+
+  async streamAnswer(input: StreamAnswerInput): Promise<{
+    answer: string;
+    usage: {
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      estimatedCostUsd: number;
+    };
+  }> {
+    const generationModel =
+      input.generationModel || this.defaultGenerationModel;
+
+    if (!generationModel) {
+      throw new GenerationFailure(
+        "generation_failed",
+        "generation_failed",
+      );
+    }
+
+    try {
+      const result = this.streamTextFn({
+        model: this.modelFactory(generationModel),
+        system: buildSystemPrompt(input.promptVersion, input.retrievalStrategy),
+        prompt: buildUserPrompt(
+          input.question,
+          input.promptContext,
+          input.conversationContext,
+        ),
+      });
+
+      let answer = "";
+
+      for await (const textDelta of result.textStream) {
+        if (textDelta.length === 0) {
+          continue;
+        }
+
+        answer += textDelta;
+        await input.onTextDelta?.(textDelta);
+      }
+
+      const usage = await result.usage;
+      const trimmedAnswer = answer.trim();
+
+      if (trimmedAnswer.length === 0) {
+        throw new GenerationFailure("generation_failed", "generation_failed");
+      }
+
+      return {
+        answer: trimmedAnswer,
+        usage: toGenerationUsage(generationModel, usage),
+      };
+    } catch (error) {
+      logRagError(
+        "ai.generation_provider_stream_failed",
         {
           model: generationModel,
           promptVersion: input.promptVersion,
@@ -148,6 +226,7 @@ export function createOpenAiGenerationProviderFromEnv(
     defaultGenerationModel: env.RAG_GENERATION_MODEL,
     modelFactory: (model) => provider.chat(model),
     generateText: deps.generateText,
+    streamText: deps.streamText,
   });
 }
 
@@ -222,6 +301,35 @@ function classifyGenerationFailure(error: unknown) {
   }
 
   return "generation_failed";
+}
+
+function toGenerationUsage(
+  generationModel: string,
+  usage: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    inputTokenDetails?: {
+      cacheReadTokens?: number;
+    };
+  },
+) {
+  const inputTokens = usage.inputTokens ?? 0;
+  const outputTokens = usage.outputTokens ?? 0;
+  const totalTokens = usage.totalTokens ?? inputTokens + outputTokens;
+  const cachedInputTokens = usage.inputTokenDetails?.cacheReadTokens ?? 0;
+
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    estimatedCostUsd: estimateOpenAiGenerationCostUsd({
+      model: generationModel,
+      inputTokens,
+      cachedInputTokens,
+      outputTokens,
+    }),
+  };
 }
 
 function extractStatusCode(error: unknown): number | null {
