@@ -8,13 +8,16 @@ import {
   conversationDetailResponseSchema,
   conversationMessageResponseSchema,
   createConversationResponseSchema,
+  ragConversationStreamEventSchema,
   ragQueryRunDetailResponseSchema,
   type AppendConversationMessageResponse,
   type ConversationDetailResponse,
   type ConversationMessageResponse,
   type CreateConversationResponse,
+  type RagConversationStreamEvent,
 } from "@/application/rag/schemas";
 import type { AppendConversationMessageOutput } from "@/application/rag/append-conversation-message";
+import type { StreamConversationMessageEvent } from "@/application/rag/stream-conversation-message-events";
 import type { RagRunDetail } from "@/repositories/rag-query-runs-repository";
 
 export function toCreateConversationHttpResponse(
@@ -74,6 +77,34 @@ export function toAppendConversationMessageHttpResponse(
   }
 
   throw new Error("unsupported_append_conversation_message_result");
+}
+
+export function toConversationStreamEventHttpResponse(
+  event: StreamConversationMessageEvent,
+): RagConversationStreamEvent {
+  switch (event.type) {
+    case "user_message_created":
+      return ragConversationStreamEventSchema.parse({
+        type: event.type,
+        userMessage: toConversationMessageHttpResponse(event.userMessage),
+      });
+    case "phase":
+      return ragConversationStreamEventSchema.parse(event);
+    case "source":
+      return ragConversationStreamEventSchema.parse(event);
+    case "answer_delta":
+      return ragConversationStreamEventSchema.parse(event);
+    case "done":
+      return ragConversationStreamEventSchema.parse({
+        type: event.type,
+        status: event.status,
+        assistantMessage: toConversationMessageHttpResponse(
+          event.assistantMessage,
+        ),
+      });
+    case "error":
+      return ragConversationStreamEventSchema.parse(event);
+  }
 }
 
 function toRagRunDetailHttpResponse(trace: RagRunDetail) {
