@@ -56,8 +56,16 @@ export type GenerateAnswerInput = {
   retrievalStrategy: RagRetrievalStrategy;
 };
 
+export type StreamAnswerInput = GenerateAnswerInput & {
+  onTextDelta?: (textDelta: string) => Promise<void> | void;
+};
+
 export interface GenerationProvider {
   generateAnswer(input: GenerateAnswerInput): Promise<{
+    answer: string;
+    usage: GenerationUsage;
+  }>;
+  streamAnswer(input: StreamAnswerInput): Promise<{
     answer: string;
     usage: GenerationUsage;
   }>;
