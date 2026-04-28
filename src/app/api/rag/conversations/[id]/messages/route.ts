@@ -1,6 +1,8 @@
 import { AppendConversationMessage } from "@/application/rag/append-conversation-message";
 import { AnswerQuestion } from "@/application/rag/answer-question";
+import { GetConversationDetail } from "@/application/rag/get-conversation-detail";
 import { RetrieveChunks } from "@/application/rag/retrieve-chunks";
+import { StreamConversationMessage } from "@/application/rag/stream-conversation-message";
 import { db } from "@/db/client";
 import { env } from "@/env/server";
 import { createOpenAiEmbeddingProviderFromEnv } from "@/infrastructure/ai/openai-embedding-provider";
@@ -42,8 +44,18 @@ const appendMessage = new AppendConversationMessage({
   messages: messagesRepository,
   answerQuestion,
 });
+const getConversationDetail = new GetConversationDetail({
+  conversations: conversationsRepository,
+});
+const streamMessage = new StreamConversationMessage({
+  conversations: conversationsRepository,
+  messages: messagesRepository,
+  answerQuestion,
+});
 
 export const POST = createRagConversationMessagesHandler({
   appendMessage,
+  getConversationDetail,
+  streamMessage,
   secret: env.RAG_QUERY_SECRET ?? "",
 });
