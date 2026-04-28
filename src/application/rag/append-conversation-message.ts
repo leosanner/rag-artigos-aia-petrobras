@@ -124,6 +124,10 @@ export class AppendConversationMessage {
       };
     }
 
+    if (turnResult.kind === "focused_document_rejected") {
+      throw new Error("unexpected_focused_rejection_in_global_conversation");
+    }
+
     const createdAssistantMessage = await this.messages.append({
       conversationId: input.conversationId,
       role: "assistant",

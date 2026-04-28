@@ -5,6 +5,7 @@ import {
   extractRelatedTerms,
   type RetrievedChunkMatch,
 } from "@/domain/rag";
+import type { FocusedDocumentClassification } from "@/repositories/documents-repository";
 
 import type { EmbeddingUsage, GenerationUsage } from "./ports";
 import { AnswerQuestion } from "./answer-question";
@@ -14,6 +15,7 @@ const GENERATION_MODEL = "gpt-4.1-mini";
 const EMBEDDING_MODEL = "text-embedding-3-large";
 const PROMPT_VERSION = "f04-global-rag-v1";
 const CREATED_RUN_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const FOCUSED_DOCUMENT_ID = "44444444-4444-4444-8444-444444444444";
 
 function buildMatch(
   overrides: Partial<RetrievedChunkMatch> = {},
@@ -69,6 +71,7 @@ function createService(
     createError?: unknown;
     nowMs?: () => number;
     createdRunId?: string;
+    classification?: FocusedDocumentClassification;
   } = {},
 ) {
   const matches =
@@ -113,11 +116,17 @@ function createService(
           })
         : vi.fn().mockRejectedValue(overrides.createError),
   };
+  const focusedDocumentClassifier = {
+    classifyForFocusedRag: vi
+      .fn()
+      .mockResolvedValue(overrides.classification ?? "ok"),
+  };
 
   const service = new AnswerQuestion({
     retrieveChunks,
     generationProvider,
     runsRepository,
+    focusedDocumentClassifier,
     generationModel: GENERATION_MODEL,
     promptVersion: PROMPT_VERSION,
     nowMs: overrides.nowMs ?? createNowMs(432),
@@ -128,6 +137,7 @@ function createService(
     retrieveChunks,
     generationProvider,
     runsRepository,
+    focusedDocumentClassifier,
     matches,
     embeddingUsage,
     generationUsage,
@@ -135,20 +145,148 @@ function createService(
 }
 
 describe("AnswerQuestion", () => {
-  it("rejects unsupported modes before retrieval or persistence", async () => {
-    const { service, retrieveChunks, generationProvider, runsRepository } =
-      createService();
+  it("rejects a focused request when classification returns not_processed without calling embedding, generation, or persisting a run", async () => {
+    const {
+      service,
+      retrieveChunks,
+      generationProvider,
+      runsRepository,
+      focusedDocumentClassifier,
+    } = createService({ classification: "not_processed" });
+
+    await expect(
+      service.execute({
+        question: "Quais técnicas o documento descreve?",
+        mode: "focused",
+        documentId: FOCUSED_DOCUMENT_ID,
+      }),
+    ).resolves.toEqual({
+      kind: "focused_document_rejected",
+      reason: "not_processed",
+    });
+
+    expect(focusedDocumentClassifier.classifyForFocusedRag).toHaveBeenCalledWith(
+      FOCUSED_DOCUMENT_ID,
+    );
+    expect(retrieveChunks.search).not.toHaveBeenCalled();
+    expect(generationProvider.generateAnswer).not.toHaveBeenCalled();
+    expect(runsRepository.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a focused request for an unknown document with the not_found reason", async () => {
+    const { service, runsRepository } = createService({
+      classification: "not_found",
+    });
 
     await expect(
       service.execute({
         question: "Pergunta",
-        mode: "focused" as never,
+        mode: "focused",
+        documentId: FOCUSED_DOCUMENT_ID,
       }),
-    ).rejects.toThrow(/unsupported/i);
-
-    expect(retrieveChunks.search).not.toHaveBeenCalled();
-    expect(generationProvider.generateAnswer).not.toHaveBeenCalled();
+    ).resolves.toEqual({
+      kind: "focused_document_rejected",
+      reason: "not_found",
+    });
     expect(runsRepository.create).not.toHaveBeenCalled();
+  });
+
+  it("forwards documentId to retrieval and persists a focused trace with mode=focused and the documentId", async () => {
+    const {
+      service,
+      retrieveChunks,
+      runsRepository,
+      focusedDocumentClassifier,
+    } = createService({
+      answer: "Resposta focada [2].",
+    });
+    const question = "Pergunta focada?";
+
+    const result = await service.execute({
+      question,
+      mode: "focused",
+      documentId: FOCUSED_DOCUMENT_ID,
+    });
+
+    expect(result).toMatchObject({
+      kind: "answered",
+      status: "answered",
+      mode: "focused",
+      metadata: expect.objectContaining({
+        mode: "focused",
+        documentId: FOCUSED_DOCUMENT_ID,
+      }),
+    });
+    expect(focusedDocumentClassifier.classifyForFocusedRag).toHaveBeenCalledWith(
+      FOCUSED_DOCUMENT_ID,
+    );
+    expect(retrieveChunks.search).toHaveBeenCalledWith({
+      question,
+      retrieval: {
+        topK: 6,
+        strategy: "standard",
+      },
+      documentId: FOCUSED_DOCUMENT_ID,
+    });
+    expect(runsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: "focused",
+        documentId: FOCUSED_DOCUMENT_ID,
+        status: "answered",
+      }),
+    );
+  });
+
+  it("returns answered_no_evidence on a focused request when retrieval finds no chunks and persists mode=focused with documentId", async () => {
+    const { service, generationProvider, runsRepository } = createService({
+      matches: [],
+    });
+
+    const result = await service.execute({
+      question: "Pergunta focada sem evidência?",
+      mode: "focused",
+      documentId: FOCUSED_DOCUMENT_ID,
+    });
+
+    expect(result).toMatchObject({
+      kind: "answered",
+      status: "answered_no_evidence",
+      mode: "focused",
+      sources: [],
+    });
+    expect(generationProvider.generateAnswer).not.toHaveBeenCalled();
+    expect(runsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: "focused",
+        documentId: FOCUSED_DOCUMENT_ID,
+        status: "answered_no_evidence",
+      }),
+    );
+  });
+
+  it("persists a focused generation_failed run with mode=focused and the documentId", async () => {
+    const { service, runsRepository } = createService({
+      generationError: new Error("boom"),
+    });
+
+    await expect(
+      service.execute({
+        question: "Pergunta focada?",
+        mode: "focused",
+        documentId: FOCUSED_DOCUMENT_ID,
+      }),
+    ).resolves.toEqual({
+      kind: "error",
+      error: "generation_failed",
+    });
+    expect(runsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: "focused",
+        documentId: FOCUSED_DOCUMENT_ID,
+        status: "generation_failed",
+        errorCode: "generation_failed",
+      }),
+    );
   });
 
   it("persists answered_no_evidence when no chunks are retrieved and derives related terms from the question only", async () => {
@@ -184,6 +322,7 @@ describe("AnswerQuestion", () => {
       }),
       metadata: {
         mode: "global",
+        documentId: null,
         topK: 6,
         retrievalStrategy: "standard",
         candidateTopK: 6,
@@ -212,6 +351,7 @@ describe("AnswerQuestion", () => {
       question,
       answer: buildNoEvidenceAnswer(),
       mode: "global",
+      documentId: null,
       status: "answered_no_evidence",
       errorCode: null,
       topK: 6,
@@ -290,6 +430,7 @@ describe("AnswerQuestion", () => {
       relatedTerms: expectedRelatedTerms,
       metadata: {
         mode: "global",
+        documentId: null,
         topK: 9,
         retrievalStrategy: "standard",
         candidateTopK: 9,
@@ -324,6 +465,7 @@ describe("AnswerQuestion", () => {
       question,
       answer: "A síntese prioriza a segunda fonte [2].",
       mode: "global",
+      documentId: null,
       status: "answered",
       errorCode: null,
       topK: 9,
@@ -377,6 +519,7 @@ describe("AnswerQuestion", () => {
       status: "answered",
       metadata: {
         mode: "global",
+        documentId: null,
         topK: 6,
         retrievalStrategy: "explore",
         candidateTopK: 18,
@@ -512,6 +655,7 @@ describe("AnswerQuestion", () => {
       question,
       answer: null,
       mode: "global",
+      documentId: null,
       status: "generation_failed",
       errorCode: "generation_failed",
       topK: 6,
@@ -572,6 +716,7 @@ describe("AnswerQuestion", () => {
       question,
       answer: null,
       mode: "global",
+      documentId: null,
       status: "generation_unavailable",
       errorCode: "generation_unavailable",
       topK: 6,
@@ -690,6 +835,7 @@ describe("AnswerQuestion", () => {
       question,
       answer: null,
       mode: "global",
+      documentId: null,
       status: "generation_unavailable",
       errorCode: "generation_unavailable",
       topK: 6,

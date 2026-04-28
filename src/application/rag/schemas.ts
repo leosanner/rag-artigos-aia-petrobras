@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   EXPLORE_RETRIEVAL_MAX_CANDIDATES,
+  FOCUSED_DOCUMENT_REJECTION_REASONS,
   FocusedRagAskRequestSchema,
   RAG_QUERY_RUN_ERROR_CODES,
   RAG_QUERY_RUN_STATUSES,
@@ -9,6 +10,7 @@ import {
   RAG_RETRIEVAL_MIN_TOP_K,
   RagRetrievalSettingsSchema,
   RagRetrievalStrategySchema,
+  type FocusedDocumentRejectionReason,
   type FocusedRagAskRequest,
   type RagSource as DomainRagSource,
   type RagQueryRunErrorCode as DomainRagQueryRunErrorCode,
@@ -40,10 +42,17 @@ export type GlobalRagAskInput = z.infer<typeof globalRagAskInputSchema>;
 export type AnswerQuestionConversationContext = {
   transcript: string;
 };
-export type AnswerQuestionInput = GlobalRagAskInput & {
+type AnswerQuestionInputExtensions = {
   conversationContext?: AnswerQuestionConversationContext;
   requestTraceId?: string;
 };
+export type GlobalAnswerQuestionInput = GlobalRagAskInput &
+  AnswerQuestionInputExtensions;
+export type FocusedAnswerQuestionInput = FocusedRagAskRequest &
+  AnswerQuestionInputExtensions;
+export type AnswerQuestionInput =
+  | GlobalAnswerQuestionInput
+  | FocusedAnswerQuestionInput;
 
 const ragSourceShape = {
   sourceNumber: z.number().int().positive(),
@@ -94,7 +103,8 @@ const ragQueryRunErrorCodeSchema: z.ZodType<DomainRagQueryRunErrorCode> =
 
 export const ragAnswerMetadataSchema = z
   .object({
-    mode: z.literal("global"),
+    mode: z.enum(["global", "focused"]),
+    documentId: z.string().uuid().nullable(),
     topK: z
       .number()
       .int()
@@ -148,7 +158,7 @@ export type RagAnswerAudit = z.infer<typeof ragAnswerAuditSchema>;
 export const ragAnsweredResponseSchema = z
   .object({
     answer: z.string().min(1),
-    mode: z.literal("global"),
+    mode: z.enum(["global", "focused"]),
     sources: z.array(ragSourceSchema),
     metadata: ragAnswerMetadataSchema,
   })
@@ -200,7 +210,8 @@ export const ragQueryRunDetailResponseSchema = z
     id: z.string().uuid(),
     question: z.string().min(1),
     answer: z.string().min(1).nullable(),
-    mode: z.literal("global"),
+    mode: z.enum(["global", "focused"]),
+    documentId: z.string().uuid().nullable(),
     status: ragQueryRunStatusSchema,
     errorCode: ragQueryRunErrorCodeSchema.nullable(),
     sources: z.array(ragRunSourceResponseSchema),
@@ -405,7 +416,7 @@ export const answerQuestionAnsweredResultSchema = z
     status: z.enum(["answered", "answered_no_evidence"]),
     traceId: z.string().uuid(),
     answer: z.string().min(1),
-    mode: z.literal("global"),
+    mode: z.enum(["global", "focused"]),
     sources: z.array(ragSourceSchema),
     relatedTerms: z.array(relatedTermSchema),
     metadata: ragAnswerMetadataSchema,
@@ -420,9 +431,20 @@ export const answerQuestionErrorResultSchema = z
   })
   .strip();
 
+export const focusedDocumentRejectionReasonSchema: z.ZodType<FocusedDocumentRejectionReason> =
+  z.enum(FOCUSED_DOCUMENT_REJECTION_REASONS);
+
+export const answerQuestionFocusedRejectionResultSchema = z
+  .object({
+    kind: z.literal("focused_document_rejected"),
+    reason: focusedDocumentRejectionReasonSchema,
+  })
+  .strip();
+
 export const answerQuestionResultSchema = z.discriminatedUnion("kind", [
   answerQuestionAnsweredResultSchema,
   answerQuestionErrorResultSchema,
+  answerQuestionFocusedRejectionResultSchema,
 ]);
 
 export type AnswerQuestionAnsweredResult = z.infer<
@@ -430,5 +452,8 @@ export type AnswerQuestionAnsweredResult = z.infer<
 >;
 export type AnswerQuestionErrorResult = z.infer<
   typeof answerQuestionErrorResultSchema
+>;
+export type AnswerQuestionFocusedRejectionResult = z.infer<
+  typeof answerQuestionFocusedRejectionResultSchema
 >;
 export type AnswerQuestionResult = z.infer<typeof answerQuestionResultSchema>;

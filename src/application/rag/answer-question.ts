@@ -22,6 +22,7 @@ import type {
 import { GLOBAL_RAG_PROMPT_VERSION } from "./constants";
 import type {
   EmbeddingUsage,
+  FocusedDocumentClassifier,
   GenerationProvider,
   GenerationUsage,
 } from "./ports";
@@ -39,6 +40,7 @@ export type AnswerQuestionDeps = {
   retrieveChunks: Pick<RetrieveChunks, "search" | "embeddingModel">;
   generationProvider: GenerationProvider;
   runsRepository: Pick<RagQueryRunsRepository, "create">;
+  focusedDocumentClassifier: FocusedDocumentClassifier;
   generationModel: string;
   promptVersion?: string;
   nowMs?: () => number;
@@ -67,6 +69,7 @@ export class AnswerQuestion {
   >;
   private readonly generationProvider: GenerationProvider;
   private readonly runsRepository: Pick<RagQueryRunsRepository, "create">;
+  private readonly focusedDocumentClassifier: FocusedDocumentClassifier;
   private readonly generationModel: string;
   private readonly promptVersion: string;
   private readonly nowMs: () => number;
@@ -75,27 +78,42 @@ export class AnswerQuestion {
     this.retrieveChunks = deps.retrieveChunks;
     this.generationProvider = deps.generationProvider;
     this.runsRepository = deps.runsRepository;
+    this.focusedDocumentClassifier = deps.focusedDocumentClassifier;
     this.generationModel = deps.generationModel;
     this.promptVersion = deps.promptVersion ?? GLOBAL_RAG_PROMPT_VERSION;
     this.nowMs = deps.nowMs ?? Date.now;
   }
 
   async execute(input: AnswerQuestionInput): Promise<AnswerQuestionResult> {
-    if (input.mode !== "global") {
-      throw new Error("Unsupported RAG mode");
+    const documentId = input.mode === "focused" ? input.documentId : null;
+
+    if (input.mode === "focused") {
+      const classification =
+        await this.focusedDocumentClassifier.classifyForFocusedRag(
+          input.documentId,
+        );
+
+      if (classification !== "ok") {
+        return answerQuestionResultSchema.parse({
+          kind: "focused_document_rejected",
+          reason: classification,
+        });
+      }
     }
 
+    const mode: "global" | "focused" = input.mode;
     const retrieval = normalizeRetrievalSettings(input.retrieval);
     const retrievalQuestion =
       input.conversationContext?.transcript ?? input.question;
     const startedAtMs = this.nowMs();
-    const metadata = this.buildMetadata(retrieval);
+    const metadata = this.buildMetadata(mode, documentId, retrieval);
     let retrievalResult: Awaited<ReturnType<RetrieveChunks["search"]>>;
 
     try {
       retrievalResult = await this.retrieveChunks.search({
         question: retrievalQuestion,
         retrieval,
+        ...(documentId !== null ? { documentId } : {}),
       });
     } catch (error) {
       const failureCode = toApplicationFailureCode(error);
@@ -169,7 +187,7 @@ export class AnswerQuestion {
         status: "answered_no_evidence",
         traceId: persisted.id,
         answer: NO_EVIDENCE_ANSWER,
-        mode: "global",
+        mode,
         sources: [],
         relatedTerms,
         metadata,
@@ -226,7 +244,7 @@ export class AnswerQuestion {
           status: "answered_no_evidence",
           traceId: persisted.id,
           answer: NO_EVIDENCE_ANSWER,
-          mode: "global",
+          mode,
           sources: [],
           relatedTerms: noEvidenceRelatedTerms,
           metadata,
@@ -301,7 +319,7 @@ export class AnswerQuestion {
       status: "answered",
       traceId: persisted.id,
       answer,
-      mode: "global",
+      mode,
       sources,
       relatedTerms,
       metadata,
@@ -309,9 +327,14 @@ export class AnswerQuestion {
     });
   }
 
-  private buildMetadata(retrieval: RagRetrievalSettings): RagAnswerMetadata {
+  private buildMetadata(
+    mode: "global" | "focused",
+    documentId: string | null,
+    retrieval: RagRetrievalSettings,
+  ): RagAnswerMetadata {
     return {
-      mode: "global",
+      mode,
+      documentId,
       topK: retrieval.topK,
       retrievalStrategy: retrieval.strategy,
       candidateTopK: getCandidateTopK(retrieval),
@@ -353,7 +376,8 @@ export class AnswerQuestion {
     return {
       question: input.question,
       answer: input.answer,
-      mode: "global",
+      mode: input.metadata.mode,
+      documentId: input.metadata.documentId,
       status: input.status,
       errorCode: input.errorCode,
       topK: input.metadata.topK,
