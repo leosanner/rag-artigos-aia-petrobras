@@ -16,6 +16,8 @@ import {
   type RagQueryRunErrorCode as DomainRagQueryRunErrorCode,
   type RagQueryRunStatus as DomainRagQueryRunStatus,
   type RelatedTerm as DomainRelatedTerm,
+  type SelectableRagDocument as DomainSelectableRagDocument,
+  SelectableRagDocumentSchema,
 } from "@/domain/rag";
 
 const ragRetrievalStrategySchema = RagRetrievalStrategySchema;
@@ -176,6 +178,21 @@ export type RagAnsweredResponse = z.infer<typeof ragAnsweredResponseSchema>;
 
 export type RagAskSuccessResponse = z.infer<typeof ragAskSuccessResponseSchema>;
 
+export const selectableRagDocumentSchema: z.ZodType<DomainSelectableRagDocument> =
+  SelectableRagDocumentSchema;
+
+export type SelectableRagDocument = z.infer<typeof selectableRagDocumentSchema>;
+
+export const listRagDocumentsResponseSchema = z
+  .object({
+    documents: z.array(selectableRagDocumentSchema),
+  })
+  .strip();
+
+export type ListRagDocumentsResponse = z.infer<
+  typeof listRagDocumentsResponseSchema
+>;
+
 export const ragQueryRunSummaryResponseSchema = z
   .object({
     id: z.string().uuid(),
@@ -263,12 +280,27 @@ export type ConversationDetailResponse = z.infer<
   typeof conversationDetailResponseSchema
 >;
 
-export const appendConversationMessageRequestSchema = z
+export const appendConversationMessageGlobalRequestSchema = z
   .object({
     content: z.string().trim().min(1),
     retrievalSettings: ragRetrievalInputSchema.optional(),
+    mode: z.literal("global").optional(),
   })
   .strict();
+
+export const appendConversationMessageFocusedRequestSchema = z
+  .object({
+    content: z.string().trim().min(1),
+    retrievalSettings: ragRetrievalInputSchema.optional(),
+    mode: z.literal("focused"),
+    documentId: z.string().uuid(),
+  })
+  .strict();
+
+export const appendConversationMessageRequestSchema = z.union([
+  appendConversationMessageGlobalRequestSchema,
+  appendConversationMessageFocusedRequestSchema,
+]);
 
 export type AppendConversationMessageRequest = z.infer<
   typeof appendConversationMessageRequestSchema
@@ -287,6 +319,20 @@ export const appendConversationMessageResponseSchema = z.union([
       status: z.enum(["generation_failed", "generation_unavailable"]),
       userMessage: conversationMessageResponseSchema,
       errorCode: z.enum(["generation_failed", "generation_unavailable"]),
+    })
+    .strip(),
+  z
+    .object({
+      status: z.literal("document_not_found"),
+      userMessage: conversationMessageResponseSchema,
+      errorCode: z.literal("document_not_found"),
+    })
+    .strip(),
+  z
+    .object({
+      status: z.literal("document_not_focusable"),
+      userMessage: conversationMessageResponseSchema,
+      errorCode: z.literal("document_not_focusable"),
     })
     .strip(),
 ]);
@@ -349,6 +395,26 @@ export type RagUnauthorizedResponse = z.infer<
   typeof ragUnauthorizedResponseSchema
 >;
 
+export const ragDocumentNotFoundResponseSchema = z
+  .object({
+    error: z.literal("document_not_found"),
+  })
+  .strip();
+
+export type RagDocumentNotFoundResponse = z.infer<
+  typeof ragDocumentNotFoundResponseSchema
+>;
+
+export const ragDocumentNotFocusableResponseSchema = z
+  .object({
+    error: z.literal("document_not_focusable"),
+  })
+  .strip();
+
+export type RagDocumentNotFocusableResponse = z.infer<
+  typeof ragDocumentNotFocusableResponseSchema
+>;
+
 export const ragGenerationErrorCodeSchema = z.enum(RAG_QUERY_RUN_ERROR_CODES);
 
 export type RagGenerationErrorCode = z.infer<
@@ -398,6 +464,8 @@ export type RagTechnicalErrorResponse = z.infer<
 export const ragAskErrorResponseSchema = z.union([
   ragInvalidRequestResponseSchema,
   ragUnauthorizedResponseSchema,
+  ragDocumentNotFoundResponseSchema,
+  ragDocumentNotFocusableResponseSchema,
   ragGenerationErrorResponseSchema,
   ragTechnicalErrorResponseSchema,
 ]);
