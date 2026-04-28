@@ -12,6 +12,7 @@ const SECRET = "query-secret-value";
 const CONVERSATION_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const CURRENT_TRACE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const RUN_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const FOCUSED_DOCUMENT_ID = "12121212-1212-4212-8212-121212121212";
 const MESSAGE_CREATED_AT = "2026-04-24T09:00:00.000Z";
 const ASSISTANT_CREATED_AT = "2026-04-24T09:00:01.000Z";
 
@@ -205,9 +206,38 @@ const CREATE_CONVERSATION_RESPONSE = {
   lastMessageAt: null,
 };
 
-type AskFixture = Omit<typeof SUCCESS_RESPONSE, "audit" | "metadata"> & {
+const SELECTABLE_DOCUMENTS_RESPONSE = {
+  documents: [
+    {
+      id: FOCUSED_DOCUMENT_ID,
+      title: "artigo focado a.pdf",
+      authors: "Silva et al.",
+      publicationYear: 2024,
+      doi: "10.1000/focado-a",
+      chunkCount: 12,
+      updatedAt: "2026-04-25T10:30:00.000Z",
+    },
+    {
+      id: "34343434-3434-4343-8343-343434343434",
+      title: "artigo focado b.pdf",
+      authors: null,
+      publicationYear: null,
+      doi: null,
+      chunkCount: 5,
+      updatedAt: "2026-04-23T08:00:00.000Z",
+    },
+  ],
+};
+
+type AskFixture = Omit<typeof SUCCESS_RESPONSE, "audit" | "metadata" | "mode"> & {
+  mode: "global" | "focused";
   audit: typeof SUCCESS_RESPONSE.audit | typeof NO_EVIDENCE_RESPONSE.audit;
-  metadata: Omit<typeof SUCCESS_RESPONSE.metadata, "retrievalStrategy"> & {
+  metadata: Omit<
+    typeof SUCCESS_RESPONSE.metadata,
+    "retrievalStrategy" | "mode" | "documentId"
+  > & {
+    mode: "global" | "focused";
+    documentId: string | null;
     retrievalStrategy: "standard" | "explore";
   };
 };
@@ -326,6 +356,20 @@ function clickNewConversation(): void {
   fireEvent.click(screen.getByRole("button", { name: /nova conversa/i }));
 }
 
+function clickFocusedMode(): void {
+  fireEvent.click(screen.getByLabelText(/documento especifico/i));
+}
+
+function clickGlobalMode(): void {
+  fireEvent.click(screen.getByLabelText(/base inteira/i));
+}
+
+function selectFocusedDocument(value: string): void {
+  fireEvent.change(screen.getByLabelText(/documento alvo/i), {
+    target: { value },
+  });
+}
+
 describe("/query page", () => {
   const fetchMock = vi.fn<
     (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
@@ -351,6 +395,8 @@ describe("/query page", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText(/pergunta/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/secret de consulta/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/base inteira/i)).toBeChecked();
+    expect(screen.getByLabelText(/documento especifico/i)).not.toBeChecked();
     expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue(6);
     expect(screen.getByRole("button", { name: /consultar base/i })).toBeDisabled();
     expect(
@@ -360,6 +406,78 @@ describe("/query page", () => {
       screen.getByRole("button", { name: /carregar historico recente/i }),
     ).toBeDisabled();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("lazy-loads selectable documents only after focused mode is enabled", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(SELECTABLE_DOCUMENTS_RESPONSE));
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      clickFocusedMode();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rag/documents",
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${SECRET}`,
+        }),
+      }),
+    );
+    expect(
+      await screen.findByRole("option", { name: /artigo focado a\.pdf/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("requires a selected document in focused mode and preserves the selection across mode switches", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(SELECTABLE_DOCUMENTS_RESPONSE));
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Compare os achados.");
+    setTopK("9");
+
+    await act(async () => {
+      clickFocusedMode();
+    });
+
+    await screen.findByRole("option", { name: /artigo focado a\.pdf/i });
+
+    expect(
+      screen.getByRole("button", { name: /consultar base/i }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /explorar perspectivas/i }),
+    ).toBeDisabled();
+
+    selectFocusedDocument(FOCUSED_DOCUMENT_ID);
+
+    expect(
+      screen.getByRole("button", { name: /consultar base/i }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: /explorar perspectivas/i }),
+    ).toBeEnabled();
+
+    clickGlobalMode();
+    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue(9);
+    expect(
+      screen.getByRole("button", { name: /consultar base/i }),
+    ).toBeEnabled();
+
+    clickFocusedMode();
+
+    expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
+      FOCUSED_DOCUMENT_ID,
+    );
+    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue(9);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("submits standard and explore queries with validated retrieval settings", async () => {
@@ -454,6 +572,63 @@ describe("/query page", () => {
           retrievalSettings: {
             topK: 8,
             strategy: "explore",
+          },
+        }),
+      }),
+    );
+  });
+
+  it("submits focused questions through the conversation route with mode and documentId", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(SELECTABLE_DOCUMENTS_RESPONSE));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        appendResponseFromAsk({
+          ...SUCCESS_RESPONSE,
+          mode: "focused",
+          metadata: {
+            ...SUCCESS_RESPONSE.metadata,
+            mode: "focused",
+            documentId: FOCUSED_DOCUMENT_ID,
+          },
+        }),
+      ),
+    );
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Quais tecnicas aparecem neste documento?");
+
+    await act(async () => {
+      clickFocusedMode();
+    });
+
+    await screen.findByRole("option", { name: /artigo focado a\.pdf/i });
+    selectFocusedDocument(FOCUSED_DOCUMENT_ID);
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      `/api/rag/conversations/${CONVERSATION_ID}/messages`,
+      expect.objectContaining({
+        method: "POST",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${SECRET}`,
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          content: "Quais tecnicas aparecem neste documento?",
+          mode: "focused",
+          documentId: FOCUSED_DOCUMENT_ID,
+          retrievalSettings: {
+            topK: 6,
+            strategy: "standard",
           },
         }),
       }),
@@ -834,6 +1009,113 @@ describe("/query page", () => {
         /a geracao da resposta falhou\. tente reformular a pergunta ou tentar novamente\./i,
       ),
     ).toBeInTheDocument();
+  });
+
+  it("clears the secret and shows a safe unauthorized message when loading focused documents is rejected", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "unauthorized" }, { status: 401 }),
+    );
+    sessionStorage.setItem("query:secret", SECRET);
+
+    render(<QueryPage />);
+
+    await act(async () => {
+      clickFocusedMode();
+    });
+
+    expect(
+      screen.getAllByText(/secret de consulta foi rejeitado/i).length,
+    ).toBeGreaterThan(0);
+    expect(sessionStorage.getItem("query:secret")).toBeNull();
+    expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe("");
+  });
+
+  it("shows the safe focused document-not-found message and keeps the active conversation state intact", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(SELECTABLE_DOCUMENTS_RESPONSE));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          status: "document_not_found",
+          userMessage: appendResponseFromAsk(
+            SUCCESS_RESPONSE,
+            "Pergunta focada sem documento valido",
+          ).userMessage,
+          errorCode: "document_not_found",
+        },
+        { status: 404 },
+      ),
+    );
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Pergunta focada sem documento valido");
+
+    await act(async () => {
+      clickFocusedMode();
+    });
+
+    await screen.findByRole("option", { name: /artigo focado a\.pdf/i });
+    selectFocusedDocument(FOCUSED_DOCUMENT_ID);
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    expect(
+      screen.getByText(/documento nao encontrado ou indisponivel para foco/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/pergunta focada sem documento valido/i).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByText(/conversa nao encontrada ou indisponivel para recarga/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the safe focused not-focusable message and keeps the persisted user turn in the transcript", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(SELECTABLE_DOCUMENTS_RESPONSE));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          status: "document_not_focusable",
+          userMessage: appendResponseFromAsk(
+            SUCCESS_RESPONSE,
+            "Pergunta focada em documento ainda nao pronto",
+          ).userMessage,
+          errorCode: "document_not_focusable",
+        },
+        { status: 422 },
+      ),
+    );
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Pergunta focada em documento ainda nao pronto");
+
+    await act(async () => {
+      clickFocusedMode();
+    });
+
+    await screen.findByRole("option", { name: /artigo focado a\.pdf/i });
+    selectFocusedDocument(FOCUSED_DOCUMENT_ID);
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    expect(
+      screen.getByText(/documento ainda nao esta pronto para consulta focada/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/pergunta focada em documento ainda nao pronto/i)
+        .length,
+    ).toBeGreaterThan(0);
   });
 
   it("shows the dedicated generation_unavailable message on 503", async () => {

@@ -6,6 +6,7 @@ import {
   appendConversationMessageResponseSchema,
   conversationDetailResponseSchema,
   createConversationResponseSchema,
+  listRagDocumentsResponseSchema,
   ragInvalidRequestResponseSchema,
   ragQueryRunDetailResponseSchema,
   ragQueryRunSummariesResponseSchema,
@@ -17,6 +18,7 @@ import {
   type RagQueryRunDetailResponse,
   type RagQueryRunSummaryResponse,
   type RelatedTerm,
+  type SelectableRagDocument,
 } from "@/application/rag/schemas";
 import {
   RAG_RETRIEVAL_DEFAULT_TOP_K,
@@ -28,6 +30,10 @@ import {
 import {
   formatTechnicalErrorMessage,
   RAG_EMPTY_SOURCES_MESSAGE,
+  RAG_FOCUSED_DOCUMENT_NOT_FOCUSABLE_MESSAGE,
+  RAG_FOCUSED_DOCUMENT_NOT_FOUND_MESSAGE,
+  RAG_FOCUSED_DOCUMENTS_EMPTY_MESSAGE,
+  RAG_FOCUSED_DOCUMENTS_ERROR_MESSAGE,
   RAG_GENERATION_FAILED_MESSAGE,
   RAG_GENERATION_UNAVAILABLE_MESSAGE,
   RAG_HISTORY_EMPTY_MESSAGE,
@@ -183,6 +189,7 @@ type QuerySubmissionStrategy = Extract<
   RagRetrievalStrategy,
   "standard" | "explore"
 >;
+type QueryMode = "global" | "focused";
 
 type AskState =
   | { kind: "idle" }
@@ -214,6 +221,13 @@ type SelectedRunState = {
   error: LoadErrorKind | null;
 };
 
+type SelectableDocumentsState = {
+  status: "idle" | "loading" | "loaded" | "error";
+  documents: SelectableRagDocument[];
+  error: LoadErrorKind | null;
+  lastLoadedSecret: string | null;
+};
+
 function createInitialRecentRunsState(): RecentRunsState {
   return {
     status: "idle",
@@ -239,9 +253,20 @@ function createInitialConversationState(): ConversationState {
   };
 }
 
+function createInitialSelectableDocumentsState(): SelectableDocumentsState {
+  return {
+    status: "idle",
+    documents: [],
+    error: null,
+    lastLoadedSecret: null,
+  };
+}
+
 export default function QueryPage() {
   const [question, setQuestion] = useState("");
   const [secret, setSecret] = useState("");
+  const [queryMode, setQueryMode] = useState<QueryMode>("global");
+  const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const [topK, setTopK] = useState(RAG_RETRIEVAL_DEFAULT_TOP_K);
   const [askState, setAskState] = useState<AskState>({ kind: "idle" });
   const [recentRunsState, setRecentRunsState] = useState<RecentRunsState>(
@@ -254,15 +279,24 @@ export default function QueryPage() {
   const [conversationState, setConversationState] = useState<ConversationState>(
     createInitialConversationState,
   );
+  const [selectableDocumentsState, setSelectableDocumentsState] =
+    useState<SelectableDocumentsState>(createInitialSelectableDocumentsState);
   const [expandedAuditMessageIds, setExpandedAuditMessageIds] = useState<
     Set<string>
   >(() => new Set());
 
   const trimmedQuestion = question.trim();
   const trimmedSecret = secret.trim();
+  const selectedDocument =
+    selectableDocumentsState.documents.find(
+      (document) => document.id === selectedDocumentId,
+    ) ?? null;
   const isSubmitting = askState.kind === "submitting";
   const canSubmit =
-    trimmedQuestion.length > 0 && trimmedSecret.length > 0 && !isSubmitting;
+    trimmedQuestion.length > 0 &&
+    trimmedSecret.length > 0 &&
+    !isSubmitting &&
+    (queryMode === "global" || selectedDocumentId.length > 0);
   const isStandardSubmitting =
     askState.kind === "submitting" && askState.strategy === "standard";
   const isExploreSubmitting =
@@ -342,12 +376,33 @@ export default function QueryPage() {
     conversationState.conversation?.id,
   ]);
 
+  useEffect(() => {
+    if (
+      queryMode !== "focused" ||
+      trimmedSecret.length === 0 ||
+      selectableDocumentsState.status === "loading" ||
+      selectableDocumentsState.lastLoadedSecret === trimmedSecret
+    ) {
+      return;
+    }
+
+    void loadSelectableDocuments(trimmedSecret);
+    // loadSelectableDocuments mutates the guarded state above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    queryMode,
+    trimmedSecret,
+    selectableDocumentsState.status,
+    selectableDocumentsState.lastLoadedSecret,
+  ]);
+
   function updateSecret(value: string) {
     setSecret(value);
 
     if (value.length === 0) {
       sessionStorage.removeItem(SECRET_STORAGE_KEY);
       resetPersistedAuditState();
+      resetSelectableDocumentsState();
       setConversationState((current) => ({
         ...current,
         status: current.conversation ? "loaded" : "idle",
@@ -364,10 +419,16 @@ export default function QueryPage() {
     setSelectedRunState(createInitialSelectedRunState());
   }
 
+  function resetSelectableDocumentsState() {
+    setSelectableDocumentsState(createInitialSelectableDocumentsState());
+    setSelectedDocumentId("");
+  }
+
   function clearSecret() {
     sessionStorage.removeItem(SECRET_STORAGE_KEY);
     setSecret("");
     resetPersistedAuditState();
+    resetSelectableDocumentsState();
     setConversationState((current) => ({
       ...current,
       status: current.conversation ? "loaded" : "idle",
@@ -375,8 +436,113 @@ export default function QueryPage() {
     }));
   }
 
+  async function loadSelectableDocuments(secretValue = trimmedSecret) {
+    const effectiveSecret = secretValue.trim();
+
+    if (effectiveSecret.length === 0) {
+      return;
+    }
+
+    setSelectableDocumentsState((current) => ({
+      ...current,
+      status: "loading",
+      error: null,
+    }));
+
+    const response = await fetchJson("/api/rag/documents", {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${effectiveSecret}`,
+      },
+    });
+
+    if (response.kind === "network_error") {
+      console.error("[rag/query]", {
+        phase: "loadSelectableDocuments",
+        kind: "network_error",
+      });
+      setSelectableDocumentsState({
+        status: "error",
+        documents: [],
+        error: "technical",
+        lastLoadedSecret: effectiveSecret,
+      });
+      return;
+    }
+
+    if (response.status === 200) {
+      const parsed = listRagDocumentsResponseSchema.safeParse(response.body);
+
+      if (!parsed.success) {
+        console.error("[rag/query]", {
+          phase: "loadSelectableDocuments",
+          status: response.status,
+          body: response.body,
+          parseError: true,
+        });
+        setSelectableDocumentsState({
+          status: "error",
+          documents: [],
+          error: "technical",
+          lastLoadedSecret: effectiveSecret,
+        });
+        return;
+      }
+
+      setSelectableDocumentsState({
+        status: "loaded",
+        documents: parsed.data.documents,
+        error: null,
+        lastLoadedSecret: effectiveSecret,
+      });
+      setSelectedDocumentId((current) =>
+        current.length > 0 &&
+        parsed.data.documents.some((document) => document.id === current)
+          ? current
+          : "",
+      );
+      return;
+    }
+
+    if (response.status === 401) {
+      const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
+      console.error("[rag/query]", {
+        phase: "loadSelectableDocuments",
+        status: response.status,
+        body: response.body,
+      });
+      clearSecret();
+      if (parsed.success) {
+        setAskState({ kind: "unauthorized" });
+      } else {
+        setAskState({
+          kind: "technical_error",
+          message: formatTechnicalErrorMessage(response.status),
+        });
+      }
+      return;
+    }
+
+    console.error("[rag/query]", {
+      phase: "loadSelectableDocuments",
+      status: response.status,
+      body: response.body,
+    });
+    setSelectableDocumentsState({
+      status: "error",
+      documents: [],
+      error: "technical",
+      lastLoadedSecret: effectiveSecret,
+    });
+  }
+
   async function submitQuestion(strategy: QuerySubmissionStrategy) {
-    if (trimmedQuestion.length === 0 || trimmedSecret.length === 0) {
+    if (
+      trimmedQuestion.length === 0 ||
+      trimmedSecret.length === 0 ||
+      (queryMode === "focused" && selectedDocumentId.length === 0)
+    ) {
       return;
     }
 
@@ -397,13 +563,25 @@ export default function QueryPage() {
         Authorization: `Bearer ${trimmedSecret}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        content: trimmedQuestion,
-        retrievalSettings: {
-          topK,
-          strategy,
-        },
-      }),
+      body: JSON.stringify(
+        queryMode === "focused"
+          ? {
+              content: trimmedQuestion,
+              mode: "focused",
+              documentId: selectedDocumentId,
+              retrievalSettings: {
+                topK,
+                strategy,
+              },
+            }
+          : {
+              content: trimmedQuestion,
+              retrievalSettings: {
+                topK,
+                strategy,
+              },
+            },
+      ),
       },
     );
 
@@ -501,6 +679,19 @@ export default function QueryPage() {
     }
 
     if (response.status === 404) {
+      const parsed = appendConversationMessageResponseSchema.safeParse(
+        response.body,
+      );
+
+      if (parsed.success && parsed.data.status === "document_not_found") {
+        appendTranscriptMessages([parsed.data.userMessage]);
+        setAskState({
+          kind: "technical_error",
+          message: RAG_FOCUSED_DOCUMENT_NOT_FOUND_MESSAGE,
+        });
+        return;
+      }
+
       console.error("[rag/query]", {
         phase: "submitQuestion",
         status: response.status,
@@ -510,6 +701,32 @@ export default function QueryPage() {
         status: "error",
         conversation: null,
         error: "not_found",
+      });
+      setAskState({
+        kind: "technical_error",
+        message: formatTechnicalErrorMessage(response.status),
+      });
+      return;
+    }
+
+    if (response.status === 422) {
+      const parsed = appendConversationMessageResponseSchema.safeParse(
+        response.body,
+      );
+
+      if (parsed.success && parsed.data.status === "document_not_focusable") {
+        appendTranscriptMessages([parsed.data.userMessage]);
+        setAskState({
+          kind: "technical_error",
+          message: RAG_FOCUSED_DOCUMENT_NOT_FOCUSABLE_MESSAGE,
+        });
+        return;
+      }
+
+      console.error("[rag/query]", {
+        phase: "submitQuestion",
+        status: response.status,
+        body: response.body,
       });
       setAskState({
         kind: "technical_error",
@@ -1046,10 +1263,10 @@ export default function QueryPage() {
               <span className={styles.titleAccent}>documental</span>
             </h1>
             <p className={styles.lede}>
-              Faça uma pergunta global sobre os documentos indexados e receba
-              uma resposta com citacoes inline, fontes numeradas e trilha de
-              auditoria. Apenas usuarios com o secret podem consultar ou ler o
-              historico persistido.
+              Faça uma pergunta sobre toda a base ou restrinja a consulta a um
+              documento especifico. Todas as respostas mantem citacoes inline,
+              fontes numeradas e trilha de auditoria. Apenas usuarios com o
+              secret podem consultar ou ler o historico persistido.
             </p>
           </div>
 
@@ -1078,10 +1295,149 @@ export default function QueryPage() {
             />
           </div>
 
+          <div className={`${styles.field} ${styles.fieldMode}`}>
+            <fieldset className={styles.modeFieldset}>
+              <legend className={styles.label}>
+                <span>Modo de consulta</span>
+                <span className={styles.labelIndex}>[ 02 ]</span>
+              </legend>
+
+              <div className={styles.modeOptions}>
+                <label className={styles.modeOption}>
+                  <input
+                    type="radio"
+                    name="query-mode"
+                    value="global"
+                    checked={queryMode === "global"}
+                    onChange={() => {
+                      setQueryMode("global");
+                      setAskState({ kind: "idle" });
+                    }}
+                  />
+                  <span>Base inteira</span>
+                </label>
+
+                <label className={styles.modeOption}>
+                  <input
+                    type="radio"
+                    name="query-mode"
+                    value="focused"
+                    checked={queryMode === "focused"}
+                    onChange={() => {
+                      setQueryMode("focused");
+                      setAskState({ kind: "idle" });
+                    }}
+                  />
+                  <span>Documento especifico</span>
+                </label>
+              </div>
+            </fieldset>
+          </div>
+
+          {queryMode === "focused" ? (
+            <div className={`${styles.field} ${styles.fieldFocusedDocument}`}>
+              <label htmlFor="query-document" className={styles.label}>
+                <span>Documento alvo</span>
+                <span className={styles.labelIndex}>[ 03 ]</span>
+              </label>
+
+              {trimmedSecret.length === 0 ? (
+                <p className={styles.inlineNote}>
+                  Informe o secret para listar documentos disponiveis.
+                </p>
+              ) : null}
+
+              {trimmedSecret.length > 0 &&
+              selectableDocumentsState.status === "loading" ? (
+                <p className={styles.inlineNote}>
+                  Carregando documentos disponiveis...
+                </p>
+              ) : null}
+
+              {trimmedSecret.length > 0 &&
+              selectableDocumentsState.status === "error" ? (
+                <div className={styles.inlineActionRow}>
+                  <p className={styles.inlineNote}>
+                    {RAG_FOCUSED_DOCUMENTS_ERROR_MESSAGE}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void loadSelectableDocuments();
+                    }}
+                    className={`${styles.btn} ${styles.btnSecondary}`}
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              ) : null}
+
+              {trimmedSecret.length > 0 &&
+              selectableDocumentsState.status === "loaded" &&
+              selectableDocumentsState.documents.length === 0 ? (
+                <p className={styles.inlineNote}>
+                  {RAG_FOCUSED_DOCUMENTS_EMPTY_MESSAGE}
+                </p>
+              ) : null}
+
+              {trimmedSecret.length > 0 &&
+              selectableDocumentsState.documents.length > 0 ? (
+                <>
+                  <select
+                    id="query-document"
+                    value={selectedDocumentId}
+                    onChange={(event) => setSelectedDocumentId(event.target.value)}
+                    className={styles.select}
+                  >
+                    <option value="">Selecione um documento focavel</option>
+                    {selectableDocumentsState.documents.map((document) => (
+                      <option key={document.id} value={document.id}>
+                        {document.title}
+                      </option>
+                    ))}
+                  </select>
+
+                  {selectedDocument ? (
+                    <div className={styles.documentSummary}>
+                      <p className={styles.documentSummaryTitle}>
+                        {selectedDocument.title}
+                      </p>
+                      {selectedDocument.authors ? (
+                        <p className={styles.documentSummaryMeta}>
+                          autores :: {selectedDocument.authors}
+                        </p>
+                      ) : null}
+                      {selectedDocument.publicationYear ? (
+                        <p className={styles.documentSummaryMeta}>
+                          ano :: {selectedDocument.publicationYear}
+                        </p>
+                      ) : null}
+                      {selectedDocument.doi ? (
+                        <p className={styles.documentSummaryMeta}>
+                          doi :: {selectedDocument.doi}
+                        </p>
+                      ) : null}
+                      <p className={styles.documentSummaryMeta}>
+                        chunks indexados :: {selectedDocument.chunkCount}
+                      </p>
+                      <p className={styles.documentSummaryMeta}>
+                        atualizado :: {formatTimestamp(selectedDocument.updatedAt)}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className={styles.inlineNote}>
+                      Escolha um documento para habilitar a consulta focada.
+                    </p>
+                  )}
+                </>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className={`${styles.field} ${styles.fieldControls}`}>
             <label htmlFor="query-top-k" className={styles.label}>
               <span>Fontes recuperadas</span>
-              <span className={styles.labelIndex}>[ 02 ]</span>
+              <span className={styles.labelIndex}>[ 04 ]</span>
             </label>
             <div className={styles.controlRow}>
               <input
@@ -1198,7 +1554,7 @@ export default function QueryPage() {
               <div className={`${styles.field} ${styles.fieldQuestion}`}>
                 <label htmlFor="query-question" className={styles.label}>
                   <span>Pergunta</span>
-                  <span className={styles.labelIndex}>[ 03 ]</span>
+                  <span className={styles.labelIndex}>[ 05 ]</span>
                 </label>
                 <textarea
                   id="query-question"
@@ -1217,7 +1573,7 @@ export default function QueryPage() {
                     }
                   }}
                   rows={3}
-                  placeholder="Ex.: Quais tecnicas aparecem com mais frequencia nos estudos?"
+                  placeholder="Ex.: Quais tecnicas aparecem com mais frequencia nos estudos ou neste documento?"
                   className={styles.textarea}
                 />
               </div>
