@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { AppendConversationMessage } from "@/application/rag/append-conversation-message";
+import type { GetConversationDetail } from "@/application/rag/get-conversation-detail";
+import type { StreamConversationMessage } from "@/application/rag/stream-conversation-message";
 
 import { createRagConversationMessagesHandler } from "./handler";
 
@@ -18,6 +20,46 @@ function buildAppendMessage(
 ): Pick<AppendConversationMessage, "execute"> {
   return {
     execute: vi.fn().mockResolvedValue(result),
+  };
+}
+
+function buildGetConversationDetail(
+  result:
+    | { status: "found" }
+    | { status: "not_found" } = { status: "found" },
+): Pick<GetConversationDetail, "execute"> {
+  return {
+    execute: vi.fn().mockResolvedValue(
+      result.status === "found"
+        ? {
+            status: "found",
+            conversation: {
+              id: CONVERSATION_ID,
+              title: null,
+              createdAt: MESSAGE_AT,
+              updatedAt: MESSAGE_AT,
+              lastMessageAt: null,
+              messages: [],
+            },
+          }
+        : result,
+    ),
+  };
+}
+
+function buildStreamMessage(
+  implementation?: (
+    onEvent: Parameters<StreamConversationMessage["execute"]>[1]["onEvent"],
+  ) => Promise<"completed" | "not_found">,
+): Pick<StreamConversationMessage, "execute"> {
+  return {
+    execute: vi.fn().mockImplementation(async (_input, options) => {
+      if (implementation) {
+        return implementation(options.onEvent);
+      }
+
+      return "completed";
+    }),
   };
 }
 
@@ -39,6 +81,16 @@ function context(id: string = CONVERSATION_ID) {
   return {
     params: Promise.resolve({ id }),
   };
+}
+
+function postStream(
+  body: unknown,
+  headers: Record<string, string> = {},
+): Request {
+  return post(body, {
+    Accept: "text/event-stream",
+    ...headers,
+  });
 }
 
 function userMessage() {
@@ -91,6 +143,30 @@ function assistantMessage() {
   };
 }
 
+async function readSseEvents(response: Response) {
+  const payload = await response.text();
+
+  return payload
+    .trim()
+    .split("\n\n")
+    .filter(Boolean)
+    .map((chunk) => {
+      const lines = chunk.split("\n");
+      const event = lines
+        .find((line) => line.startsWith("event: "))
+        ?.replace("event: ", "");
+      const data = lines
+        .filter((line) => line.startsWith("data: "))
+        .map((line) => line.replace("data: ", ""))
+        .join("\n");
+
+      return {
+        event,
+        data: JSON.parse(data) as Record<string, unknown>,
+      };
+    });
+}
+
 describe("POST /api/rag/conversations/:id/messages handler", () => {
   it("appends a user message with retrieval settings and returns the transcript slice", async () => {
     const appendMessage = buildAppendMessage({
@@ -100,6 +176,8 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
     });
     const handler = createRagConversationMessagesHandler({
       appendMessage,
+      getConversationDetail: buildGetConversationDetail(),
+      streamMessage: buildStreamMessage(),
       secret: VALID_SECRET,
     });
 
@@ -138,6 +216,8 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
     const appendMessage = buildAppendMessage({ status: "not_found" });
     const handler = createRagConversationMessagesHandler({
       appendMessage,
+      getConversationDetail: buildGetConversationDetail(),
+      streamMessage: buildStreamMessage(),
       secret: VALID_SECRET,
     });
 
@@ -178,6 +258,8 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
     const appendMessage = buildAppendMessage({ status: "not_found" });
     const handler = createRagConversationMessagesHandler({
       appendMessage,
+      getConversationDetail: buildGetConversationDetail(),
+      streamMessage: buildStreamMessage(),
       secret: VALID_SECRET,
     });
 
@@ -204,10 +286,14 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
     });
     const failedHandler = createRagConversationMessagesHandler({
       appendMessage: failed,
+      getConversationDetail: buildGetConversationDetail(),
+      streamMessage: buildStreamMessage(),
       secret: VALID_SECRET,
     });
     const unavailableHandler = createRagConversationMessagesHandler({
       appendMessage: unavailable,
+      getConversationDetail: buildGetConversationDetail(),
+      streamMessage: buildStreamMessage(),
       secret: VALID_SECRET,
     });
 
@@ -246,6 +332,8 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
     });
     const handler = createRagConversationMessagesHandler({
       appendMessage,
+      getConversationDetail: buildGetConversationDetail(),
+      streamMessage: buildStreamMessage(),
       secret: VALID_SECRET,
     });
 
@@ -298,6 +386,8 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
     });
     const handler = createRagConversationMessagesHandler({
       appendMessage,
+      getConversationDetail: buildGetConversationDetail(),
+      streamMessage: buildStreamMessage(),
       secret: VALID_SECRET,
     });
 
@@ -333,6 +423,8 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
     };
     const handler = createRagConversationMessagesHandler({
       appendMessage,
+      getConversationDetail: buildGetConversationDetail(),
+      streamMessage: buildStreamMessage(),
       secret: VALID_SECRET,
     });
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -358,5 +450,172 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
     expect(typeof payload.requestTraceId).toBe("string");
 
     errorSpy.mockRestore();
+  });
+
+  it("returns an SSE stream when the client requests text/event-stream", async () => {
+    const appendMessage = buildAppendMessage({
+      status: "answered",
+      userMessage: userMessage(),
+      assistantMessage: assistantMessage(),
+    });
+    const getConversationDetail = buildGetConversationDetail();
+    const streamMessage = buildStreamMessage(async (onEvent) => {
+      await onEvent({
+        type: "user_message_created",
+        userMessage: userMessage(),
+      });
+      await onEvent({
+        type: "phase",
+        phase: "retrieving_sources",
+      });
+      await onEvent({
+        type: "source",
+        source: {
+          sourceNumber: 1,
+          chunkId: "77777777-7777-4777-8777-777777777777",
+          documentId: "88888888-8888-4888-8888-888888888888",
+          documentTitle: "artigo.pdf",
+          chunkIndex: 0,
+          excerpt: "Trecho governado",
+          score: 0.91,
+          documentPipelineVersion: "documents-v1",
+          chunkingVersion: "hybrid-v1-900-150",
+          embeddingModel: "text-embedding-3-large",
+        },
+      });
+      await onEvent({
+        type: "phase",
+        phase: "generating_answer",
+      });
+      await onEvent({
+        type: "answer_delta",
+        textDelta: "Classificacao",
+      });
+      await onEvent({
+        type: "done",
+        status: "answered",
+        assistantMessage: assistantMessage(),
+      });
+
+      return "completed";
+    });
+    const handler = createRagConversationMessagesHandler({
+      appendMessage,
+      getConversationDetail,
+      streamMessage,
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      postStream(
+        {
+          content: "Quais tecnicas aparecem?",
+        },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+      context(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/event-stream");
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(getConversationDetail.execute).toHaveBeenCalledWith({
+      id: CONVERSATION_ID,
+    });
+    expect(appendMessage.execute).not.toHaveBeenCalled();
+    expect(streamMessage.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: CONVERSATION_ID,
+        userMessageContent: "Quais tecnicas aparecem?",
+      }),
+      expect.any(Object),
+    );
+
+    const events = await readSseEvents(response);
+
+    expect(events.map((event) => event.event)).toEqual([
+      "user_message_created",
+      "phase",
+      "source",
+      "phase",
+      "answer_delta",
+      "done",
+    ]);
+    expect(events[0]?.data.type).toBe("user_message_created");
+    expect(events[4]?.data).toEqual({
+      type: "answer_delta",
+      textDelta: "Classificacao",
+    });
+    expect(events[5]?.data.type).toBe("done");
+  });
+
+  it("keeps unknown conversations as a pre-stream 404 in SSE mode", async () => {
+    const handler = createRagConversationMessagesHandler({
+      appendMessage: buildAppendMessage({ status: "not_found" }),
+      getConversationDetail: buildGetConversationDetail({ status: "not_found" }),
+      streamMessage: buildStreamMessage(),
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      postStream(
+        {
+          content: "Pergunta",
+        },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+      context(),
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "not_found" });
+  });
+
+  it("serializes safe mid-stream errors as SSE events under HTTP 200", async () => {
+    const handler = createRagConversationMessagesHandler({
+      appendMessage: buildAppendMessage({ status: "not_found" }),
+      getConversationDetail: buildGetConversationDetail(),
+      streamMessage: buildStreamMessage(async (onEvent) => {
+        await onEvent({
+          type: "user_message_created",
+          userMessage: userMessage(),
+        });
+        await onEvent({
+          type: "phase",
+          phase: "retrieving_sources",
+        });
+        await onEvent({
+          type: "error",
+          status: "generation_unavailable",
+          errorCode: "generation_unavailable",
+        });
+
+        return "completed";
+      }),
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      postStream(
+        {
+          content: "Pergunta",
+        },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+      context(),
+    );
+    const events = await readSseEvents(response);
+
+    expect(response.status).toBe(200);
+    expect(events.map((event) => event.event)).toEqual([
+      "user_message_created",
+      "phase",
+      "error",
+    ]);
+    expect(events[2]?.data).toEqual({
+      type: "error",
+      status: "generation_unavailable",
+      errorCode: "generation_unavailable",
+    });
   });
 });
