@@ -391,6 +391,94 @@ function jsonResponse(
   });
 }
 
+function createControlledEventStreamResponse() {
+  const encoder = new TextEncoder();
+  let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
+
+  return {
+    response: new Response(
+      new ReadableStream<Uint8Array>({
+        start(innerController) {
+          controller = innerController;
+        },
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      },
+    ),
+    push(event: Record<string, unknown>) {
+      controller?.enqueue(
+        encoder.encode(
+          `event: ${String(event.type)}\ndata: ${JSON.stringify(event)}\n\n`,
+        ),
+      );
+    },
+    close() {
+      controller?.close();
+    },
+  };
+}
+
+function streamEventsFromAsk(
+  response: AskFixture,
+  question = "Quais tecnicas aparecem com mais frequencia?",
+  answerChunks: string[] = [response.answer],
+) {
+  const appended = appendResponseFromAsk(response, question);
+  const sourceEvents = response.sources.map((source) => {
+    const streamSource = { ...source };
+    delete streamSource.citedInAnswer;
+
+    return {
+      type: "source" as const,
+      source: streamSource,
+    };
+  });
+
+  return [
+    {
+      type: "user_message_created" as const,
+      userMessage: {
+        ...appended.userMessage,
+        createdAt: appended.userMessage.createdAt,
+      },
+    },
+    {
+      type: "phase" as const,
+      phase: "retrieving_sources" as const,
+    },
+    ...sourceEvents,
+    ...(response.sources.length > 0
+      ? [
+          {
+            type: "phase" as const,
+            phase: "generating_answer" as const,
+          },
+          ...answerChunks.map((chunk) => ({
+            type: "answer_delta" as const,
+            textDelta: chunk,
+          })),
+        ]
+      : []),
+    {
+      type: "done" as const,
+      status:
+        response.sources.length === 0 ? "answered_no_evidence" : "answered",
+      assistantMessage: {
+        ...appended.assistantMessage,
+        createdAt: appended.assistantMessage.createdAt,
+        trace: appended.assistantMessage.trace
+          ? {
+              ...appended.assistantMessage.trace,
+              createdAt: appended.assistantMessage.trace.createdAt,
+            }
+          : null,
+      },
+    },
+  ];
+}
+
 function typeQuestion(value: string): void {
   fireEvent.change(screen.getByLabelText(/pergunta/i), {
     target: { value },
@@ -754,6 +842,130 @@ describe("/query page", () => {
         .length,
     ).toBeGreaterThan(0);
     expect(screen.queryByText(/carregando historico auditado/i)).not.toBeInTheDocument();
+  });
+
+  it("streams sources first and then renders answer deltas live before hydrating the final assistant trace", async () => {
+    const stream = createControlledEventStreamResponse();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(stream.response);
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Quais tecnicas aparecem com mais frequencia?");
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    await act(async () => {
+      stream.push(streamEventsFromAsk(SUCCESS_RESPONSE)[0]!);
+      stream.push(streamEventsFromAsk(SUCCESS_RESPONSE)[1]!);
+    });
+
+    expect(
+      await screen.findByText(/consultando fontes/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/quais tecnicas aparecem com mais frequencia\?/i)
+        .length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByLabelText(/pergunta/i)).toHaveValue("");
+
+    await act(async () => {
+      for (const event of streamEventsFromAsk(SUCCESS_RESPONSE).slice(2, 4)) {
+        stream.push(event);
+      }
+    });
+
+    expect(screen.getByText("1. artigo-a.pdf")).toBeInTheDocument();
+    expect(screen.getByText("2. artigo-b.pdf")).toBeInTheDocument();
+
+    await act(async () => {
+      stream.push({
+        type: "phase",
+        phase: "generating_answer",
+      });
+      stream.push({
+        type: "answer_delta",
+        textDelta: "Os documentos destacam ",
+      });
+      stream.push({
+        type: "answer_delta",
+        textDelta: "classificacao supervisionada [1] [2].",
+      });
+    });
+
+    expect(await screen.findByText(/gerando resposta/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Os documentos destacam classificacao supervisionada [1] [2].",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(CURRENT_TRACE_ID)).not.toBeInTheDocument();
+
+    await act(async () => {
+      stream.push(
+        streamEventsFromAsk(
+          SUCCESS_RESPONSE,
+          "Quais tecnicas aparecem com mais frequencia?",
+          [
+          "Os documentos destacam ",
+          "classificacao supervisionada [1] [2].",
+          ],
+        ).at(-1)!,
+      );
+      stream.close();
+    });
+
+    expect(await screen.findByText(CURRENT_TRACE_ID)).toBeInTheDocument();
+    expect(screen.queryByText(/consultando fontes/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps the streamed user message and shows a safe error when the SSE turn fails", async () => {
+    const stream = createControlledEventStreamResponse();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(stream.response);
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Pergunta com falha");
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    await act(async () => {
+      stream.push({
+        type: "user_message_created",
+        userMessage: {
+          id: "99999999-9999-4999-8999-999999999993",
+          role: "user",
+          content: "Pergunta com falha",
+          createdAt: MESSAGE_CREATED_AT,
+          trace: null,
+        },
+      });
+      stream.push({
+        type: "phase",
+        phase: "retrieving_sources",
+      });
+      stream.push({
+        type: "error",
+        status: "generation_unavailable",
+        errorCode: "generation_unavailable",
+      });
+      stream.close();
+    });
+
+    expect(
+      await screen.findByText(/servico de geracao indisponivel/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Pergunta com falha")).toBeInTheDocument();
+    expect(screen.queryByText(/gerando resposta/i)).not.toBeInTheDocument();
   });
 
   it("renders the focused handoff CTA only for cited global source cards", async () => {
