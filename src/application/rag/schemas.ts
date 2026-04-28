@@ -341,6 +341,83 @@ export type AppendConversationMessageResponse = z.infer<
   typeof appendConversationMessageResponseSchema
 >;
 
+export const ragConversationStreamPhaseSchema = z.enum([
+  "retrieving_sources",
+  "generating_answer",
+]);
+
+export type RagConversationStreamPhase = z.infer<
+  typeof ragConversationStreamPhaseSchema
+>;
+
+export const ragConversationStreamErrorStatusSchema = z.enum([
+  "generation_failed",
+  "generation_unavailable",
+  "document_not_found",
+  "document_not_focusable",
+]);
+
+export type RagConversationStreamErrorStatus = z.infer<
+  typeof ragConversationStreamErrorStatusSchema
+>;
+
+export const ragConversationStreamUserMessageCreatedEventSchema = z
+  .object({
+    type: z.literal("user_message_created"),
+    userMessage: conversationMessageResponseSchema,
+  })
+  .strip();
+
+export const ragConversationStreamPhaseEventSchema = z
+  .object({
+    type: z.literal("phase"),
+    phase: ragConversationStreamPhaseSchema,
+  })
+  .strip();
+
+export const ragConversationStreamSourceEventSchema = z
+  .object({
+    type: z.literal("source"),
+    source: ragSourceSchema,
+  })
+  .strip();
+
+export const ragConversationStreamAnswerDeltaEventSchema = z
+  .object({
+    type: z.literal("answer_delta"),
+    textDelta: z.string().min(1),
+  })
+  .strip();
+
+export const ragConversationStreamDoneEventSchema = z
+  .object({
+    type: z.literal("done"),
+    status: z.enum(["answered", "answered_no_evidence"]),
+    assistantMessage: conversationMessageResponseSchema,
+  })
+  .strip();
+
+export const ragConversationStreamErrorEventSchema = z
+  .object({
+    type: z.literal("error"),
+    status: ragConversationStreamErrorStatusSchema,
+    errorCode: ragConversationStreamErrorStatusSchema,
+  })
+  .strip();
+
+export const ragConversationStreamEventSchema = z.discriminatedUnion("type", [
+  ragConversationStreamUserMessageCreatedEventSchema,
+  ragConversationStreamPhaseEventSchema,
+  ragConversationStreamSourceEventSchema,
+  ragConversationStreamAnswerDeltaEventSchema,
+  ragConversationStreamDoneEventSchema,
+  ragConversationStreamErrorEventSchema,
+]);
+
+export type RagConversationStreamEvent = z.infer<
+  typeof ragConversationStreamEventSchema
+>;
+
 export const ragQueryRunIdParamSchema = z.string().uuid();
 
 export const conversationIdParamSchema = z.string().uuid();
