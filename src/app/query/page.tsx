@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   appendConversationMessageResponseSchema,
@@ -51,6 +51,7 @@ import {
 import styles from "./page.module.css";
 
 const SECRET_STORAGE_KEY = "query:secret";
+const SOURCE_FOCUS_ACTION_LABEL = "Conversar apenas sobre este artigo";
 
 // ---------------------------------------------------------------------------
 // Mock visual para iteracao de design — ativar com ?mock=1 na URL.
@@ -228,6 +229,10 @@ type SelectableDocumentsState = {
   lastLoadedSecret: string | null;
 };
 
+type HandoffState =
+  | { status: "idle" }
+  | { status: "starting"; sourceChunkId: string };
+
 function createInitialRecentRunsState(): RecentRunsState {
   return {
     status: "idle",
@@ -284,6 +289,12 @@ export default function QueryPage() {
   const [expandedAuditMessageIds, setExpandedAuditMessageIds] = useState<
     Set<string>
   >(() => new Set());
+  const [isUrlStateReady, setIsUrlStateReady] = useState(false);
+  const [handoffState, setHandoffState] = useState<HandoffState>({
+    status: "idle",
+  });
+  const handoffInFlightRef = useRef(false);
+  const suppressUrlSyncRef = useRef(false);
 
   const trimmedQuestion = question.trim();
   const trimmedSecret = secret.trim();
@@ -296,7 +307,7 @@ export default function QueryPage() {
     trimmedQuestion.length > 0 &&
     trimmedSecret.length > 0 &&
     !isSubmitting &&
-    (queryMode === "global" || selectedDocumentId.length > 0);
+    (queryMode === "global" || selectedDocument !== null);
   const isStandardSubmitting =
     askState.kind === "submitting" && askState.strategy === "standard";
   const isExploreSubmitting =
@@ -332,6 +343,8 @@ export default function QueryPage() {
     const stored = sessionStorage.getItem(SECRET_STORAGE_KEY);
     const url = new URL(window.location.href);
     const conversationParam = url.searchParams.get("conversation");
+    const modeParam = url.searchParams.get("mode");
+    const documentIdParam = url.searchParams.get("documentId");
     const mockParam = url.searchParams.get("mock");
 
     if (mockParam === "1") {
@@ -347,6 +360,18 @@ export default function QueryPage() {
       return;
     }
 
+    if (modeParam === "focused") {
+      setQueryMode("focused");
+    }
+
+    if (
+      modeParam === "focused" &&
+      documentIdParam &&
+      isUuidValue(documentIdParam)
+    ) {
+      setSelectedDocumentId(documentIdParam);
+    }
+
     if (conversationParam) {
       setConversationId(conversationParam);
     }
@@ -354,7 +379,24 @@ export default function QueryPage() {
     if (stored) {
       setSecret(stored);
     }
+
+    setIsUrlStateReady(true);
   }, []);
+
+  useEffect(() => {
+    if (!isUrlStateReady || suppressUrlSyncRef.current) {
+      return;
+    }
+
+    syncQueryUrl({
+      conversationId,
+      mode: queryMode,
+      documentId:
+        queryMode === "focused" && isUuidValue(selectedDocumentId)
+          ? selectedDocumentId
+          : null,
+    });
+  }, [conversationId, isUrlStateReady, queryMode, selectedDocumentId]);
 
   useEffect(() => {
     if (
@@ -436,11 +478,15 @@ export default function QueryPage() {
     }));
   }
 
-  async function loadSelectableDocuments(secretValue = trimmedSecret) {
+  async function loadSelectableDocuments(
+    secretValue = trimmedSecret,
+    options: { syncSelection?: boolean } = {},
+  ): Promise<SelectableRagDocument[] | null> {
     const effectiveSecret = secretValue.trim();
+    const syncSelection = options.syncSelection ?? true;
 
     if (effectiveSecret.length === 0) {
-      return;
+      return null;
     }
 
     setSelectableDocumentsState((current) => ({
@@ -468,7 +514,7 @@ export default function QueryPage() {
         error: "technical",
         lastLoadedSecret: effectiveSecret,
       });
-      return;
+      return null;
     }
 
     if (response.status === 200) {
@@ -487,7 +533,7 @@ export default function QueryPage() {
           error: "technical",
           lastLoadedSecret: effectiveSecret,
         });
-        return;
+        return null;
       }
 
       setSelectableDocumentsState({
@@ -496,13 +542,15 @@ export default function QueryPage() {
         error: null,
         lastLoadedSecret: effectiveSecret,
       });
-      setSelectedDocumentId((current) =>
-        current.length > 0 &&
-        parsed.data.documents.some((document) => document.id === current)
-          ? current
-          : "",
-      );
-      return;
+      if (syncSelection) {
+        setSelectedDocumentId((current) =>
+          current.length > 0 &&
+          parsed.data.documents.some((document) => document.id === current)
+            ? current
+            : "",
+        );
+      }
+      return parsed.data.documents;
     }
 
     if (response.status === 401) {
@@ -521,7 +569,7 @@ export default function QueryPage() {
           message: formatTechnicalErrorMessage(response.status),
         });
       }
-      return;
+      return null;
     }
 
     console.error("[rag/query]", {
@@ -535,13 +583,14 @@ export default function QueryPage() {
       error: "technical",
       lastLoadedSecret: effectiveSecret,
     });
+    return null;
   }
 
   async function submitQuestion(strategy: QuerySubmissionStrategy) {
     if (
       trimmedQuestion.length === 0 ||
       trimmedSecret.length === 0 ||
-      (queryMode === "focused" && selectedDocumentId.length === 0)
+      (queryMode === "focused" && selectedDocument === null)
     ) {
       return;
     }
@@ -782,14 +831,26 @@ export default function QueryPage() {
     return createConversation();
   }
 
-  async function createConversation(): Promise<string | null> {
+  async function createConversation(
+    options: {
+      preserveCurrentConversation?: boolean;
+      pushUrlOnSuccess?: boolean;
+    } = {},
+  ): Promise<string | null> {
     if (trimmedSecret.length === 0) {
       return null;
     }
 
+    const preserveCurrentConversation =
+      options.preserveCurrentConversation ?? false;
+    const pushUrlOnSuccess = options.pushUrlOnSuccess ?? true;
+    const previousConversation = preserveCurrentConversation
+      ? conversationState.conversation
+      : null;
+
     setConversationState({
       status: "loading",
-      conversation: null,
+      conversation: previousConversation,
       error: null,
     });
 
@@ -810,7 +871,7 @@ export default function QueryPage() {
       });
       setConversationState({
         status: "error",
-        conversation: null,
+        conversation: previousConversation,
         error: "technical",
       });
       setAskState({
@@ -832,7 +893,7 @@ export default function QueryPage() {
         });
         setConversationState({
           status: "error",
-          conversation: null,
+          conversation: previousConversation,
           error: "technical",
         });
         setAskState({
@@ -854,7 +915,19 @@ export default function QueryPage() {
         error: null,
       });
       setExpandedAuditMessageIds(new Set());
-      syncConversationUrl(parsed.data.id);
+      if (pushUrlOnSuccess) {
+        writeQueryUrl(
+          {
+            conversationId: parsed.data.id,
+            mode: queryMode,
+            documentId:
+              queryMode === "focused" && isUuidValue(selectedDocumentId)
+                ? selectedDocumentId
+                : null,
+          },
+          "push",
+        );
+      }
 
       return parsed.data.id;
     }
@@ -870,14 +943,14 @@ export default function QueryPage() {
       if (parsed.success) {
         setAskState({ kind: "unauthorized" });
         setConversationState({
-          status: "idle",
-          conversation: null,
+          status: previousConversation ? "loaded" : "idle",
+          conversation: previousConversation,
           error: "unauthorized",
         });
       } else {
         setConversationState({
-          status: "idle",
-          conversation: null,
+          status: previousConversation ? "loaded" : "idle",
+          conversation: previousConversation,
           error: "technical",
         });
         setAskState({
@@ -895,7 +968,7 @@ export default function QueryPage() {
     });
     setConversationState({
       status: "error",
-      conversation: null,
+      conversation: previousConversation,
       error: "technical",
     });
     setAskState({
@@ -909,6 +982,60 @@ export default function QueryPage() {
     setAskState({ kind: "idle" });
     setQuestion("");
     await createConversation();
+  }
+
+  async function startFocusedConversationFromSource(source: SourceCard) {
+    if (trimmedSecret.length === 0 || handoffInFlightRef.current) {
+      return;
+    }
+
+    handoffInFlightRef.current = true;
+    suppressUrlSyncRef.current = true;
+    setHandoffState({ status: "starting", sourceChunkId: source.chunkId });
+    setAskState({ kind: "idle" });
+
+    try {
+      const documents = await loadSelectableDocuments(trimmedSecret, {
+        syncSelection: false,
+      });
+
+      if (!documents) {
+        return;
+      }
+
+      if (!documents.some((document) => document.id === source.documentId)) {
+        setAskState({
+          kind: "technical_error",
+          message: RAG_FOCUSED_DOCUMENT_NOT_FOUND_MESSAGE,
+        });
+        return;
+      }
+
+      const nextConversationId = await createConversation({
+        preserveCurrentConversation: true,
+        pushUrlOnSuccess: false,
+      });
+
+      if (!nextConversationId) {
+        return;
+      }
+
+      setQueryMode("focused");
+      setSelectedDocumentId(source.documentId);
+      setAskState({ kind: "idle" });
+      writeQueryUrl(
+        {
+          conversationId: nextConversationId,
+          mode: "focused",
+          documentId: source.documentId,
+        },
+        "push",
+      );
+    } finally {
+      suppressUrlSyncRef.current = false;
+      handoffInFlightRef.current = false;
+      setHandoffState({ status: "idle" });
+    }
   }
 
   async function loadConversation(id: string, secretValue = trimmedSecret) {
@@ -970,7 +1097,6 @@ export default function QueryPage() {
         error: null,
       });
       setExpandedAuditMessageIds(new Set());
-      syncConversationUrl(parsed.data.id);
       return;
     }
 
@@ -1487,6 +1613,8 @@ export default function QueryPage() {
           <ConversationAuditAside
             messages={expandedAuditMessages}
             onClose={(messageId) => toggleAudit(messageId)}
+            onStartFocusedConversation={startFocusedConversationFromSource}
+            handoffState={handoffState}
           />
         ) : null}
         <section className={`${styles.panel} ${styles.chatPanel}`}>
@@ -1776,6 +1904,12 @@ export default function QueryPage() {
                 blockIndex="[ 04 ] Fontes persistidas"
                 sources={selectedRunState.run.sources}
                 showCitationFlags
+                onStartFocusedConversation={
+                  selectedRunState.run.mode === "global"
+                    ? startFocusedConversationFromSource
+                    : undefined
+                }
+                handoffState={handoffState}
               />
             </section>
           ) : null}
@@ -1855,9 +1989,16 @@ type ConversationAuditAsideProps = {
     }
   >;
   onClose: (messageId: string) => void;
+  onStartFocusedConversation: (source: SourceCard) => void;
+  handoffState: HandoffState;
 };
 
-function ConversationAuditAside({ messages, onClose }: ConversationAuditAsideProps) {
+function ConversationAuditAside({
+  messages,
+  onClose,
+  onStartFocusedConversation,
+  handoffState,
+}: ConversationAuditAsideProps) {
   return (
     <aside className={styles.auditAside} aria-label="Auditoria da conversa">
       {messages.map((message) => (
@@ -1896,6 +2037,12 @@ function ConversationAuditAside({ messages, onClose }: ConversationAuditAsidePro
               blockIndex="[ 03 ] Fontes da mensagem"
               sources={message.trace.sources}
               showCitationFlags
+              onStartFocusedConversation={
+                message.trace.mode === "global"
+                  ? onStartFocusedConversation
+                  : undefined
+              }
+              handoffState={handoffState}
             />
         </section>
       ))}
@@ -2041,10 +2188,14 @@ function SourcesBlock({
   blockIndex,
   sources,
   showCitationFlags = false,
+  onStartFocusedConversation,
+  handoffState = { status: "idle" },
 }: {
   blockIndex: string;
   sources: SourceCard[];
   showCitationFlags?: boolean;
+  onStartFocusedConversation?: (source: SourceCard) => void;
+  handoffState?: HandoffState;
 }) {
   return (
     <article className={`${styles.resultBlock} ${styles.sourcesBlockAccent}`}>
@@ -2057,34 +2208,57 @@ function SourcesBlock({
           <p className={styles.emptySources}>{RAG_EMPTY_SOURCES_MESSAGE}</p>
         ) : (
           <ol className={styles.sources}>
-            {sources.map((source) => (
-              <li key={source.chunkId} className={styles.sourceCard}>
-                <div className={styles.sourceNumber} aria-hidden="true">
-                  {source.sourceNumber}
-                </div>
-                <div>
-                  <p className={styles.sourceTitle}>
-                    {source.sourceNumber}. {source.documentTitle}
-                  </p>
-                  <p className={styles.sourceExcerpt}>
-                    {truncateExcerptPreview(source.excerpt)}
-                  </p>
-                  <div className={styles.sourceMetaRow}>
-                    <span className={styles.sourceChip}>
-                      score :: {source.score.toFixed(2)}
-                    </span>
-                    <span className={styles.sourceChip}>
-                      chunk :: {source.chunkIndex}
-                    </span>
-                    {showCitationFlags ? (
+            {sources.map((source) => {
+              const canStartFocusedConversation =
+                onStartFocusedConversation !== undefined &&
+                source.citedInAnswer === true;
+              const isStartingFocusedConversation =
+                handoffState.status === "starting" &&
+                handoffState.sourceChunkId === source.chunkId;
+
+              return (
+                <li key={source.chunkId} className={styles.sourceCard}>
+                  <div className={styles.sourceNumber} aria-hidden="true">
+                    {source.sourceNumber}
+                  </div>
+                  <div className={styles.sourceContent}>
+                    <p className={styles.sourceTitle}>
+                      {source.sourceNumber}. {source.documentTitle}
+                    </p>
+                    <p className={styles.sourceExcerpt}>
+                      {truncateExcerptPreview(source.excerpt)}
+                    </p>
+                    <div className={styles.sourceMetaRow}>
                       <span className={styles.sourceChip}>
-                        citado :: {source.citedInAnswer ? "sim" : "nao"}
+                        score :: {source.score.toFixed(2)}
                       </span>
+                      <span className={styles.sourceChip}>
+                        chunk :: {source.chunkIndex}
+                      </span>
+                      {showCitationFlags ? (
+                        <span className={styles.sourceChip}>
+                          citado :: {source.citedInAnswer ? "sim" : "nao"}
+                        </span>
+                      ) : null}
+                    </div>
+                    {canStartFocusedConversation ? (
+                      <div className={styles.sourceActionRow}>
+                        <button
+                          type="button"
+                          onClick={() => onStartFocusedConversation(source)}
+                          disabled={handoffState.status === "starting"}
+                          className={`${styles.btn} ${styles.btnSecondary} ${styles.sourceActionButton}`}
+                        >
+                          {isStartingFocusedConversation
+                            ? "Preparando foco..."
+                            : SOURCE_FOCUS_ACTION_LABEL}
+                        </button>
+                      </div>
                     ) : null}
                   </div>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ol>
         )}
       </div>
@@ -2105,10 +2279,56 @@ function readTopKInput(value: string): number {
   );
 }
 
-function syncConversationUrl(conversationId: string): void {
+function syncQueryUrl({
+  conversationId,
+  mode,
+  documentId,
+}: {
+  conversationId: string | null;
+  mode: QueryMode;
+  documentId: string | null;
+}): void {
+  writeQueryUrl({ conversationId, mode, documentId }, "replace");
+}
+
+function writeQueryUrl(
+  {
+    conversationId,
+    mode,
+    documentId,
+  }: {
+  conversationId: string | null;
+  mode: QueryMode;
+  documentId: string | null;
+  },
+  historyMode: "push" | "replace",
+): void {
   const url = new URL(window.location.href);
-  url.searchParams.set("conversation", conversationId);
-  window.history.pushState({}, "", url);
+
+  if (conversationId) {
+    url.searchParams.set("conversation", conversationId);
+  } else {
+    url.searchParams.delete("conversation");
+  }
+
+  if (mode === "focused") {
+    url.searchParams.set("mode", "focused");
+  } else {
+    url.searchParams.delete("mode");
+  }
+
+  if (mode === "focused" && documentId) {
+    url.searchParams.set("documentId", documentId);
+  } else {
+    url.searchParams.delete("documentId");
+  }
+
+  if (historyMode === "push") {
+    window.history.pushState({}, "", url);
+    return;
+  }
+
+  window.history.replaceState({}, "", url);
 }
 
 async function fetchJson(
@@ -2151,6 +2371,12 @@ function formatRunStatus(status: RagQueryRunSummaryResponse["status"]): string {
     case "generation_unavailable":
       return "geracao indisponivel";
   }
+}
+
+function isUuidValue(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }
 
 function formatTimestamp(value: string): string {
