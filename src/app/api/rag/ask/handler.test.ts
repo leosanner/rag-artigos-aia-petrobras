@@ -12,7 +12,9 @@ const VALID_SECRET = "query-secret-value";
 const OPENAI_API_KEY = "sk-test-super-secret";
 const DATABASE_URL = "postgres://user:password@localhost:5432/app";
 
-function buildAnsweredResult(): AnswerQuestionResult {
+function buildAnsweredResult(
+  overrides: Partial<Extract<AnswerQuestionResult, { kind: "answered" }>> = {},
+): AnswerQuestionResult {
   return {
     kind: "answered",
     status: "answered",
@@ -66,6 +68,7 @@ function buildAnsweredResult(): AnswerQuestionResult {
       },
       totalCostUsd: 0.00002063,
     },
+    ...overrides,
   };
 }
 
@@ -202,6 +205,64 @@ describe("POST /api/rag/ask handler", () => {
     });
   });
 
+  it("accepts focused requests and forwards the validated document scope to the service", async () => {
+    const answerQuestion = buildAnswerQuestion(
+      buildAnsweredResult({
+        mode: "focused",
+        metadata: {
+          mode: "focused",
+          documentId: DOCUMENT_ID,
+          topK: 6,
+          retrievalStrategy: "standard",
+          candidateTopK: 6,
+          promptVersion: "f04-global-rag-v1",
+          generationModel: "gpt-4.1-mini",
+          embeddingModel: "text-embedding-3-large",
+        },
+      }),
+    );
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      post(
+        {
+          question: `  ${QUESTION}  `,
+          mode: "focused",
+          documentId: DOCUMENT_ID,
+          retrieval: {
+            topK: 9,
+            strategy: "explore",
+          },
+        },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(
+      expect.objectContaining({
+        mode: "focused",
+        metadata: expect.objectContaining({
+          mode: "focused",
+          documentId: DOCUMENT_ID,
+          topK: 6,
+        }),
+      }),
+    );
+    expect(answerQuestion.execute).toHaveBeenCalledWith({
+      question: QUESTION,
+      mode: "focused",
+      documentId: DOCUMENT_ID,
+      retrieval: {
+        topK: 9,
+        strategy: "explore",
+      },
+    });
+  });
+
   it("returns 400 for malformed JSON without calling the service", async () => {
     const answerQuestion = buildAnswerQuestion(buildAnsweredResult());
     const handler = createRagAskHandler({
@@ -245,6 +306,12 @@ describe("POST /api/rag/ask handler", () => {
         { Authorization: `Bearer ${VALID_SECRET}` },
       ),
     );
+    const invalidFocusedId = await handler(
+      post(
+        { question: QUESTION, mode: "focused", documentId: "not-a-uuid" },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+    );
     const extraField = await handler(
       post(
         { question: QUESTION, mode: "global", ignored: true },
@@ -256,6 +323,8 @@ describe("POST /api/rag/ask handler", () => {
     expect(await blankQuestion.json()).toEqual({ error: "invalid_request" });
     expect(invalidShape.status).toBe(400);
     expect(await invalidShape.json()).toEqual({ error: "invalid_request" });
+    expect(invalidFocusedId.status).toBe(400);
+    expect(await invalidFocusedId.json()).toEqual({ error: "invalid_request" });
     expect(extraField.status).toBe(400);
     expect(await extraField.json()).toEqual({ error: "invalid_request" });
     expect(answerQuestion.execute).not.toHaveBeenCalled();
@@ -343,6 +412,53 @@ describe("POST /api/rag/ask handler", () => {
     expect(await response.json()).toEqual({ error: "generation_failed" });
     expect(body).not.toHaveProperty("sources");
   });
+
+  it("maps a focused not_found rejection to 404 with a sanitized code", async () => {
+    const answerQuestion = buildAnswerQuestion({
+      kind: "focused_document_rejected",
+      reason: "not_found",
+    });
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      post(
+        { question: QUESTION, mode: "focused", documentId: DOCUMENT_ID },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toEqual({ error: "document_not_found" });
+  });
+
+  it.each(["not_processed", "not_indexed"] as const)(
+    "maps a focused %s rejection to 422 with the sanitized focusable code",
+    async (reason) => {
+      const answerQuestion = buildAnswerQuestion({
+        kind: "focused_document_rejected",
+        reason,
+      });
+      const handler = createRagAskHandler({
+        answerQuestion,
+        secret: VALID_SECRET,
+      });
+
+      const response = await handler(
+        post(
+          { question: QUESTION, mode: "focused", documentId: DOCUMENT_ID },
+          { Authorization: `Bearer ${VALID_SECRET}` },
+        ),
+      );
+
+      expect(response.status).toBe(422);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(await response.json()).toEqual({ error: "document_not_focusable" });
+    },
+  );
 
   it("maps generation_unavailable to 503 without exposing sources", async () => {
     const answerQuestion = buildAnswerQuestion({
