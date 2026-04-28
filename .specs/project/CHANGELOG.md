@@ -2,6 +2,38 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - feat(query): hand off cited source cards into focused conversations
+
+Date: 2026-04-28
+
+Changed:
+
+- Added a first-cut focused handoff on `/query` from global-answer source cards:
+  the operator can now click `Conversar apenas sobre este artigo` and land in a
+  brand-new focused conversation with that cited article preselected. The CTA
+  appears only on source cards explicitly marked as cited in the answer.
+- Generalized `/query` URL sync to persist the focused draft with
+  `conversation`, `mode`, and `documentId`, and restored that draft on reload
+  when the operator secret is already available.
+- Hardened the handoff flow so unavailable articles do not clear an existing
+  focused draft selection, repeated clicks do not create duplicate empty
+  conversations, and successful handoffs preserve browser back-navigation
+  between the previous conversation URL and the new focused draft URL.
+- Added page coverage for the new CTA visibility rules, source-card handoff
+  flows from both conversation audit and persisted run detail, URL restoration,
+  unavailable-document abort, and safe 401 / 500 paths.
+- Tracked the behavior as the follow-up contract
+  `.specs/features/F-09-source-card-focused-handoff/spec.md`, explicitly
+  deferring inline citation clicks to a later iteration.
+
+Files:
+
+- `src/app/query/page.tsx`
+- `src/app/query/page.module.css`
+- `src/app/query/page.test.tsx`
+- `.specs/features/F-09-source-card-focused-handoff/spec.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - test(f07): close focused RAG with integration coverage
 
 Date: 2026-04-28
