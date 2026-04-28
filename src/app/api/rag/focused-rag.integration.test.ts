@@ -7,6 +7,8 @@ import { AnswerQuestion } from "@/application/rag/answer-question";
 import { AppendConversationMessage } from "@/application/rag/append-conversation-message";
 import { ListRagDocuments } from "@/application/rag/list-rag-documents";
 import { RetrieveChunks } from "@/application/rag/retrieve-chunks";
+import { GetConversationDetail } from "@/application/rag/get-conversation-detail";
+import { StreamConversationMessage } from "@/application/rag/stream-conversation-message";
 import type {
   GenerationProvider,
   QuestionEmbeddingProvider,
@@ -170,6 +172,21 @@ function buildGenerationProvider(spy: ReturnType<typeof vi.fn>): GenerationProvi
         estimatedCostUsd: 0.0000123,
       },
     })),
+    streamAnswer: spy.mockImplementation(async (input) => {
+      const answer = "Resposta deterministica para o teste de integracao [1].";
+
+      await input.onTextDelta?.(answer);
+
+      return {
+        answer,
+        usage: {
+          inputTokens: 50,
+          outputTokens: 20,
+          totalTokens: 70,
+          estimatedCostUsd: 0.0000123,
+        },
+      };
+    }),
   };
 }
 
@@ -204,6 +221,14 @@ function wire(db: TestDatabase): Wired {
     messages: messagesRepository,
     answerQuestion,
   });
+  const getConversationDetail = new GetConversationDetail({
+    conversations,
+  });
+  const streamMessage = new StreamConversationMessage({
+    conversations,
+    messages: messagesRepository,
+    answerQuestion,
+  });
 
   const askHandler = createRagAskHandler({
     answerQuestion,
@@ -217,6 +242,8 @@ function wire(db: TestDatabase): Wired {
   });
   const messagesHandler = createRagConversationMessagesHandler({
     appendMessage,
+    getConversationDetail,
+    streamMessage,
     secret: SECRET,
   });
 
