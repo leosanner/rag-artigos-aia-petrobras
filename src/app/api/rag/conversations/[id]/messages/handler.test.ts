@@ -9,6 +9,7 @@ const CONVERSATION_ID = "11111111-1111-4111-8111-111111111111";
 const USER_MESSAGE_ID = "22222222-2222-4222-8222-222222222222";
 const ASSISTANT_MESSAGE_ID = "33333333-3333-4333-8333-333333333333";
 const TRACE_ID = "44444444-4444-4444-8444-444444444444";
+const DOCUMENT_ID = "55555555-5555-4555-8555-555555555555";
 const MESSAGE_AT = new Date("2026-04-23T12:35:01.000Z");
 const ASSISTANT_AT = new Date("2026-04-23T12:35:02.000Z");
 
@@ -149,6 +150,13 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
       post({ content: "   " }, { Authorization: `Bearer ${VALID_SECRET}` }),
       context(),
     );
+    const invalidFocusedBody = await handler(
+      post(
+        { content: "Pergunta", mode: "focused" },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+      context(),
+    );
     const notFound = await handler(
       post({ content: "Pergunta" }, { Authorization: `Bearer ${VALID_SECRET}` }),
       context(),
@@ -160,6 +168,8 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
     expect(await invalidId.json()).toEqual({ error: "invalid_id" });
     expect(invalidBody.status).toBe(400);
     expect(await invalidBody.json()).toEqual({ error: "invalid_request" });
+    expect(invalidFocusedBody.status).toBe(400);
+    expect(await invalidFocusedBody.json()).toEqual({ error: "invalid_request" });
     expect(notFound.status).toBe(404);
     expect(await notFound.json()).toEqual({ error: "not_found" });
   });
@@ -226,6 +236,95 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
     expect((await unavailableResponse.json()).errorCode).toBe(
       "generation_unavailable",
     );
+  });
+
+  it("accepts a focused request body and maps a missing focused document to 404", async () => {
+    const appendMessage = buildAppendMessage({
+      status: "document_not_found",
+      userMessage: userMessage(),
+      errorCode: "document_not_found",
+    });
+    const handler = createRagConversationMessagesHandler({
+      appendMessage,
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      post(
+        {
+          content: "  Quais tecnicas aparecem?  ",
+          mode: "focused",
+          documentId: DOCUMENT_ID,
+          retrievalSettings: {
+            topK: 8,
+            strategy: "explore",
+          },
+        },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+      context(),
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      status: "document_not_found",
+      userMessage: {
+        id: USER_MESSAGE_ID,
+        role: "user",
+        content: "Quais tecnicas aparecem?",
+        createdAt: MESSAGE_AT.toISOString(),
+        trace: null,
+      },
+      errorCode: "document_not_found",
+    });
+    expect(appendMessage.execute).toHaveBeenCalledWith({
+      conversationId: CONVERSATION_ID,
+      userMessageContent: "Quais tecnicas aparecem?",
+      mode: "focused",
+      documentId: DOCUMENT_ID,
+      retrievalSettings: {
+        topK: 8,
+        strategy: "explore",
+      },
+      requestTraceId: expect.any(String),
+    });
+  });
+
+  it("maps non-focusable focused documents to 422 without changing the conversation-not-found contract", async () => {
+    const appendMessage = buildAppendMessage({
+      status: "document_not_focusable",
+      userMessage: userMessage(),
+      errorCode: "document_not_focusable",
+    });
+    const handler = createRagConversationMessagesHandler({
+      appendMessage,
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      post(
+        {
+          content: "Pergunta",
+          mode: "focused",
+          documentId: DOCUMENT_ID,
+        },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+      context(),
+    );
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({
+      status: "document_not_focusable",
+      userMessage: {
+        id: USER_MESSAGE_ID,
+        role: "user",
+        content: "Quais tecnicas aparecem?",
+        createdAt: MESSAGE_AT.toISOString(),
+        trace: null,
+      },
+      errorCode: "document_not_focusable",
+    });
   });
 
   it("returns 500 with a sanitized body on unexpected failure and logs structured details", async () => {

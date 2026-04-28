@@ -64,12 +64,23 @@ export function createRagConversationMessagesHandler(
     const requestTraceId = randomUUID().slice(0, 8);
 
     try {
-      const result = await deps.appendMessage.execute({
-        conversationId: parsedId.data,
-        userMessageContent: parsedBody.data.content,
-        retrievalSettings: parsedBody.data.retrievalSettings,
-        requestTraceId,
-      });
+      const appendInput =
+        parsedBody.data.mode === "focused"
+          ? {
+              conversationId: parsedId.data,
+              userMessageContent: parsedBody.data.content,
+              retrievalSettings: parsedBody.data.retrievalSettings,
+              mode: "focused" as const,
+              documentId: parsedBody.data.documentId,
+              requestTraceId,
+            }
+          : {
+              conversationId: parsedId.data,
+              userMessageContent: parsedBody.data.content,
+              retrievalSettings: parsedBody.data.retrievalSettings,
+              requestTraceId,
+            };
+      const result = await deps.appendMessage.execute(appendInput);
 
       if (result.status === "not_found") {
         return notFoundResponse();
@@ -81,6 +92,10 @@ export function createRagConversationMessagesHandler(
           ? 502
           : result.status === "generation_unavailable"
             ? 503
+            : result.status === "document_not_found"
+              ? 404
+              : result.status === "document_not_focusable"
+                ? 422
             : 200;
 
       return NextResponse.json(body, {
