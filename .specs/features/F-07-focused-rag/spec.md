@@ -119,8 +119,11 @@ needed for the current task:
 3. In global mode, the page behaves according to the latest shared `/query`
    contracts already delivered before focused retrieval lands.
 4. In focused mode, the operator selects one document and submits a question.
-5. The page calls `POST /api/rag/ask` with
-   `{ question, mode: "focused", documentId, retrieval? }`.
+5. The page uses the shared F-06 conversation transport and, in focused mode,
+   submits turns through `POST /api/rag/conversations/:id/messages` with
+   `{ content, mode: "focused", documentId, retrievalSettings? }`. The
+   single-turn `POST /api/rag/ask` contract remains supported for direct API
+   use and regression coverage.
 6. The route validates the request and delegates to the same `AnswerQuestion`
    service introduced in F-03 and later extended by F-04/F-05/F-08.
 7. `AnswerQuestion` verifies that the selected document exists, is processed,
@@ -171,7 +174,8 @@ needed for the current task:
 |--------|-------------------|-------------|
 | `GET` | `/api/rag/documents` | Returns processed and indexed documents available for focused RAG. |
 | `POST` | `/api/rag/ask` | Extends the shared ask route with `{ question, mode: "focused", documentId, retrieval? }`. |
-| `GET` | `/query` | Extends the evolved shared page with focused mode and a document picker. |
+| `POST` | `/api/rag/conversations/:id/messages` | Extends the F-06 conversation transport so focused turns add `mode: "focused"` and `documentId` to the existing body. |
+| `GET` | `/query` | Extends the evolved shared page with focused mode and a document picker, using the shared conversation transport already established by F-06. |
 | Function | `ListRagDocuments.execute()` | Application service for selector data. |
 | Function | `AnswerQuestion.execute(input)` | Existing shared application service extended with focused mode. |
 
@@ -204,7 +208,7 @@ needed for the current task:
 2. `GET /api/rag/documents` excludes pending, failed, and processed-but-unindexed
    documents.
 3. `POST /api/rag/ask` rejects focused requests with missing or invalid
-   `documentId`.
+   `documentId` using the legacy `400 invalid_request` shape.
 4. Focused vector search returns only chunks from the selected document while
    still honoring the shared retrieval settings.
 5. A focused request for a processed but unindexed document returns a safe

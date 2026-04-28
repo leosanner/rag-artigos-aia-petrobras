@@ -4,8 +4,9 @@
 
 Expose Block 03 use cases over HTTP and evolve `/query` with focused mode on
 top of the existing shared shell (F-04 controls + F-05 audit + F-06
-conversation + F-08 rerank), without creating a separate page or weakening
-any existing safe error/audit contract.
+conversation), without creating a separate page or weakening any existing safe
+error/audit contract. The rerank UI contract remains pending under F-08 in the
+current repository state.
 
 ## Scope
 
@@ -19,14 +20,19 @@ any existing safe error/audit contract.
   `focused_document_rejected` outcome from Block 03 to a sanitized HTTP
   response (`404` for `"not_found"`, `422` for `"not_processed"` /
   `"not_indexed"`).
+- Extending `POST /api/rag/conversations/:id/messages` so the existing global
+  body remains byte-compatible while focused turns add
+  `{ mode: "focused", documentId }` beside `content` and optional
+  `retrievalSettings`, reusing the F-06 conversation transport already used by
+  `/query`.
 - Returning focused-success responses with `mode: "focused"` and
   `documentId` echoed in metadata, on top of the existing F-05/F-08 success
   payload.
 - `/query` UI: a mode toggle (global ↔ focused), a document picker that
   loads from `/api/rag/documents`, and a submit-disabled state until a
-  document is selected. The retrieval controls (`topK`, strategy
-  standard/explore/rerank), audit panel, and conversation shell remain
-  intact and apply to focused mode the same way they apply to global mode.
+  document is selected. The current retrieval controls (`topK`, strategy
+  standard/explore), audit panel, and conversation shell remain intact and
+  apply to focused mode the same way they apply to global mode.
 - Route-level and page-level tests.
 
 **Out of scope:**
@@ -43,7 +49,7 @@ any existing safe error/audit contract.
 
 | Rule | Statement | This block |
 |---|---|---|
-| RN-04 | Focused mode uses the same retrieval-controls model as global mode. | The focused submission path reuses the F-04/F-08 retrieval controls UI and sends the same `retrieval` payload. |
+| RN-04 | Focused mode uses the same retrieval-controls model as global mode. | The focused submission path reuses the current `/query` retrieval controls UI and sends the same `retrieval` payload. |
 | RN-05 | The UI must not offer pending, failed, or unindexed documents as selectable focused targets. | The picker only renders what `/api/rag/documents` returns; no client-side override. |
 | RN-06 | A focused request for an unknown, non-processed, or unindexed document returns a safe client error and does not call generation. | The route maps the Block 03 typed rejection to `404` or `422` with `{ error: "..." }` and never reaches embedding/generation. |
 | RN-08 | F-07 must not change the existing global request/response behavior. | The discriminated union keeps the global request shape intact; existing global responses remain unchanged. |
@@ -58,7 +64,7 @@ any existing safe error/audit contract.
 - [ ] RF-B04-02: `POST /api/rag/ask` accepts the focused variant of the
   discriminated union and rejects malformed payloads (missing/invalid
   `documentId`, unknown fields, invalid retrieval) with the existing
-  `{ error: "invalid_request" }` 422 response.
+  `{ error: "invalid_request" }` 400 response.
 - [ ] RF-B04-03: A focused request whose `documentId` is unknown returns
   HTTP 404 with `{ error: "document_not_found" }`; a focused request whose
   document is not processed or not indexed returns HTTP 422 with
@@ -69,9 +75,10 @@ any existing safe error/audit contract.
   metadata) plus `mode: "focused"` and the requested `documentId` in
   metadata.
 - [ ] RF-B04-05: `/query` adds a mode selector (global / focused) and a
-  document picker driven by `/api/rag/documents`. Existing controls
-  (`topK`, strategy, conversation shell, audit panel) remain visible and
-  apply identically in both modes.
+  document picker driven by `/api/rag/documents`, and submits focused turns
+  through `POST /api/rag/conversations/:id/messages`. Existing controls
+  (`topK`, strategy standard/explore, conversation shell, audit panel)
+  remain visible and apply identically in both modes.
 - [ ] RF-B04-06: `/query` disables the focused submit action until a
   selectable document is chosen.
 - [ ] RF-B04-07: Switching between global and focused does not clear the
@@ -110,15 +117,24 @@ export const RagAskFocusedErrorSchema = z.object({
 ```http
 GET  /api/rag/documents          → 200 ListRagDocumentsResponse | 401
 POST /api/rag/ask                → 200 RagAskResponse
-                                   | 401 | 422 invalid_request
+                                   | 401 | 400 invalid_request
                                    | 404 document_not_found
                                    | 422 document_not_focusable
+POST /api/rag/conversations/:id/messages
+                                → 200 AppendConversationMessageResponse
+                                   | 400 invalid_request
+                                   | 401 unauthorized
+                                   | 404 not_found | document_not_found
+                                   | 422 document_not_focusable
+                                   | 502 generation_failed
+                                   | 503 generation_unavailable
 ```
 
 ## Key Modules
 
 - `src/app/api/rag/documents/route.ts` (new)
 - `src/app/api/rag/ask/route.ts` (extended)
+- `src/app/api/rag/conversations/[id]/messages/route.ts` (extended)
 - `src/application/rag/schemas.ts` (request discriminated union assembled
   from Block 01 types)
 - `src/app/query/page.tsx` (focused-mode UI)
@@ -129,6 +145,8 @@ POST /api/rag/ask                → 200 RagAskResponse
 
 - `src/app/api/rag/documents/route.test.ts`
 - `src/app/api/rag/ask/route.test.ts` (extended with focused cases)
+- `src/app/api/rag/conversations/[id]/messages/route.test.ts` (extended with
+  focused cases)
 - `src/app/query/page.test.tsx` (extended: mode toggle, picker, disabled
   submit)
 
@@ -144,5 +162,6 @@ state.
 
 - Route and page tests pass.
 - `pnpm lint && pnpm typecheck` are green.
-- `/query` exposes focused mode end-to-end on top of the shared shell with
-  no regression on global, conversation, or rerank flows.
+- `/query` exposes focused mode end-to-end on top of the current shared shell
+  with no regression on global or conversation flows; rerank UI remains
+  pending under F-08.
