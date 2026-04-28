@@ -21,6 +21,7 @@ export type RetrieveChunksDeps = {
 export type RetrieveChunksInput = {
   question: string;
   retrieval: RagRetrievalSettings;
+  documentId?: string;
 };
 
 export type RetrieveChunksResult = {
@@ -68,6 +69,9 @@ export class RetrieveChunks {
         topK: candidateTopK,
         chunkingVersion: this.chunkingVersion,
         embeddingModel: this.embeddingModel,
+        ...(input.documentId !== undefined
+          ? { documentId: input.documentId }
+          : {}),
       });
 
       if (input.retrieval.strategy === "standard") {

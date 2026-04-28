@@ -1,14 +1,29 @@
 import type { RagRetrievalStrategy, RetrievedChunkMatch } from "@/domain/rag";
+import type {
+  FocusedDocumentClassification,
+  SelectableDocumentRow,
+} from "@/repositories/documents-repository";
 
 export type SearchGlobalChunksInput = {
   queryEmbedding: number[];
   topK: number;
   chunkingVersion: string;
   embeddingModel: string;
+  documentId?: string;
 };
 
 export interface GlobalChunkSearchRepository {
   searchGlobal(input: SearchGlobalChunksInput): Promise<RetrievedChunkMatch[]>;
+}
+
+export interface FocusedDocumentClassifier {
+  classifyForFocusedRag(
+    documentId: string,
+  ): Promise<FocusedDocumentClassification>;
+}
+
+export interface SelectableDocumentsReader {
+  listSelectableForFocusedRag(): Promise<SelectableDocumentRow[]>;
 }
 
 export type EmbeddingUsage = {

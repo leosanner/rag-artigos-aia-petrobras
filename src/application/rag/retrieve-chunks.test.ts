@@ -186,6 +186,51 @@ describe("RetrieveChunks", () => {
     );
   });
 
+  it("forwards documentId to the chunks repository when focused mode supplies it", async () => {
+    const queryEmbedding = [0.1, 0.2, 0.3];
+    const embeddingUsage = {
+      inputTokens: 11,
+      estimatedCostUsd: 0.00000143,
+    };
+    const matches = [buildMatch({ documentId: DOCUMENT_B })];
+    const questionEmbeddingProvider = {
+      embedQuestion: vi.fn().mockResolvedValue({
+        embedding: queryEmbedding,
+        usage: embeddingUsage,
+      }),
+    };
+    const chunksRepository = {
+      searchGlobal: vi.fn().mockResolvedValue(matches),
+    };
+    const service = new RetrieveChunks({
+      questionEmbeddingProvider,
+      chunksRepository,
+      embeddingModel: EMBEDDING_MODEL,
+    });
+
+    await expect(
+      service.search({
+        question: "Quais técnicas o documento usa?",
+        retrieval: {
+          topK: 6,
+          strategy: "standard",
+        },
+        documentId: DOCUMENT_B,
+      }),
+    ).resolves.toEqual({
+      matches,
+      embedding: embeddingUsage,
+    });
+
+    expect(chunksRepository.searchGlobal).toHaveBeenCalledWith({
+      queryEmbedding,
+      topK: 6,
+      chunkingVersion: DEFAULT_CHUNKING_CONFIG.chunkingVersion,
+      embeddingModel: EMBEDDING_MODEL,
+      documentId: DOCUMENT_B,
+    });
+  });
+
   it("wraps repository failures and preserves any embedding audit already captured", async () => {
     const queryEmbedding = [0.1, 0.2, 0.3];
     const embeddingUsage = {
