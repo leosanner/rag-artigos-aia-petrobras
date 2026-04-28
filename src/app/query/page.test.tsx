@@ -64,6 +64,7 @@ const SUCCESS_RESPONSE = {
   ],
   metadata: {
     mode: "global" as const,
+    documentId: null,
     topK: 6,
     retrievalStrategy: "standard" as const,
     candidateTopK: 6,
@@ -121,6 +122,7 @@ const RUN_DETAIL = {
   question: "Quais tecnicas aparecem com maior frequencia?",
   answer: "Classificacao supervisionada [1].",
   mode: "global" as const,
+  documentId: null,
   status: "answered" as const,
   errorCode: null,
   sources: [
@@ -149,6 +151,7 @@ const RUN_DETAIL = {
   ],
   metadata: {
     mode: "global" as const,
+    documentId: null,
     topK: 6,
     retrievalStrategy: "standard" as const,
     candidateTopK: 6,
@@ -239,6 +242,7 @@ function appendResponseFromAsk(
         question,
         answer: response.answer,
         mode: response.mode,
+        documentId: response.metadata.documentId,
         status:
           response.sources.length === 0
             ? ("answered_no_evidence" as const)

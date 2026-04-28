@@ -46,6 +46,7 @@ function buildPersistRagQueryRunInput(
     question: "Quais tecnicas aparecem?",
     answer: "Classificacao supervisionada [1].",
     mode: "global",
+    documentId: null,
     status: "answered",
     errorCode: null,
     topK: 6,
@@ -270,6 +271,7 @@ function createFakeAnswerQuestion(
               ],
         metadata: {
           mode: "global",
+          documentId: null,
           topK: input.retrieval?.topK ?? 6,
           retrievalStrategy: input.retrieval?.strategy ?? "standard",
           candidateTopK:

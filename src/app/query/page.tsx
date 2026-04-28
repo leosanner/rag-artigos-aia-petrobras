@@ -54,6 +54,7 @@ const SECRET_STORAGE_KEY = "query:secret";
 const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
   const metadata: RagAnswerMetadata = {
     mode: "global",
+    documentId: null,
     topK: 6,
     retrievalStrategy: "standard",
     candidateTopK: 24,
@@ -101,6 +102,7 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
           answer:
             "As tecnicas mais recorrentes nos artigos analisados sao Random Forest e Support Vector Machines para classificacao supervisionada [1], seguidas por redes convolucionais aplicadas a sensoriamento remoto [2].",
           mode: "global",
+          documentId: null,
           status: "answered",
           errorCode: null,
           metadata,

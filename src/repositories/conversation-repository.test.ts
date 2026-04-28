@@ -63,6 +63,7 @@ function buildPersistRagQueryRunInput(): PersistRagQueryRunInput {
     question: "Quais tecnicas aparecem com maior frequencia?",
     answer: "Os estudos destacam classificacao supervisionada [1].",
     mode: "global",
+    documentId: null,
     status: "answered",
     errorCode: null,
     topK: 6,

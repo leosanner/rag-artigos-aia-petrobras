@@ -21,6 +21,7 @@ function buildPersistRagQueryRunInput(
     question: "Quais tecnicas aparecem?",
     answer: "Classificacao supervisionada [1].",
     mode: "global",
+    documentId: null,
     status: "answered",
     errorCode: null,
     topK: 6,
