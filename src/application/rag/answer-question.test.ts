@@ -67,6 +67,7 @@ function createService(
     answer?: string;
     generationUsage?: GenerationUsage;
     generationError?: unknown;
+    streamedAnswerChunks?: string[];
     retrievalError?: unknown;
     createError?: unknown;
     nowMs?: () => number;
@@ -104,6 +105,23 @@ function createService(
         ? vi.fn().mockResolvedValue({
             answer: overrides.answer ?? "Resposta [2].",
             usage: generationUsage,
+          })
+        : vi.fn().mockRejectedValue(overrides.generationError),
+    streamAnswer:
+      overrides.generationError === undefined
+        ? vi.fn().mockImplementation(async (input) => {
+            const chunks =
+              overrides.streamedAnswerChunks ??
+              [overrides.answer ?? "Resposta [2]."];
+
+            for (const chunk of chunks) {
+              await input.onTextDelta?.(chunk);
+            }
+
+            return {
+              answer: chunks.join(""),
+              usage: generationUsage,
+            };
           })
         : vi.fn().mockRejectedValue(overrides.generationError),
   };
@@ -882,6 +900,105 @@ describe("AnswerQuestion", () => {
         status: "answered",
         errorCode: null,
         answer: "A síntese prioriza a segunda fonte [2].",
+      }),
+    );
+  });
+
+  it("streams sources first, then text deltas, and validates citations after the final accumulated answer", async () => {
+    const eventLog: string[] = [];
+    const { service, generationProvider, runsRepository } = createService({
+      streamedAnswerChunks: ["Resposta", " stream", " [", "2]."],
+    });
+
+    const result = await service.executeStream(
+      {
+        question: "Quais abordagens aparecem com mais frequência?",
+        mode: "global",
+      },
+      {
+        onSources: (sources) => {
+          eventLog.push(`sources:${sources.map((source) => source.sourceNumber).join(",")}`);
+        },
+        onGenerationStart: () => {
+          eventLog.push("generation:start");
+        },
+        onAnswerDelta: (textDelta) => {
+          eventLog.push(`delta:${textDelta}`);
+        },
+      },
+    );
+
+    expect(result).toMatchObject({
+      kind: "answered",
+      status: "answered",
+      answer: "Resposta stream [2].",
+    });
+    expect(generationProvider.generateAnswer).not.toHaveBeenCalled();
+    expect(generationProvider.streamAnswer).toHaveBeenCalledTimes(1);
+    expect(eventLog).toEqual([
+      "sources:1,2",
+      "generation:start",
+      "delta:Resposta",
+      "delta: stream",
+      "delta: [",
+      "delta:2].",
+    ]);
+    expect(runsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "answered",
+        answer: "Resposta stream [2].",
+        sources: expect.arrayContaining([
+          expect.objectContaining({
+            sourceNumber: 1,
+            citedInAnswer: false,
+          }),
+          expect.objectContaining({
+            sourceNumber: 2,
+            citedInAnswer: true,
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it("persists a failed run when streamed generation fails after sources were selected", async () => {
+    const onSources = vi.fn();
+    const onGenerationStart = vi.fn();
+    const onAnswerDelta = vi.fn();
+    const { service, runsRepository } = createService({
+      generationError: new Error("provider stream failed"),
+    });
+
+    await expect(
+      service.executeStream(
+        {
+          question: "Quais abordagens aparecem com mais frequência?",
+          mode: "global",
+        },
+        {
+          onSources,
+          onGenerationStart,
+          onAnswerDelta,
+        },
+      ),
+    ).resolves.toEqual({
+      kind: "error",
+      error: "generation_failed",
+    });
+
+    expect(onSources).toHaveBeenCalledTimes(1);
+    expect(onGenerationStart).toHaveBeenCalledTimes(1);
+    expect(onAnswerDelta).not.toHaveBeenCalled();
+    expect(runsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "generation_failed",
+        errorCode: "generation_failed",
+        answer: null,
+        sources: expect.arrayContaining([
+          expect.objectContaining({
+            sourceNumber: 1,
+          }),
+        ]),
       }),
     );
   });
