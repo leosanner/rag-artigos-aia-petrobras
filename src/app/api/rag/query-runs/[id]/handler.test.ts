@@ -38,6 +38,7 @@ describe("GET /api/rag/query-runs/:id handler", () => {
       question: "Quais tecnicas aparecem com maior frequencia?",
       answer: "Classificacao supervisionada [1].",
       mode: "global",
+      documentId: null,
       status: "answered",
       errorCode: null,
       sources: [
@@ -66,6 +67,7 @@ describe("GET /api/rag/query-runs/:id handler", () => {
       ],
       metadata: {
         mode: "global",
+        documentId: null,
         topK: 6,
         retrievalStrategy: "standard",
         candidateTopK: 6,
@@ -105,6 +107,7 @@ describe("GET /api/rag/query-runs/:id handler", () => {
       question: "Quais tecnicas aparecem com maior frequencia?",
       answer: "Classificacao supervisionada [1].",
       mode: "global",
+      documentId: null,
       status: "answered",
       errorCode: null,
       sources: [
@@ -133,6 +136,7 @@ describe("GET /api/rag/query-runs/:id handler", () => {
       ],
       metadata: {
         mode: "global",
+        documentId: null,
         topK: 6,
         retrievalStrategy: "standard",
         candidateTopK: 6,
@@ -212,17 +216,19 @@ describe("GET /api/rag/query-runs/:id handler", () => {
   });
 
   it("strips unknown fields before returning JSON", async () => {
-    const getRun = buildGetRun({
+    const resultWithExtraField = {
       id: RUN_ID,
       question: "Quais tecnicas aparecem com maior frequencia?",
       answer: null,
       mode: "global",
+      documentId: null,
       status: "generation_failed",
       errorCode: "generation_failed",
       sources: [],
       relatedTerms: [],
       metadata: {
         mode: "global",
+        documentId: null,
         topK: 6,
         retrievalStrategy: "standard",
         candidateTopK: 6,
@@ -240,9 +246,9 @@ describe("GET /api/rag/query-runs/:id handler", () => {
         totalCostUsd: 0.000002,
       },
       createdAt: CREATED_AT,
-      // @ts-expect-error - extra field must not leak
       providerPayload: { raw: "secret" },
-    });
+    } as Awaited<ReturnType<GetQueryRun["execute"]>>;
+    const getRun = buildGetRun(resultWithExtraField);
     const handler = createRagQueryRunDetailHandler({
       getRun,
       secret: VALID_SECRET,

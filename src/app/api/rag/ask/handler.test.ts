@@ -35,6 +35,7 @@ function buildAnsweredResult(): AnswerQuestionResult {
     ],
     metadata: {
       mode: "global",
+      documentId: null,
       topK: 6,
       retrievalStrategy: "standard",
       candidateTopK: 6,
@@ -140,6 +141,7 @@ describe("POST /api/rag/ask handler", () => {
       ],
       metadata: {
         mode: "global",
+        documentId: null,
         topK: 6,
         retrievalStrategy: "standard",
         candidateTopK: 6,

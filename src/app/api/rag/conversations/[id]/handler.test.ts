@@ -62,6 +62,7 @@ describe("GET /api/rag/conversations/:id handler", () => {
               question: "Quais tecnicas aparecem?",
               answer: "Classificacao supervisionada [1].",
               mode: "global",
+              documentId: null,
               status: "answered",
               errorCode: null,
               sources: [
@@ -82,6 +83,7 @@ describe("GET /api/rag/conversations/:id handler", () => {
               relatedTerms: [],
               metadata: {
                 mode: "global",
+                documentId: null,
                 topK: 6,
                 retrievalStrategy: "standard",
                 candidateTopK: 6,
