@@ -46,6 +46,12 @@ export type AnswerQuestionDeps = {
   nowMs?: () => number;
 };
 
+export type AnswerQuestionStreamCallbacks = {
+  onSources?: (sources: RagSource[]) => Promise<void> | void;
+  onGenerationStart?: () => Promise<void> | void;
+  onAnswerDelta?: (textDelta: string) => Promise<void> | void;
+};
+
 const NO_EVIDENCE_ANSWER = buildNoEvidenceAnswer();
 const ZERO_EMBEDDING_USAGE: EmbeddingUsage = {
   inputTokens: 0,
@@ -85,6 +91,20 @@ export class AnswerQuestion {
   }
 
   async execute(input: AnswerQuestionInput): Promise<AnswerQuestionResult> {
+    return this.executeInternal(input, null);
+  }
+
+  async executeStream(
+    input: AnswerQuestionInput,
+    callbacks: AnswerQuestionStreamCallbacks,
+  ): Promise<AnswerQuestionResult> {
+    return this.executeInternal(input, callbacks);
+  }
+
+  private async executeInternal(
+    input: AnswerQuestionInput,
+    callbacks: AnswerQuestionStreamCallbacks | null,
+  ): Promise<AnswerQuestionResult> {
     const documentId = input.mode === "focused" ? input.documentId : null;
 
     if (input.mode === "focused") {
@@ -205,15 +225,25 @@ export class AnswerQuestion {
     let answer: string;
     let citedSourceNumbers: Set<number>;
 
+    await callbacks?.onSources?.(sources);
+
     try {
-      const result = await this.generationProvider.generateAnswer({
-        question: input.question,
-        conversationContext: input.conversationContext,
-        promptContext,
-        promptVersion: this.promptVersion,
-        generationModel: this.generationModel,
-        retrievalStrategy: retrieval.strategy,
-      });
+      const result =
+        callbacks === null
+          ? await this.generationProvider.generateAnswer({
+              question: input.question,
+              conversationContext: input.conversationContext,
+              promptContext,
+              promptVersion: this.promptVersion,
+              generationModel: this.generationModel,
+              retrievalStrategy: retrieval.strategy,
+            })
+          : await this.streamGeneratedAnswer({
+              input,
+              promptContext,
+              retrieval,
+              callbacks,
+            });
       generation = result.usage;
 
       const generatedAnswer = result.answer.trim();
@@ -324,6 +354,27 @@ export class AnswerQuestion {
       relatedTerms,
       metadata,
       audit,
+    });
+  }
+
+  private async streamGeneratedAnswer(input: {
+    input: AnswerQuestionInput;
+    promptContext: string;
+    retrieval: RagRetrievalSettings;
+    callbacks: AnswerQuestionStreamCallbacks;
+  }) {
+    await input.callbacks.onGenerationStart?.();
+
+    return this.generationProvider.streamAnswer({
+      question: input.input.question,
+      conversationContext: input.input.conversationContext,
+      promptContext: input.promptContext,
+      promptVersion: this.promptVersion,
+      generationModel: this.generationModel,
+      retrievalStrategy: input.retrieval.strategy,
+      onTextDelta: async (textDelta) => {
+        await input.callbacks.onAnswerDelta?.(textDelta);
+      },
     });
   }
 
