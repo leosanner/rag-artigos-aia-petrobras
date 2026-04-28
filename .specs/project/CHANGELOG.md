@@ -2,6 +2,66 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - feat(query): stream conversation turns, live sources, and answer text
+
+Date: 2026-04-28
+
+Changed:
+
+- Extended the conversation generation boundary with streaming support by
+  adding `GenerationProvider.streamAnswer(...)`, implementing it in the OpenAI
+  adapter through AI SDK `streamText(...)`, and keeping the same normalized
+  usage/cost output plus safe failure mapping already used by the sync path.
+- Added a dedicated streamed conversation use case and event vocabulary so the
+  existing audited turn engine can emit persisted user-message creation,
+  retrieval/generation phases, final selected live sources, answer deltas, and
+  safe completion/error events without creating a chat-only pipeline.
+- Upgraded `POST /api/rag/conversations/:id/messages` to dual-mode transport:
+  JSON fallback stays intact, while `Accept: text/event-stream` now returns an
+  SSE stream with pre-stream JSON validation failures and mid-stream safe
+  `error` events under HTTP 200.
+- Updated `/query` so conversation turns render a transient assistant bubble
+  with `Consultando fontes...`, progressively reveal the final selected source
+  previews, stream answer text token by token, and then replace that transient
+  bubble with the final persisted assistant message and its audit trace.
+- Added integration coverage for successful streamed turns that reload the
+  persisted assistant trace and for failed streamed turns that persist the
+  failed run while leaving the transcript with only the user row.
+- Added the full `F-10 / Streaming Query UX` feature contract and recorded
+  `AD-017`, which captures the decision to stream only the conversation
+  transport in this first cut while leaving `POST /api/rag/ask` unchanged.
+
+Files:
+
+- `src/application/rag/ports.ts`
+- `src/application/rag/answer-question.ts`
+- `src/application/rag/answer-question.test.ts`
+- `src/application/rag/stream-conversation-message-events.ts`
+- `src/application/rag/stream-conversation-message.ts`
+- `src/application/rag/stream-conversation-message.test.ts`
+- `src/application/rag/schemas.ts`
+- `src/infrastructure/ai/openai-generation-provider.ts`
+- `src/infrastructure/ai/openai-generation-provider.test.ts`
+- `src/app/api/rag/conversations/dto.ts`
+- `src/app/api/rag/conversations/[id]/messages/handler.ts`
+- `src/app/api/rag/conversations/[id]/messages/handler.test.ts`
+- `src/app/api/rag/conversations/[id]/messages/route.ts`
+- `src/app/query/page.tsx`
+- `src/app/query/page.module.css`
+- `src/app/query/page.test.tsx`
+- `src/app/api/rag/focused-rag.integration.test.ts`
+- `src/app/api/rag/streaming-query.integration.test.ts`
+- `.specs/features/F-10-streaming-query-ux/spec.md`
+- `.specs/features/F-10-streaming-query-ux/01-application-streamed-turn-and-events.md`
+- `.specs/features/F-10-streaming-query-ux/02-infrastructure-openai-streaming.md`
+- `.specs/features/F-10-streaming-query-ux/03-interface-sse-conversation-route.md`
+- `.specs/features/F-10-streaming-query-ux/04-interface-streaming-query-page.md`
+- `.specs/features/F-10-streaming-query-ux/05-integration-and-review.md`
+- `.specs/project/ROADMAP.md`
+- `.specs/project/query-experience-evolution.md`
+- `.specs/project/STATE.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - feat(query): hand off cited source cards into focused conversations
 
 Date: 2026-04-28
