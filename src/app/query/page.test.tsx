@@ -10,9 +10,12 @@ import QueryPage from "./page";
 const LONG_EXCERPT = `${"A".repeat(RAG_SOURCE_EXCERPT_PREVIEW_LENGTH)} trecho extra para truncar`;
 const SECRET = "query-secret-value";
 const CONVERSATION_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+const FOCUSED_HANDOFF_CONVERSATION_ID = "fefefefe-fefe-4efe-8efe-fefefefefefe";
 const CURRENT_TRACE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const RUN_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const FOCUSED_DOCUMENT_ID = "12121212-1212-4212-8212-121212121212";
+const SOURCE_HANDOFF_DOCUMENT_ID = "22222222-2222-4222-8222-222222222222";
+const RUN_DETAIL_SOURCE_DOCUMENT_ID = "66666666-6666-4666-8666-666666666666";
 const MESSAGE_CREATED_AT = "2026-04-24T09:00:00.000Z";
 const ASSISTANT_CREATED_AT = "2026-04-24T09:00:01.000Z";
 
@@ -25,7 +28,7 @@ const SUCCESS_RESPONSE = {
     {
       sourceNumber: 1,
       chunkId: "11111111-1111-4111-8111-111111111111",
-      documentId: "22222222-2222-4222-8222-222222222222",
+      documentId: SOURCE_HANDOFF_DOCUMENT_ID,
       documentTitle: "artigo-a.pdf",
       chunkIndex: 0,
       excerpt: LONG_EXCERPT,
@@ -130,7 +133,7 @@ const RUN_DETAIL = {
     {
       sourceNumber: 1,
       chunkId: "55555555-5555-4555-8555-555555555555",
-      documentId: "66666666-6666-4666-8666-666666666666",
+      documentId: RUN_DETAIL_SOURCE_DOCUMENT_ID,
       documentTitle: "artigo-persistido.pdf",
       chunkIndex: 0,
       excerpt: "Trecho persistido do banco.",
@@ -206,6 +209,20 @@ const CREATE_CONVERSATION_RESPONSE = {
   lastMessageAt: null,
 };
 
+const FOCUSED_HANDOFF_CONVERSATION_RESPONSE = {
+  ...CREATE_CONVERSATION_RESPONSE,
+  id: FOCUSED_HANDOFF_CONVERSATION_ID,
+  createdAt: "2026-04-24T09:15:00.000Z",
+  updatedAt: "2026-04-24T09:15:00.000Z",
+};
+
+const FOCUSED_HANDOFF_CONVERSATION_DETAIL_RESPONSE = {
+  ...FOCUSED_HANDOFF_CONVERSATION_RESPONSE,
+  title: null,
+  lastMessageAt: null,
+  messages: [],
+};
+
 const SELECTABLE_DOCUMENTS_RESPONSE = {
   documents: [
     {
@@ -229,7 +246,63 @@ const SELECTABLE_DOCUMENTS_RESPONSE = {
   ],
 };
 
-type AskFixture = Omit<typeof SUCCESS_RESPONSE, "audit" | "metadata" | "mode"> & {
+const HANDOFF_SELECTABLE_DOCUMENTS_RESPONSE = {
+  documents: [
+    {
+      id: SOURCE_HANDOFF_DOCUMENT_ID,
+      title: "artigo-a.pdf",
+      authors: "Souza et al.",
+      publicationYear: 2022,
+      doi: "10.1000/source-a",
+      chunkCount: 7,
+      updatedAt: "2026-04-25T12:00:00.000Z",
+    },
+    {
+      id: RUN_DETAIL_SOURCE_DOCUMENT_ID,
+      title: "artigo-persistido.pdf",
+      authors: "Campos et al.",
+      publicationYear: 2021,
+      doi: "10.1000/persistido",
+      chunkCount: 4,
+      updatedAt: "2026-04-22T15:30:00.000Z",
+    },
+    ...SELECTABLE_DOCUMENTS_RESPONSE.documents,
+  ],
+};
+
+const FOCUSED_SUCCESS_RESPONSE = {
+  ...SUCCESS_RESPONSE,
+  mode: "focused" as const,
+  metadata: {
+    ...SUCCESS_RESPONSE.metadata,
+    mode: "focused" as const,
+    documentId: FOCUSED_DOCUMENT_ID,
+  },
+};
+
+const PARTIALLY_CITED_SUCCESS_RESPONSE = {
+  ...SUCCESS_RESPONSE,
+  sources: [
+    {
+      ...SUCCESS_RESPONSE.sources[0],
+      citedInAnswer: true,
+    },
+    {
+      ...SUCCESS_RESPONSE.sources[1],
+      citedInAnswer: false,
+    },
+  ],
+};
+
+type AskSourceFixture = (typeof SUCCESS_RESPONSE.sources)[number] & {
+  citedInAnswer?: boolean;
+};
+
+type AskFixture = Omit<
+  typeof SUCCESS_RESPONSE,
+  "audit" | "metadata" | "mode" | "sources"
+> & {
+  sources: AskSourceFixture[];
   mode: "global" | "focused";
   audit: typeof SUCCESS_RESPONSE.audit | typeof NO_EVIDENCE_RESPONSE.audit;
   metadata: Omit<
@@ -280,7 +353,7 @@ function appendResponseFromAsk(
         errorCode: null,
         sources: response.sources.map((source) => ({
           ...source,
-          citedInAnswer: true,
+          citedInAnswer: source.citedInAnswer ?? true,
         })),
         relatedTerms: response.relatedTerms,
         metadata: response.metadata,
@@ -356,6 +429,14 @@ function clickNewConversation(): void {
   fireEvent.click(screen.getByRole("button", { name: /nova conversa/i }));
 }
 
+function clickViewAudit(): void {
+  const toggle = screen.queryByRole("button", { name: /ver auditoria/i });
+
+  if (toggle) {
+    fireEvent.click(toggle);
+  }
+}
+
 function clickFocusedMode(): void {
   fireEvent.click(screen.getByLabelText(/documento especifico/i));
 }
@@ -368,6 +449,14 @@ function selectFocusedDocument(value: string): void {
   fireEvent.change(screen.getByLabelText(/documento alvo/i), {
     target: { value },
   });
+}
+
+function clickStartFocusedConversation(index = 0): void {
+  fireEvent.click(
+    screen.getAllByRole("button", {
+      name: /conversar apenas sobre este artigo/i,
+    })[index]!,
+  );
 }
 
 describe("/query page", () => {
@@ -667,6 +756,65 @@ describe("/query page", () => {
     expect(screen.queryByText(/carregando historico auditado/i)).not.toBeInTheDocument();
   });
 
+  it("renders the focused handoff CTA only for cited global source cards", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(appendResponseFromAsk(PARTIALLY_CITED_SUCCESS_RESPONSE)),
+    );
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Quais tecnicas aparecem com mais frequencia?");
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    clickViewAudit();
+
+    expect(
+      screen.getAllByRole("button", {
+        name: /conversar apenas sobre este artigo/i,
+      }),
+    ).toHaveLength(1);
+    expect(screen.getByText(/citado :: nao/i)).toBeInTheDocument();
+  });
+
+  it("does not render the focused handoff CTA for already-focused source cards", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(SELECTABLE_DOCUMENTS_RESPONSE));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(appendResponseFromAsk(FOCUSED_SUCCESS_RESPONSE)),
+    );
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Quais tecnicas aparecem neste documento?");
+
+    await act(async () => {
+      clickFocusedMode();
+    });
+
+    await screen.findByRole("option", { name: /artigo focado a\.pdf/i });
+    selectFocusedDocument(FOCUSED_DOCUMENT_ID);
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    clickViewAudit();
+
+    expect(
+      screen.queryByRole("button", {
+        name: /conversar apenas sobre este artigo/i,
+      }),
+    ).not.toBeInTheDocument();
+  });
+
   it("loads an existing conversation from the URL when a stored secret exists", async () => {
     sessionStorage.setItem("query:secret", SECRET);
     window.history.pushState({}, "", `/query?conversation=${CONVERSATION_ID}`);
@@ -688,6 +836,53 @@ describe("/query page", () => {
     expect(
       screen.getAllByText(/Quais tecnicas aparecem com maior frequencia/i).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("restores a focused draft from the URL after reload when a stored secret exists", async () => {
+    sessionStorage.setItem("query:secret", SECRET);
+    window.history.pushState(
+      {},
+      "",
+      `/query?conversation=${CONVERSATION_ID}&mode=focused&documentId=${FOCUSED_DOCUMENT_ID}`,
+    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(CONVERSATION_DETAIL_RESPONSE));
+    fetchMock.mockResolvedValueOnce(jsonResponse(SELECTABLE_DOCUMENTS_RESPONSE));
+
+    render(<QueryPage />);
+
+    expect(await screen.findByText(SUCCESS_RESPONSE.answer)).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: /artigo focado a\.pdf/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/documento especifico/i)).toBeChecked();
+    expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
+      FOCUSED_DOCUMENT_ID,
+    );
+  });
+
+  it("restores an empty focused draft from the URL after a handoff-style reload", async () => {
+    sessionStorage.setItem("query:secret", SECRET);
+    window.history.pushState(
+      {},
+      "",
+      `/query?conversation=${FOCUSED_HANDOFF_CONVERSATION_ID}&mode=focused&documentId=${SOURCE_HANDOFF_DOCUMENT_ID}`,
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(FOCUSED_HANDOFF_CONVERSATION_DETAIL_RESPONSE),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(HANDOFF_SELECTABLE_DOCUMENTS_RESPONSE),
+    );
+
+    render(<QueryPage />);
+
+    expect(
+      await screen.findByText(
+        /envie uma pergunta para criar ou continuar uma conversa auditavel/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/documento especifico/i)).toBeChecked();
+    expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
+      SOURCE_HANDOFF_DOCUMENT_ID,
+    );
   });
 
   it("starts a new conversation explicitly and syncs the URL", async () => {
@@ -728,6 +923,132 @@ describe("/query page", () => {
     expect(screen.getAllByText(/citado :: sim/i).length).toBeGreaterThan(0);
   });
 
+  it("starts a new focused conversation from a cited source card in the conversation audit", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        appendResponseFromAsk(
+          {
+            ...SUCCESS_RESPONSE,
+            metadata: {
+              ...SUCCESS_RESPONSE.metadata,
+              topK: 8,
+            },
+          },
+          "Compare as abordagens metodologicas.",
+        ),
+      ),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(HANDOFF_SELECTABLE_DOCUMENTS_RESPONSE),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(FOCUSED_HANDOFF_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Compare as abordagens metodologicas.");
+    setTopK("8");
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    typeQuestion("Agora quero aprofundar esse artigo.");
+    clickViewAudit();
+
+    await act(async () => {
+      clickStartFocusedConversation();
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/rag/documents",
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${SECRET}`,
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "/api/rag/conversations",
+      expect.objectContaining({
+        method: "POST",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${SECRET}`,
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({}),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(screen.getByLabelText(/documento especifico/i)).toBeChecked();
+    expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
+      SOURCE_HANDOFF_DOCUMENT_ID,
+    );
+    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue(8);
+    expect(screen.getByLabelText(/pergunta/i)).toHaveValue(
+      "Agora quero aprofundar esse artigo.",
+    );
+    expect(window.location.search).toContain(
+      `conversation=${FOCUSED_HANDOFF_CONVERSATION_ID}`,
+    );
+    expect(window.location.search).toContain("mode=focused");
+    expect(window.location.search).toContain(
+      `documentId=${SOURCE_HANDOFF_DOCUMENT_ID}`,
+    );
+    expect(screen.getByText(/conversa sem titulo/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/envie uma pergunta para criar ou continuar uma conversa auditavel/i),
+    ).toBeInTheDocument();
+  });
+
+  it("ignores repeated rapid clicks while a focused handoff is already starting", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(appendResponseFromAsk(SUCCESS_RESPONSE)),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(HANDOFF_SELECTABLE_DOCUMENTS_RESPONSE),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(FOCUSED_HANDOFF_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Quais tecnicas aparecem com mais frequencia?");
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    clickViewAudit();
+
+    const handoffButton = screen.getAllByRole("button", {
+      name: /conversar apenas sobre este artigo/i,
+    })[0]!;
+
+    await act(async () => {
+      fireEvent.click(handoffButton);
+      fireEvent.click(handoffButton);
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(window.location.search).toContain(
+      `conversation=${FOCUSED_HANDOFF_CONVERSATION_ID}`,
+    );
+  });
+
   it("truncates long excerpts only in the rendered preview", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }));
     fetchMock.mockResolvedValueOnce(
@@ -746,6 +1067,75 @@ describe("/query page", () => {
 
     expect(screen.getByText(preview)).toBeInTheDocument();
     expect(screen.queryByText(LONG_EXCERPT)).not.toBeInTheDocument();
+  });
+
+  it("starts a new focused conversation from a cited source card in persisted run detail", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(RUN_SUMMARIES));
+    fetchMock.mockResolvedValueOnce(jsonResponse(RUN_DETAIL));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(HANDOFF_SELECTABLE_DOCUMENTS_RESPONSE),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(FOCUSED_HANDOFF_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Quero revisar essa fonte no detalhe.");
+
+    await act(async () => {
+      clickLoadHistory();
+    });
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /quais tecnicas aparecem com maior frequencia\?/i,
+        }),
+      );
+    });
+
+    await act(async () => {
+      clickStartFocusedConversation();
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/rag/documents",
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${SECRET}`,
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "/api/rag/conversations",
+      expect.objectContaining({
+        method: "POST",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${SECRET}`,
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({}),
+      }),
+    );
+    expect(screen.getByLabelText(/documento especifico/i)).toBeChecked();
+    expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
+      RUN_DETAIL_SOURCE_DOCUMENT_ID,
+    );
+    expect(screen.getByLabelText(/pergunta/i)).toHaveValue(
+      "Quero revisar essa fonte no detalhe.",
+    );
+    expect(window.location.search).toContain(
+      `conversation=${FOCUSED_HANDOFF_CONVERSATION_ID}`,
+    );
+    expect(window.location.search).toContain(
+      `documentId=${RUN_DETAIL_SOURCE_DOCUMENT_ID}`,
+    );
   });
 
   it("shows the no-evidence state, empty sources, and skipped generation audit", async () => {
@@ -1116,6 +1506,172 @@ describe("/query page", () => {
       screen.getAllByText(/pergunta focada em documento ainda nao pronto/i)
         .length,
     ).toBeGreaterThan(0);
+  });
+
+  it("shows a safe message, keeps the current conversation, and preserves the current focused draft selection when the cited article is no longer focusable", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(SELECTABLE_DOCUMENTS_RESPONSE));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(appendResponseFromAsk(SUCCESS_RESPONSE)),
+    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(SELECTABLE_DOCUMENTS_RESPONSE));
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+
+    await act(async () => {
+      clickFocusedMode();
+    });
+
+    await screen.findByRole("option", { name: /artigo focado a\.pdf/i });
+    selectFocusedDocument(FOCUSED_DOCUMENT_ID);
+    clickGlobalMode();
+    typeQuestion("Quais tecnicas aparecem com mais frequencia?");
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    clickViewAudit();
+
+    await act(async () => {
+      clickStartFocusedConversation();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "/api/rag/documents",
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store",
+      }),
+    );
+    expect(
+      screen.getByText(/documento nao encontrado ou indisponivel para foco/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText(SUCCESS_RESPONSE.answer).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByLabelText(/base inteira/i)).toBeChecked();
+    expect(window.location.search).toBe(`?conversation=${CONVERSATION_ID}`);
+
+    clickFocusedMode();
+
+    expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
+      FOCUSED_DOCUMENT_ID,
+    );
+  });
+
+  it("reuses the safe unauthorized UX when focused handoff document preflight is rejected", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(appendResponseFromAsk(SUCCESS_RESPONSE)),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "unauthorized" }, { status: 401 }),
+    );
+    sessionStorage.setItem("query:secret", SECRET);
+
+    render(<QueryPage />);
+
+    typeQuestion("Quais tecnicas aparecem com mais frequencia?");
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    clickViewAudit();
+
+    await act(async () => {
+      clickStartFocusedConversation();
+    });
+
+    expect(
+      screen.getAllByText(/secret de consulta foi rejeitado/i).length,
+    ).toBeGreaterThan(0);
+    expect(sessionStorage.getItem("query:secret")).toBeNull();
+    expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe("");
+    expect(
+      screen.getAllByText(SUCCESS_RESPONSE.answer).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("reuses the safe technical UX when creating the focused handoff conversation fails", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(appendResponseFromAsk(SUCCESS_RESPONSE)),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(HANDOFF_SELECTABLE_DOCUMENTS_RESPONSE),
+    );
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: "boom" }, { status: 500 }));
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Quais tecnicas aparecem com mais frequencia?");
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    clickViewAudit();
+
+    await act(async () => {
+      clickStartFocusedConversation();
+    });
+
+    expect(screen.getByText(/\[HTTP 500\]/)).toBeInTheDocument();
+    expect(
+      screen.getAllByText(SUCCESS_RESPONSE.answer).length,
+    ).toBeGreaterThan(0);
+    expect(window.location.search).toBe(`?conversation=${CONVERSATION_ID}`);
+  });
+
+  it("reuses the safe unauthorized UX when the focused handoff conversation creation is rejected after preflight", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(appendResponseFromAsk(SUCCESS_RESPONSE)),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(HANDOFF_SELECTABLE_DOCUMENTS_RESPONSE),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "unauthorized" }, { status: 401 }),
+    );
+    sessionStorage.setItem("query:secret", SECRET);
+
+    render(<QueryPage />);
+
+    typeQuestion("Quais tecnicas aparecem com mais frequencia?");
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    clickViewAudit();
+
+    await act(async () => {
+      clickStartFocusedConversation();
+    });
+
+    expect(
+      screen.getAllByText(/secret de consulta foi rejeitado/i).length,
+    ).toBeGreaterThan(0);
+    expect(sessionStorage.getItem("query:secret")).toBeNull();
+    expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe("");
+    expect(
+      screen.getAllByText(SUCCESS_RESPONSE.answer).length,
+    ).toBeGreaterThan(0);
+    expect(window.location.search).toBe(`?conversation=${CONVERSATION_ID}`);
   });
 
   it("shows the dedicated generation_unavailable message on 503", async () => {
