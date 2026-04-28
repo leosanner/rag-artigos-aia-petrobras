@@ -1,22 +1,36 @@
 import {
   buildConversationRetrievalContext,
   deriveConversationTitle,
+  type FocusedDocumentRejectionReason,
   type RagQueryRunErrorCode,
 } from "@/domain/rag";
 import type { ConversationRepository } from "@/repositories/conversation-repository";
 import type { ConversationMessageRepository } from "@/repositories/conversation-message-repository";
 
 import type { AnswerQuestion } from "./answer-question";
-import type { GlobalRagAskInput } from "./schemas";
+import type { FocusedRagAskInput, GlobalRagAskInput } from "./schemas";
 import type { ConversationMessageResponse } from "./conversation-types";
 import { toConversationMessageResponse } from "./conversation-types";
 
-export type AppendConversationMessageInput = {
+type AppendConversationMessageInputBase = {
   conversationId: string;
   userMessageContent: string;
   retrievalSettings?: GlobalRagAskInput["retrieval"];
   requestTraceId?: string;
 };
+
+export type AppendConversationMessageInput =
+  | (AppendConversationMessageInputBase & {
+      mode?: "global";
+    })
+  | (AppendConversationMessageInputBase & {
+      mode: "focused";
+      documentId: FocusedRagAskInput["documentId"];
+    });
+
+export type AppendConversationMessageFocusedErrorCode =
+  | "document_not_found"
+  | "document_not_focusable";
 
 export type AppendConversationMessageOutput =
   | {
@@ -31,6 +45,11 @@ export type AppendConversationMessageOutput =
       status: RagQueryRunErrorCode;
       userMessage: ConversationMessageResponse;
       errorCode: RagQueryRunErrorCode;
+    }
+  | {
+      status: AppendConversationMessageFocusedErrorCode;
+      userMessage: ConversationMessageResponse;
+      errorCode: AppendConversationMessageFocusedErrorCode;
     };
 
 type AppendConversationDeps = {
@@ -103,18 +122,35 @@ export class AppendConversationMessage {
       trace: null,
     };
 
-    const turnResult = await this.answerQuestion.execute({
-      question: input.userMessageContent,
-      mode: "global",
-      retrieval: input.retrievalSettings,
-      conversationContext: {
-        transcript: buildConversationRetrievalContext({
-          latestUserMessage: input.userMessageContent,
-          previousStoredMessages,
-        }),
-      },
-      requestTraceId: input.requestTraceId,
-    });
+    const turnInput =
+      input.mode === "focused"
+        ? {
+            question: input.userMessageContent,
+            mode: "focused" as const,
+            documentId: input.documentId,
+            retrieval: input.retrievalSettings,
+            conversationContext: {
+              transcript: buildConversationRetrievalContext({
+                latestUserMessage: input.userMessageContent,
+                previousStoredMessages,
+              }),
+            },
+            requestTraceId: input.requestTraceId,
+          }
+        : {
+            question: input.userMessageContent,
+            mode: "global" as const,
+            retrieval: input.retrievalSettings,
+            conversationContext: {
+              transcript: buildConversationRetrievalContext({
+                latestUserMessage: input.userMessageContent,
+                previousStoredMessages,
+              }),
+            },
+            requestTraceId: input.requestTraceId,
+          };
+
+    const turnResult = await this.answerQuestion.execute(turnInput);
 
     if (turnResult.kind === "error") {
       return {
@@ -125,7 +161,13 @@ export class AppendConversationMessage {
     }
 
     if (turnResult.kind === "focused_document_rejected") {
-      throw new Error("unexpected_focused_rejection_in_global_conversation");
+      const mappedStatus = mapFocusedDocumentRejection(turnResult.reason);
+
+      return {
+        status: mappedStatus,
+        userMessage,
+        errorCode: mappedStatus,
+      };
     }
 
     const createdAssistantMessage = await this.messages.append({
@@ -162,4 +204,14 @@ export class AppendConversationMessage {
       assistantMessage: toConversationMessageResponse(hydratedAssistantMessage),
     };
   }
+}
+
+function mapFocusedDocumentRejection(
+  reason: FocusedDocumentRejectionReason,
+): AppendConversationMessageFocusedErrorCode {
+  if (reason === "not_found") {
+    return "document_not_found";
+  }
+
+  return "document_not_focusable";
 }

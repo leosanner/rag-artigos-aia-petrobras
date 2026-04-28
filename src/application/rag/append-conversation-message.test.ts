@@ -24,6 +24,7 @@ type TestDatabase = ReturnType<typeof createTestDatabase>["db"];
 
 type SuccessfulTurnStatus = "answered" | "answered_no_evidence";
 type FailedTurnStatus = "generation_failed" | "generation_unavailable";
+type FocusedRejectedReason = "not_found" | "not_processed" | "not_indexed";
 
 type RecordedTurnInvocation = {
   input: AnswerQuestionInput;
@@ -128,6 +129,9 @@ function createFakeAnswerQuestion(
       }
     | {
         status: FailedTurnStatus;
+      }
+    | {
+        focusedRejectedReason: FocusedRejectedReason;
       },
 ) {
   const invocations: RecordedTurnInvocation[] = [];
@@ -161,7 +165,7 @@ function createFakeAnswerQuestion(
         conversation,
       });
 
-      if (outcome.status === "generation_failed") {
+      if ("status" in outcome && outcome.status === "generation_failed") {
         await insertRun(runsRepository, {
           question: input.question,
           answer: null,
@@ -182,7 +186,7 @@ function createFakeAnswerQuestion(
         };
       }
 
-      if (outcome.status === "generation_unavailable") {
+      if ("status" in outcome && outcome.status === "generation_unavailable") {
         await insertRun(runsRepository, {
           question: input.question,
           answer: null,
@@ -200,6 +204,13 @@ function createFakeAnswerQuestion(
         return {
           kind: "error",
           error: "generation_unavailable",
+        };
+      }
+
+      if ("focusedRejectedReason" in outcome) {
+        return {
+          kind: "focused_document_rejected",
+          reason: outcome.focusedRejectedReason,
         };
       }
 
@@ -239,7 +250,7 @@ function createFakeAnswerQuestion(
         status: outcome.status,
         traceId: persisted.id,
         answer,
-        mode: "global",
+        mode: input.mode,
         sources:
           outcome.status === "answered_no_evidence"
             ? []
@@ -270,8 +281,8 @@ function createFakeAnswerQuestion(
                 },
               ],
         metadata: {
-          mode: "global",
-          documentId: null,
+          mode: input.mode,
+          documentId: input.mode === "focused" ? input.documentId : null,
           topK: input.retrieval?.topK ?? 6,
           retrievalStrategy: input.retrieval?.strategy ?? "standard",
           candidateTopK:
@@ -639,6 +650,81 @@ describe("AppendConversationMessage", () => {
       expect(persistedRuns).toHaveLength(1);
       expect(persistedRuns[0]?.status).toBe(status);
       expect(persistedRuns[0]?.question).toBe("mensagem que falha");
+    },
+  );
+
+  it.each([
+    ["not_found", "document_not_found"],
+    ["not_processed", "document_not_focusable"],
+    ["not_indexed", "document_not_focusable"],
+  ] as const)(
+    "persists the user message, forwards focused scope, and skips the assistant row on focused rejection %s",
+    async (reason, expectedStatus) => {
+      const conversation = await createConversation.execute();
+      const { answerQuestion, invocations } = createFakeAnswerQuestion(
+        db,
+        runsRepository,
+        conversation.id,
+        { focusedRejectedReason: reason },
+      );
+      const service = new AppendConversationMessage({
+        conversations,
+        messages,
+        answerQuestion,
+      });
+
+      const result = await service.execute({
+        conversationId: conversation.id,
+        userMessageContent: "mensagem focada",
+        mode: "focused",
+        documentId: "77777777-7777-4777-8777-777777777777",
+        retrievalSettings: {
+          topK: 8,
+          strategy: "explore",
+        },
+      });
+      if (result.status === "not_found") {
+        throw new Error("Expected the conversation to exist");
+      }
+
+      expect(result).toEqual({
+        status: expectedStatus,
+        userMessage: {
+          id: expect.any(String),
+          role: "user",
+          content: "mensagem focada",
+          createdAt: expect.any(Date),
+          trace: null,
+        },
+        errorCode: expectedStatus,
+      });
+      expect(invocations).toHaveLength(1);
+      expect(invocations[0]?.input).toEqual({
+        question: "mensagem focada",
+        mode: "focused",
+        documentId: "77777777-7777-4777-8777-777777777777",
+        retrieval: {
+          topK: 8,
+          strategy: "explore",
+        },
+        conversationContext: {
+          transcript: "User: mensagem focada",
+        },
+      });
+
+      const messageRows = await db
+        .select()
+        .from(ragConversationMessages)
+        .where(eq(ragConversationMessages.conversationId, conversation.id))
+        .orderBy(
+          asc(ragConversationMessages.createdAt),
+          asc(ragConversationMessages.id),
+        );
+      expect(messageRows).toHaveLength(1);
+      expect(messageRows[0]?.role).toBe("user");
+
+      const persistedRuns = await db.select().from(ragQueryRuns);
+      expect(persistedRuns).toHaveLength(0);
     },
   );
 });
