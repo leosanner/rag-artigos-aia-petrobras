@@ -33,7 +33,8 @@ export type PersistedRagSourceSnapshot = {
 export type PersistRagQueryRunInput = {
   question: string;
   answer: string | null;
-  mode: "global";
+  mode: "global" | "focused";
+  documentId: string | null;
   status: RagQueryRunStatus;
   errorCode: RagQueryRunErrorCode | null;
   topK: number;
@@ -55,7 +56,8 @@ export type PersistRagQueryRunInput = {
 };
 
 export type RagRunMetadata = {
-  mode: "global";
+  mode: "global" | "focused";
+  documentId: string | null;
   topK: number;
   retrievalStrategy: RagRetrievalStrategy;
   candidateTopK: number;
@@ -98,7 +100,8 @@ export type RagRunDetail = {
   id: string;
   question: string;
   answer: string | null;
-  mode: "global";
+  mode: "global" | "focused";
+  documentId: string | null;
   status: RagQueryRunStatus;
   errorCode: RagQueryRunErrorCode | null;
   sources: PersistedRagSourceSnapshot[];
@@ -121,6 +124,7 @@ export class RagQueryRunsRepository {
           question: input.question,
           answer: input.answer,
           mode: input.mode,
+          documentId: input.documentId,
           status: input.status,
           errorCode: input.errorCode,
           topK: input.topK,
@@ -236,6 +240,7 @@ export class RagQueryRunsRepository {
         question: run.question,
         answer: run.answer,
         mode: run.mode,
+        documentId: run.documentId,
         status: run.status,
         errorCode: run.errorCode,
         sources: sources.map((source) => ({
@@ -260,6 +265,7 @@ export class RagQueryRunsRepository {
         })),
         metadata: {
           mode: run.mode,
+          documentId: run.documentId,
           topK: run.topK,
           retrievalStrategy: run.retrievalStrategy,
           candidateTopK: run.candidateTopK,

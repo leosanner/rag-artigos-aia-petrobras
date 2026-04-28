@@ -291,7 +291,10 @@ export const ragQueryRuns = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     question: text("question").notNull(),
     answer: text("answer"),
-    mode: text("mode").$type<"global">().notNull(),
+    mode: text("mode").$type<"global" | "focused">().notNull(),
+    documentId: uuid("document_id").references(() => documents.id, {
+      onDelete: "set null",
+    }),
     status: ragQueryRunStatus("status").notNull(),
     errorCode: ragQueryRunErrorCode("error_code"),
     topK: integer("top_k").notNull(),
@@ -323,7 +326,14 @@ export const ragQueryRuns = pgTable(
       "rag_query_runs_answer_non_empty_when_present",
       sql`${table.answer} is null or length(btrim(${table.answer})) > 0`,
     ),
-    check("rag_query_runs_mode_global", sql`${table.mode} = 'global'`),
+    check(
+      "rag_query_runs_mode_valid",
+      sql`${table.mode} in ('global', 'focused')`,
+    ),
+    check(
+      "rag_query_runs_focused_document_id_consistent",
+      sql`(${table.mode} = 'focused' and ${table.documentId} is not null) or (${table.mode} = 'global' and ${table.documentId} is null)`,
+    ),
     check("rag_query_runs_top_k_positive", sql`${table.topK} > 0`),
     check(
       "rag_query_runs_retrieval_strategy_valid",

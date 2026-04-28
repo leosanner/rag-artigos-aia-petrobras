@@ -89,6 +89,7 @@ function buildPersistInput(
     question: "Quais tecnicas aparecem com maior frequencia?",
     answer: "Os estudos destacam classificacao supervisionada [1].",
     mode: "global",
+    documentId: null,
     status: "answered",
     errorCode: null,
     topK: 6,
@@ -190,12 +191,14 @@ describe("RagQueryRunsRepository", () => {
       question: input.question,
       answer: input.answer,
       mode: "global",
+      documentId: null,
       status: "answered",
       errorCode: null,
       sources: input.sources,
       relatedTerms: input.relatedTerms,
       metadata: {
         mode: "global",
+        documentId: null,
         topK: input.topK,
         retrievalStrategy: input.retrievalStrategy,
         candidateTopK: input.candidateTopK,
@@ -332,6 +335,7 @@ describe("RagQueryRunsRepository", () => {
       question: "Pergunta de auditoria",
       answer: "Resposta [1].",
       mode: "global",
+      documentId: null,
       status: "answered",
       errorCode: null,
       topK: 6,
@@ -406,6 +410,43 @@ describe("RagQueryRunsRepository", () => {
         createdAt: sameCreatedAt,
       },
     ]);
+  });
+
+  it("persists a focused run with the document scope and reads it back unchanged", async () => {
+    const input = buildPersistInput({
+      mode: "focused",
+      documentId: DOCUMENT_ID,
+    });
+
+    const created = await repository.create(input);
+    const detail = await repository.getById(created.id);
+
+    expect(detail).toMatchObject({
+      mode: "focused",
+      documentId: DOCUMENT_ID,
+      metadata: expect.objectContaining({
+        mode: "focused",
+        documentId: DOCUMENT_ID,
+      }),
+    });
+  });
+
+  it("rejects a focused run with a null document_id (db check enforces consistency)", async () => {
+    const input = buildPersistInput({
+      mode: "focused",
+      documentId: null,
+    });
+
+    await expect(repository.create(input)).rejects.toThrow();
+  });
+
+  it("rejects a global run with a non-null document_id (db check enforces consistency)", async () => {
+    const input = buildPersistInput({
+      mode: "global",
+      documentId: DOCUMENT_ID,
+    });
+
+    await expect(repository.create(input)).rejects.toThrow();
   });
 
   it("rolls back the entire create transaction when a child snapshot violates a constraint", async () => {

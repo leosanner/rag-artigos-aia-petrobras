@@ -1,0 +1,5 @@
+ALTER TABLE "rag_query_runs" DROP CONSTRAINT "rag_query_runs_mode_global";--> statement-breakpoint
+ALTER TABLE "rag_query_runs" ADD COLUMN "document_id" uuid;--> statement-breakpoint
+ALTER TABLE "rag_query_runs" ADD CONSTRAINT "rag_query_runs_document_id_documents_id_fk" FOREIGN KEY ("document_id") REFERENCES "public"."documents"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "rag_query_runs" ADD CONSTRAINT "rag_query_runs_mode_valid" CHECK ("rag_query_runs"."mode" in ('global', 'focused'));--> statement-breakpoint
+ALTER TABLE "rag_query_runs" ADD CONSTRAINT "rag_query_runs_focused_document_id_consistent" CHECK (("rag_query_runs"."mode" = 'focused' and "rag_query_runs"."document_id" is not null) or ("rag_query_runs"."mode" = 'global' and "rag_query_runs"."document_id" is null));
