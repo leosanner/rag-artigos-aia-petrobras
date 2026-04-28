@@ -1,7 +1,7 @@
 # Roadmap — AIA Insight
 
-**Current Milestone:** M2 — Base RAG and Query Experience Evolution
-**Status:** Active reprioritization
+**Current Milestone:** M2/M3 — Shared `/query` Evolution
+**Status:** Active reprioritization (`F-08` remains open; F-06/F-07/F-09/F-10 have already landed around it)
 
 > Each phase of `starter.md` becomes a milestone. Features inside a milestone are demo-able increments. The first three milestones deliver the minimum functional DEMO.
 
@@ -13,6 +13,11 @@
 > explainability/observability work forward onto `/query`, and F-08 becomes
 > the next retrieval-evolution prerequisite before conversation and focused
 > retrieval continue.
+>
+> Execution note (2026-04-28): post-F-06 `/query` UX now also includes
+> `F-09 / Source Card Focused Handoff` and `F-10 / Streaming Query UX`.
+> Streaming lands first on `POST /api/rag/conversations/:id/messages`
+> through SSE negotiation, while `POST /api/rag/ask` remains JSON-only.
 
 ---
 
@@ -78,12 +83,14 @@
 - Becomes the retrieval-contract prerequisite for later F-06 conversation work
   and the eventual F-07 focused flow
 
-**Focused RAG (Phase 4)** — DEFERRED
+**Focused RAG (Phase 4)** — COMPLETED BASELINE
 
 - Filter by specific document during retrieval
 - UI for selecting the target document
-- Must plug into the post-F-04/F-05/F-08 `/query` shell instead of the old
+- Plugged into the post-F-04/F-05/F-06 `/query` shell instead of the old
   global-only page assumptions
+- Review closeout still needs the future F-08 rerank verification sub-step
+  before the focused + rerank contract can be treated as fully covered
 
 ---
 
@@ -101,14 +108,22 @@
 - Model and prompt version recorded per request
 - UI for inspecting the current answer and persisted query runs
 
-**Conversational Query (Phase 6A)** — PLANNED
+**Conversational Query (Phase 6A)** — COMPLETED BASELINE
 
 - Chat on the shared `/query` surface
 - Persisted conversations and messages
 - Per-turn citations, related terms, usage, and cost
 - Transcript reload without losing governance visibility
-- Must reuse the evolved retrieval contract after F-08, not the earlier
-  pre-rerank strategy model
+- Reuses the existing audited turn engine and focused-aware conversation
+  transport already landed on `/query`
+
+**Streaming Query UX (Phase 6B)** — COMPLETED ON THE CONVERSATION PATH
+
+- SSE negotiation on `POST /api/rag/conversations/:id/messages`
+- Live `Consultando fontes...` source reveal before answer generation
+- Token-by-token answer rendering inside the active transcript bubble
+- Final persisted assistant trace hydration after `done`
+- `POST /api/rag/ask` remains JSON-only in this first streaming cut
 
 ---
 
@@ -133,7 +148,8 @@
 
 ## Future Considerations
 
-- More sophisticated interactive UI beyond F-06 (for example streaming turns)
+- Stream reconnect/resume semantics beyond the first-cut SSE transport
+- Inline clickable citation markers beyond the source-card handoff
 - Integration with external bases (e.g., Scielo, arXiv) beyond the fixed corpus
 - Automation of recurring analyses
 - Expansion to domains beyond EIA
