@@ -4,6 +4,8 @@ import { isAuthorizedIngestionSyncRequest } from "@/application/ingestion/author
 import type { AnswerQuestion } from "@/application/rag/answer-question";
 import {
   answerQuestionResultSchema,
+  ragDocumentNotFocusableResponseSchema,
+  ragDocumentNotFoundResponseSchema,
   ragAskRequestSchema,
   ragAskSuccessResponseSchema,
   ragGenerationFailedResponseSchema,
@@ -38,10 +40,6 @@ export function createRagAskHandler(deps: RagAskHandlerDeps) {
     const parsed = ragAskRequestSchema.safeParse(raw);
 
     if (!parsed.success) {
-      return invalidRequestResponse();
-    }
-
-    if (parsed.data.mode !== "global") {
       return invalidRequestResponse();
     }
 
@@ -83,6 +81,14 @@ export function createRagAskHandler(deps: RagAskHandlerDeps) {
       }
     }
 
+    if (result.kind === "focused_document_rejected") {
+      if (result.reason === "not_found") {
+        return documentNotFoundResponse();
+      }
+
+      return documentNotFocusableResponse();
+    }
+
     return technicalErrorResponse();
   };
 }
@@ -105,6 +111,28 @@ function unauthorizedResponse(): Response {
 
   return NextResponse.json(body, {
     status: 401,
+    headers: NO_STORE_HEADERS,
+  });
+}
+
+function documentNotFoundResponse(): Response {
+  const body = ragDocumentNotFoundResponseSchema.parse({
+    error: "document_not_found",
+  });
+
+  return NextResponse.json(body, {
+    status: 404,
+    headers: NO_STORE_HEADERS,
+  });
+}
+
+function documentNotFocusableResponse(): Response {
+  const body = ragDocumentNotFocusableResponseSchema.parse({
+    error: "document_not_focusable",
+  });
+
+  return NextResponse.json(body, {
+    status: 422,
     headers: NO_STORE_HEADERS,
   });
 }
