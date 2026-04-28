@@ -7,6 +7,7 @@ import {
   conversationDetailResponseSchema,
   createConversationResponseSchema,
   listRagDocumentsResponseSchema,
+  ragConversationStreamEventSchema,
   ragInvalidRequestResponseSchema,
   ragQueryRunDetailResponseSchema,
   ragQueryRunSummariesResponseSchema,
@@ -15,8 +16,10 @@ import {
   type ConversationMessageResponse,
   type RagAnswerAudit,
   type RagAnswerMetadata,
+  type RagConversationStreamEvent,
   type RagQueryRunDetailResponse,
   type RagQueryRunSummaryResponse,
+  type RagSource,
   type RelatedTerm,
   type SelectableRagDocument,
 } from "@/application/rag/schemas";
@@ -233,6 +236,15 @@ type HandoffState =
   | { status: "idle" }
   | { status: "starting"; sourceChunkId: string };
 
+type StreamingAssistantState =
+  | { status: "idle" }
+  | {
+      status: "streaming";
+      phase: "retrieving_sources" | "generating_answer";
+      content: string;
+      sources: RagSource[];
+    };
+
 function createInitialRecentRunsState(): RecentRunsState {
   return {
     status: "idle",
@@ -255,6 +267,12 @@ function createInitialConversationState(): ConversationState {
     status: "idle",
     conversation: null,
     error: null,
+  };
+}
+
+function createInitialStreamingAssistantState(): StreamingAssistantState {
+  return {
+    status: "idle",
   };
 }
 
@@ -284,6 +302,8 @@ export default function QueryPage() {
   const [conversationState, setConversationState] = useState<ConversationState>(
     createInitialConversationState,
   );
+  const [streamingAssistantState, setStreamingAssistantState] =
+    useState<StreamingAssistantState>(createInitialStreamingAssistantState);
   const [selectableDocumentsState, setSelectableDocumentsState] =
     useState<SelectableDocumentsState>(createInitialSelectableDocumentsState);
   const [expandedAuditMessageIds, setExpandedAuditMessageIds] = useState<
@@ -596,6 +616,7 @@ export default function QueryPage() {
     }
 
     setAskState({ kind: "submitting", strategy });
+    setStreamingAssistantState(createInitialStreamingAssistantState());
 
     const activeConversationId = await ensureConversation();
 
@@ -603,53 +624,63 @@ export default function QueryPage() {
       return;
     }
 
-    const response = await fetchJson(
-      `/api/rag/conversations/${activeConversationId}/messages`,
-      {
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${trimmedSecret}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(
-        queryMode === "focused"
-          ? {
-              content: trimmedQuestion,
-              mode: "focused",
-              documentId: selectedDocumentId,
-              retrievalSettings: {
-                topK,
-                strategy,
-              },
-            }
-          : {
-              content: trimmedQuestion,
-              retrievalSettings: {
-                topK,
-                strategy,
-              },
-            },
-      ),
-      },
-    );
+    let response: Response;
 
-    if (response.kind === "network_error") {
+    try {
+      response = await fetch(
+        `/api/rag/conversations/${activeConversationId}/messages`,
+        {
+          method: "POST",
+          cache: "no-store",
+          headers: {
+            Accept: "text/event-stream, application/json",
+            Authorization: `Bearer ${trimmedSecret}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(
+            queryMode === "focused"
+              ? {
+                  content: trimmedQuestion,
+                  mode: "focused",
+                  documentId: selectedDocumentId,
+                  retrievalSettings: {
+                    topK,
+                    strategy,
+                  },
+                }
+              : {
+                  content: trimmedQuestion,
+                  retrievalSettings: {
+                    topK,
+                    strategy,
+                  },
+                },
+          ),
+        },
+      );
+    } catch {
       console.error("[rag/query]", { phase: "submitQuestion", kind: "network_error" });
       setAskState({ kind: "technical_error", message: RAG_NETWORK_ERROR_MESSAGE });
       return;
     }
 
+    const contentType = response.headers.get("content-type") ?? "";
+
+    if (response.status === 200 && contentType.includes("text/event-stream")) {
+      await handleConversationEventStream(response);
+      return;
+    }
+
+    const body = await response.json().catch(() => null);
+
     if (response.status === 200) {
-      const parsed = appendConversationMessageResponseSchema.safeParse(
-        response.body,
-      );
+      const parsed = appendConversationMessageResponseSchema.safeParse(body);
 
       if (!parsed.success) {
         console.error("[rag/query]", {
           phase: "submitQuestion",
           status: response.status,
-          body: response.body,
+          body,
           parseError: true,
         });
         setAskState({
@@ -666,7 +697,7 @@ export default function QueryPage() {
         console.error("[rag/query]", {
           phase: "submitQuestion",
           status: response.status,
-          body: response.body,
+          body,
         });
         setAskState({
           kind: "technical_error",
@@ -686,11 +717,11 @@ export default function QueryPage() {
     }
 
     if (response.status === 400) {
-      const parsed = ragInvalidRequestResponseSchema.safeParse(response.body);
+      const parsed = ragInvalidRequestResponseSchema.safeParse(body);
       console.error("[rag/query]", {
         phase: "submitQuestion",
         status: response.status,
-        body: response.body,
+        body,
       });
       setAskState(
         parsed.success
@@ -704,11 +735,11 @@ export default function QueryPage() {
     }
 
     if (response.status === 401) {
-      const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
+      const parsed = ragUnauthorizedResponseSchema.safeParse(body);
       console.error("[rag/query]", {
         phase: "submitQuestion",
         status: response.status,
-        body: response.body,
+        body,
       });
       clearSecret();
       if (parsed.success) {
@@ -728,9 +759,7 @@ export default function QueryPage() {
     }
 
     if (response.status === 404) {
-      const parsed = appendConversationMessageResponseSchema.safeParse(
-        response.body,
-      );
+      const parsed = appendConversationMessageResponseSchema.safeParse(body);
 
       if (parsed.success && parsed.data.status === "document_not_found") {
         appendTranscriptMessages([parsed.data.userMessage]);
@@ -744,7 +773,7 @@ export default function QueryPage() {
       console.error("[rag/query]", {
         phase: "submitQuestion",
         status: response.status,
-        body: response.body,
+        body,
       });
       setConversationState({
         status: "error",
@@ -759,9 +788,7 @@ export default function QueryPage() {
     }
 
     if (response.status === 422) {
-      const parsed = appendConversationMessageResponseSchema.safeParse(
-        response.body,
-      );
+      const parsed = appendConversationMessageResponseSchema.safeParse(body);
 
       if (parsed.success && parsed.data.status === "document_not_focusable") {
         appendTranscriptMessages([parsed.data.userMessage]);
@@ -775,7 +802,7 @@ export default function QueryPage() {
       console.error("[rag/query]", {
         phase: "submitQuestion",
         status: response.status,
-        body: response.body,
+        body,
       });
       setAskState({
         kind: "technical_error",
@@ -785,9 +812,7 @@ export default function QueryPage() {
     }
 
     if (response.status === 502 || response.status === 503) {
-      const parsed = appendConversationMessageResponseSchema.safeParse(
-        response.body,
-      );
+      const parsed = appendConversationMessageResponseSchema.safeParse(body);
 
       if (parsed.success && "errorCode" in parsed.data) {
         appendTranscriptMessages([parsed.data.userMessage]);
@@ -796,7 +821,7 @@ export default function QueryPage() {
       console.error("[rag/query]", {
         phase: "submitQuestion",
         status: response.status,
-        body: response.body,
+        body,
       });
 
       const errorCode =
@@ -815,12 +840,109 @@ export default function QueryPage() {
     console.error("[rag/query]", {
       phase: "submitQuestion",
       status: response.status,
-      body: response.body,
+      body,
     });
     setAskState({
       kind: "technical_error",
       message: formatTechnicalErrorMessage(response.status),
     });
+  }
+
+  async function handleConversationEventStream(response: Response) {
+    if (!response.body) {
+      setStreamingAssistantState(createInitialStreamingAssistantState());
+      setAskState({
+        kind: "technical_error",
+        message: formatTechnicalErrorMessage(response.status),
+      });
+      return;
+    }
+
+    let sawTerminalEvent = false;
+
+    try {
+      for await (const event of readConversationStreamEvents(response.body)) {
+        if (event.type === "user_message_created") {
+          appendTranscriptMessages([event.userMessage]);
+          setQuestion("");
+          continue;
+        }
+
+        if (event.type === "phase") {
+          setStreamingAssistantState((current) => ({
+            status: "streaming",
+            phase: event.phase,
+            content:
+              current.status === "streaming" ? current.content : "",
+            sources:
+              current.status === "streaming" ? current.sources : [],
+          }));
+          continue;
+        }
+
+        if (event.type === "source") {
+          setStreamingAssistantState((current) => ({
+            status: "streaming",
+            phase:
+              current.status === "streaming"
+                ? current.phase
+                : "retrieving_sources",
+            content:
+              current.status === "streaming" ? current.content : "",
+            sources:
+              current.status === "streaming"
+                ? [...current.sources, event.source]
+                : [event.source],
+          }));
+          continue;
+        }
+
+        if (event.type === "answer_delta") {
+          setStreamingAssistantState((current) => ({
+            status: "streaming",
+            phase: "generating_answer",
+            content:
+              current.status === "streaming"
+                ? `${current.content}${event.textDelta}`
+                : event.textDelta,
+            sources:
+              current.status === "streaming" ? current.sources : [],
+          }));
+          continue;
+        }
+
+        if (event.type === "done") {
+          sawTerminalEvent = true;
+          appendTranscriptMessages([event.assistantMessage]);
+          expandAudit(event.assistantMessage.id);
+          setStreamingAssistantState(createInitialStreamingAssistantState());
+          setAskState({ kind: "idle" });
+          return;
+        }
+
+        sawTerminalEvent = true;
+        setStreamingAssistantState(createInitialStreamingAssistantState());
+        setAskState({
+          kind: "technical_error",
+          message: formatStreamErrorMessage(event.status),
+        });
+        return;
+      }
+    } catch (error) {
+      console.error("[rag/query]", {
+        phase: "submitQuestion.stream",
+        kind: "stream_error",
+        error,
+      });
+    }
+
+    setStreamingAssistantState(createInitialStreamingAssistantState());
+    if (!sawTerminalEvent) {
+      setAskState({
+        kind: "technical_error",
+        message: RAG_TECHNICAL_ERROR_MESSAGE,
+      });
+    }
   }
 
   async function ensureConversation(): Promise<string | null> {
@@ -914,6 +1036,7 @@ export default function QueryPage() {
         conversation,
         error: null,
       });
+      setStreamingAssistantState(createInitialStreamingAssistantState());
       setExpandedAuditMessageIds(new Set());
       if (pushUrlOnSuccess) {
         writeQueryUrl(
@@ -980,6 +1103,7 @@ export default function QueryPage() {
 
   async function startNewConversation() {
     setAskState({ kind: "idle" });
+    setStreamingAssistantState(createInitialStreamingAssistantState());
     setQuestion("");
     await createConversation();
   }
@@ -1096,6 +1220,7 @@ export default function QueryPage() {
         conversation: parsed.data,
         error: null,
       });
+      setStreamingAssistantState(createInitialStreamingAssistantState());
       setExpandedAuditMessageIds(new Set());
       return;
     }
@@ -1647,9 +1772,10 @@ export default function QueryPage() {
             <p className={styles.emptyPanel}>Carregando conversa...</p>
           ) : null}
 
-          {conversationState.conversation?.messages.length ? (
+          {conversationState.conversation?.messages.length ||
+          streamingAssistantState.status === "streaming" ? (
             <ol className={styles.transcript}>
-              {conversationState.conversation.messages.map((message) => (
+              {(conversationState.conversation?.messages ?? []).map((message) => (
                 <ConversationMessageItem
                   key={message.id}
                   message={message}
@@ -1657,6 +1783,13 @@ export default function QueryPage() {
                   onToggleAudit={() => toggleAudit(message.id)}
                 />
               ))}
+              {streamingAssistantState.status === "streaming" ? (
+                <StreamingConversationMessageItem
+                  phase={streamingAssistantState.phase}
+                  content={streamingAssistantState.content}
+                  sources={streamingAssistantState.sources}
+                />
+              ) : null}
             </ol>
           ) : conversationState.status !== "loading" ? (
             <p className={styles.emptyPanel}>
@@ -1982,6 +2115,60 @@ function ConversationMessageItem({
   );
 }
 
+function StreamingConversationMessageItem({
+  phase,
+  content,
+  sources,
+}: {
+  phase: "retrieving_sources" | "generating_answer";
+  content: string;
+  sources: RagSource[];
+}) {
+  return (
+    <li className={`${styles.transcriptItem} ${styles.transcriptAssistant}`}>
+      <article
+        className={`${styles.transcriptBubble} ${styles.streamingTranscriptBubble}`}
+      >
+        <header className={styles.transcriptHeader}>
+          <span>Assistente</span>
+          <span>Ao vivo</span>
+        </header>
+
+        <p className={styles.streamingPhase}>
+          {phase === "retrieving_sources"
+            ? "Consultando fontes..."
+            : "Gerando resposta..."}
+        </p>
+
+        {sources.length > 0 ? (
+          <ol className={styles.streamingSources}>
+            {sources.map((source) => (
+              <li key={source.chunkId} className={styles.streamingSourceCard}>
+                <p className={styles.streamingSourceTitle}>
+                  {source.sourceNumber}. {source.documentTitle}
+                </p>
+                <p className={styles.streamingSourceExcerpt}>
+                  {truncateExcerptPreview(source.excerpt)}
+                </p>
+              </li>
+            ))}
+          </ol>
+        ) : null}
+
+        {content.length > 0 ? (
+          <p className={styles.transcriptText}>{content}</p>
+        ) : (
+          <p className={styles.streamingHint}>
+            {phase === "retrieving_sources"
+              ? "Selecionando os trechos finais para responder."
+              : "A resposta vai aparecendo abaixo conforme os tokens chegam."}
+          </p>
+        )}
+      </article>
+    </li>
+  );
+}
+
 type ConversationAuditAsideProps = {
   messages: Array<
     ConversationMessageResponse & {
@@ -2170,17 +2357,7 @@ function RelatedTermsBlock({
   );
 }
 
-type SourceCard = {
-  sourceNumber: number;
-  chunkId: string;
-  documentId: string;
-  documentTitle: string;
-  chunkIndex: number;
-  excerpt: string;
-  score: number;
-  documentPipelineVersion: string;
-  chunkingVersion: string;
-  embeddingModel: string;
+type SourceCard = RagSource & {
   citedInAnswer?: boolean;
 };
 
@@ -2350,6 +2527,100 @@ async function fetchJson(
   } catch {
     return { kind: "network_error" };
   }
+}
+
+async function* readConversationStreamEvents(
+  stream: ReadableStream<Uint8Array>,
+): AsyncGenerator<RagConversationStreamEvent> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+
+      let separatorIndex = buffer.indexOf("\n\n");
+
+      while (separatorIndex !== -1) {
+        const rawEvent = buffer.slice(0, separatorIndex);
+        buffer = buffer.slice(separatorIndex + 2);
+
+        const parsedEvent = parseConversationStreamChunk(rawEvent);
+
+        if (parsedEvent) {
+          yield parsedEvent;
+        }
+
+        separatorIndex = buffer.indexOf("\n\n");
+      }
+    }
+
+    buffer += decoder.decode();
+
+    if (buffer.trim().length > 0) {
+      const parsedEvent = parseConversationStreamChunk(buffer);
+
+      if (parsedEvent) {
+        yield parsedEvent;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function parseConversationStreamChunk(
+  chunk: string,
+): RagConversationStreamEvent | null {
+  const lines = chunk
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0);
+  const data = lines
+    .filter((line) => line.startsWith("data: "))
+    .map((line) => line.replace("data: ", ""))
+    .join("\n");
+
+  if (data.length === 0) {
+    return null;
+  }
+
+  const parsed = ragConversationStreamEventSchema.safeParse(JSON.parse(data));
+
+  if (!parsed.success) {
+    throw new Error("invalid_conversation_stream_event");
+  }
+
+  return parsed.data;
+}
+
+function formatStreamErrorMessage(
+  status:
+    | "generation_failed"
+    | "generation_unavailable"
+    | "document_not_found"
+    | "document_not_focusable",
+): string {
+  if (status === "generation_failed") {
+    return RAG_GENERATION_FAILED_MESSAGE;
+  }
+
+  if (status === "generation_unavailable") {
+    return RAG_GENERATION_UNAVAILABLE_MESSAGE;
+  }
+
+  if (status === "document_not_found") {
+    return RAG_FOCUSED_DOCUMENT_NOT_FOUND_MESSAGE;
+  }
+
+  return RAG_FOCUSED_DOCUMENT_NOT_FOCUSABLE_MESSAGE;
 }
 
 function formatUsd(value: number): string {
