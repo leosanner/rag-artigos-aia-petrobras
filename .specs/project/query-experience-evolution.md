@@ -40,8 +40,16 @@ next extension of
    messages on top of the same audited turn engine and evolved retrieval
    contract.
 5. **F-07 - Focused RAG**
-   Remains planned, but it must plug into the evolved retrieval-controls and
-   traceability model instead of the old global-only page shell.
+   Extends the evolved `/query` shell with explicit focused mode and a
+   selectable document contract instead of the old global-only page shell.
+6. **F-09 - Source Card Focused Handoff**
+   Adds the first citation-driven jump from global answer sources into a new
+   focused conversation without changing the server contract.
+7. **F-10 - Streaming Query UX**
+   Adds SSE to the conversation-message transport, streams final selected
+   sources before generation, and renders token-by-token answer progress on
+   `/query` while keeping the final persisted transcript as the source of
+   truth.
 
 ## Shared Product Decisions
 
@@ -73,6 +81,17 @@ next extension of
   level `retrievalScore` plus nullable `rerankScore`.
 - From F-06 onward, every assistant chat turn reuses the same audited turn
   engine instead of introducing a second generation pipeline.
+- From F-09 onward, cited global source cards can hand off into a new focused
+  conversation without auto-submitting a follow-up turn.
+- From F-10 onward,
+  `POST /api/rag/conversations/:id/messages` may negotiate SSE when the client
+  sends `Accept: text/event-stream`, while `POST /api/rag/ask` remains
+  JSON-only.
+- From F-10 onward, live source previews expose only the final selected answer
+  sources; the full retrieval candidate pool remains internal.
+- From F-10 onward, pre-stream validation failures stay as HTTP JSON
+  `400`/`401`/`404` responses, while mid-stream safe failures surface as SSE
+  `error` events under HTTP 200.
 
 ## Shared Invariants
 
@@ -96,5 +115,8 @@ next extension of
   to govern second-pass selection.
 - F-06 owns conversations, messages, and transcript reload while reusing the
   F-04/F-05/F-08 turn contract.
-- F-07 must later extend the evolved request/response model instead of
-  replacing it.
+- F-07 extends the shared `/query` shell with explicit focused mode and a
+  selectable document contract.
+- F-09 owns the focused source-card handoff UX on `/query`.
+- F-10 owns streamed conversation transport, live source reveal, and live
+  answer text rendering on `/query`.
