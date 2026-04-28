@@ -49,38 +49,53 @@ prepared.
 
 ## Functional Requirements
 
-- [ ] RF-B05-01: The parent `spec.md` remains the authoritative contract
-  and reflects any refinements discovered during Blocks 01-04.
-- [ ] RF-B05-02: End-to-end verification exercises:
-  1. Seed pending, failed, processed-without-chunks, and processed-with-
-     chunks documents.
+- [x] RF-B05-01: The parent `spec.md` remains the authoritative contract
+  and reflects any refinements discovered during Blocks 01-04. Synced on
+  2026-04-28; RFs and Acceptance Criteria now cite the verification
+  evidence.
+- [x] RF-B05-02: End-to-end verification exercises (see
+  `src/app/api/rag/focused-rag.integration.test.ts`):
+  1. Seed pending, failed, processed-without-chunks, processed-with-chunks
+     (two distinct documents, to prove cross-document filtering) — done in
+     `seedFixtures`.
   2. `GET /api/rag/documents` returns only the processed-with-chunks
-     entries.
+     entries — covered by scenario 1.
   3. `POST /api/rag/ask` with focused mode and an unknown id returns 404
-     and creates no `rag_query_runs` row; the embedding/generation
-     provider fakes record zero calls.
+     and creates no `rag_query_runs` row; the embedding/generation provider
+     fakes record zero calls — covered by scenario 2.
   4. `POST /api/rag/ask` with focused mode and a non-processed id returns
-     422 and creates no `rag_query_runs` row.
+     422 and creates no `rag_query_runs` row — covered by scenario 3 (both
+     `pending` and processed-but-unindexed branches).
   5. `POST /api/rag/ask` with focused mode and a valid id returns the same
      cited-answer / sources / related-terms / audit shape as global mode,
      plus `mode: "focused"` and the requested `documentId`, with all
-     selected sources confirmed to belong to that document.
-  6. The same focused request with `strategy: "rerank"` invokes the F-08
-     reranker exactly once and persists `retrievalScore` plus
-     `rerankScore` for each selected source.
+     selected sources confirmed to belong to that document — covered by
+     scenario 4 with a direct SQL inspection of the persisted
+     `rag_query_runs` row.
+  6. **Deferred — pending F-08.** The shared retrieval-strategy contract in
+     `src/domain/rag/retrieval-settings.ts` currently exposes only
+     `"standard"` and `"explore"`; `"rerank"` will be added by `F-08 /
+     Reranked Retrieval`. Once F-08 lands, this sub-step must be added to
+     the same integration test and re-verified before F-07's review can
+     close.
   7. The same focused request issued inside an F-06 conversation appends a
-     valid assistant transcript row linked to the focused trace.
-- [ ] RF-B05-03: Single-turn `/api/rag/ask` global mode is exercised in
+     valid assistant transcript row linked to the focused trace — covered
+     by scenario 5 (conversation route + transcript trace inspection).
+- [x] RF-B05-03: Single-turn `/api/rag/ask` global mode is exercised in
   regression to prove focused mode did not displace it; `/query` global
-  flow keeps producing identical responses.
-- [ ] RF-B05-04: The acceptance-criteria checklist from `spec.md`
+  flow keeps producing identical responses. Integration test regression
+  scenario plus pre-existing global handler tests cover this.
+- [x] RF-B05-04: The acceptance-criteria checklist from `spec.md`
   §Acceptance Criteria is mapped 1-to-1 to verification evidence (test
-  name or manual probe) before the review handoff.
-- [ ] RF-B05-05: `pnpm lint`, `pnpm typecheck`, and `pnpm test` are green.
-- [ ] RF-B05-06: An independent review is opened via `codex:rescue` (or
-  the reviewer the user explicitly approved) with: the F-07 `spec.md`, the
-  four block docs, and the implementation diff. The reviewer agent must be
-  fresh — never the implementer thread — per CLAUDE.md.
+  name or manual probe). Mapping is recorded inline in `spec.md` and the
+  RF list above.
+- [x] RF-B05-05: `pnpm lint`, `pnpm typecheck`, and `pnpm test` are green.
+- [ ] RF-B05-06: An independent review is opened with: the F-07 `spec.md`,
+  the four block docs, and the implementation diff. The reviewer agent
+  must be fresh — never the implementer thread — per CLAUDE.md.
+  **Status:** the user opted to delegate this handoff to a separate
+  reviewer agent in a later session. Until that reviewer signs off,
+  Acceptance Criteria item "F-07 reviewed and approved" remains open.
 
 ## Verification Steps
 

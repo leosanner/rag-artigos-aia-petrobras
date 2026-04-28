@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-04-26
-**Current Work:** `F-08 / Reranked Retrieval` is now the next `/query` milestone at the contract/planning stage; `F-06 / Conversational Query` and `F-07 / Focused RAG` remain deferred until they rebase on the evolved `F-04`/`F-05`/`F-08` retrieval and trace contract
+**Last Updated:** 2026-04-28
+**Current Work:** `F-07 / Focused RAG` Block 05 implementation closeout has landed (integration test + doc sync + lint/typecheck/test). `F-08 / Reranked Retrieval` remains the next `/query` retrieval contract, and Block 05 of F-07 has explicitly deferred the focused `rerank` verification sub-step until F-08 ships. Independent review of F-07 is still pending — a fresh reviewer agent must approve before F-07 is treated as fully reviewed (per CLAUDE.md).
 
 ---
 
 ## Recent Decisions
+
+### AD-016: F-07 Focused RAG is implemented before F-08 with rerank verification deferred (2026-04-28)
+
+**Decision:** Close `F-07 / Focused RAG` as an implemented vertical now even though `F-08 / Reranked Retrieval` has not landed yet. Block 05 verifies focused vocabulary, selector + document-scoped retrieval, focused-aware `AnswerQuestion` + `ListRagDocuments`, the `/api/rag/documents` and `/api/rag/ask` routes, the F-06 focused conversation transport, and `/query` focused-mode UI through unit tests plus a single composed integration test in `src/app/api/rag/focused-rag.integration.test.ts` that hits real Postgres. The `rerank`-strategy sub-step in Block 05's RF-B05-02 is explicitly deferred and must be added to that integration test once F-08 introduces `"rerank"` to the shared retrieval contract.
+**Reason:** All non-rerank acceptance items hold against the current shared retrieval contract (`"standard"` and `"explore"`) without coupling F-07 to F-08, and the focused vertical is otherwise complete. Carrying the closeout through now keeps the audit checklist 1-to-1 with verification evidence and prevents F-07's tests from rotting against the evolving query stack.
+**Trade-off:** F-07's review packet ships with one explicitly deferred verification sub-step. The reviewer (and any future F-08 implementer) must re-open that sub-step when `"rerank"` becomes available; otherwise focused rerank coverage will silently lag the global path.
+**Impact:** Marks RFs and Acceptance Criteria in `.specs/features/F-07-focused-rag/spec.md` as completed with evidence pointers, marks Block 05 RF-B05-01..05 done in `.specs/features/F-07-focused-rag/05-integration-and-review.md`, leaves RF-B05-06 (independent review handoff) pending. Adds `src/app/api/rag/focused-rag.integration.test.ts` covering selector / 404 / 422 / focused-success / conversation / global-regression paths against real Postgres with fake embedding/generation providers.
 
 ### AD-015: Reranked retrieval becomes the next shared `/query` retrieval contract before conversation and focused retrieval (2026-04-26)
 
@@ -153,9 +160,10 @@ _None for now._
 - [x] ~~Define M2 feature contracts and close base RAG planning decisions~~ — resolved by AD-011
 - [x] ~~Implement `F-04 / Query Controls and Explore` with TDD against its spec~~ — completed by the F-04 Block 05 closeout and local verification on 2026-04-23
 - [x] ~~Implement `F-05 / Answer Traceability` with TDD against its spec~~ — completed by the F-05 Block 05 closeout and local verification on 2026-04-23
-- [ ] Implement `F-08 / Reranked Retrieval` with TDD against its spec
-- [ ] Implement `F-06 / Conversational Query` with TDD against its spec after `F-08` lands
-- [ ] Rebase and implement `F-07 / Focused RAG` after the `/query` evolution contracts land, including `F-08`
+- [ ] Implement `F-08 / Reranked Retrieval` with TDD against its spec — when this lands, also re-open Block 05 RF-B05-02 #6 in F-07 to add focused `rerank` integration coverage
+- [x] ~~Implement `F-06 / Conversational Query`~~ — completed before F-07 closeout (see git history)
+- [x] ~~Implement `F-07 / Focused RAG`~~ — Block 05 implementation closeout completed on 2026-04-28 (AD-016); independent review still pending
+- [ ] Independent review of `F-07 / Focused RAG` by a fresh reviewer agent (per CLAUDE.md) — required before F-07 is marked reviewed
 - [ ] Choose a definitive project name (current placeholder: "AIA Insight")
 - [ ] M4 PoC: compare **Mastra** vs **Vercel AI SDK alone** on one pilot task from `starter.md` §3.6 — criteria: Next.js integration, observability out of the box, maintenance cost (AD-003)
 

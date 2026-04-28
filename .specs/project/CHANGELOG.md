@@ -2,6 +2,40 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - test(f07): close focused RAG with integration coverage
+
+Date: 2026-04-28
+
+Changed:
+
+- Added `src/app/api/rag/focused-rag.integration.test.ts`: a single
+  composed integration test that hits real Postgres through the real
+  `/api/rag/documents`, `/api/rag/ask`, and
+  `/api/rag/conversations/:id/messages` handlers with fake embedding and
+  generation providers. Covers selector filtering, focused 404 / 422
+  rejection paths (with zero embedding/generation calls and zero
+  `rag_query_runs` rows), focused success with multi-document seed data
+  proving the `documentId` filter and persisted `mode='focused'` trace,
+  conversation focused turn appending an assistant message linked to the
+  focused trace, and global-mode regression.
+- Synced `.specs/features/F-07-focused-rag/spec.md` and
+  `.specs/features/F-07-focused-rag/05-integration-and-review.md` with the
+  evidence pointers; deferred RF-B05-02 #6 (focused `rerank` strategy) to
+  the future F-08 closeout because the shared retrieval contract still
+  exposes only `"standard"` and `"explore"`.
+- Recorded AD-016 in `.specs/project/STATE.md` capturing the decision to
+  close F-07 implementation before F-08 with the rerank sub-step
+  explicitly deferred. Independent reviewer sign-off remains the only
+  open Block 05 item.
+
+Files:
+
+- `src/app/api/rag/focused-rag.integration.test.ts`
+- `.specs/features/F-07-focused-rag/spec.md`
+- `.specs/features/F-07-focused-rag/05-integration-and-review.md`
+- `.specs/project/STATE.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(rag): define the F-08 reranked retrieval contract
 
 Date: 2026-04-26
