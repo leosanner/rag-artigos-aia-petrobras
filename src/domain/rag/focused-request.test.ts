@@ -38,6 +38,16 @@ describe("FocusedRagAskRequestSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts rerank at the shared domain-request boundary", () => {
+    const result = FocusedRagAskRequestSchema.safeParse(
+      buildFocusedRequest({
+        retrieval: { topK: 6, strategy: "rerank" },
+      }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
   it("rejects a non-UUID documentId", () => {
     const result = FocusedRagAskRequestSchema.safeParse(
       buildFocusedRequest({ documentId: "not-a-uuid" }),
@@ -100,7 +110,7 @@ describe("FocusedRagAskRequestSchema", () => {
     const result = FocusedRagAskRequestSchema.safeParse(
       buildFocusedRequest({
         retrieval: {
-          strategy: "rerank" as unknown as "standard",
+          strategy: "auto" as unknown as "standard",
         },
       }),
     );
