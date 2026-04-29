@@ -33,23 +33,12 @@ export default function Home() {
       <div className={styles.container}>
         <header className={styles.header}>
           <div>
-            <p className={styles.eyebrow}>AIA Insight / DEMO</p>
-            <h1 className={styles.title}>
-              Plataforma RAG{" "}
-              <span className={styles.titleAccent}>rastreavel</span>
-            </h1>
+            <h1 className={styles.title}>Plataforma RAG rastreavel</h1>
             <p className={styles.lede}>
               Explore a base documental governada com respostas auditaveis,
               citacoes inline e fontes numeradas para apoiar analises de EIA.
             </p>
           </div>
-
-          <aside className={styles.sysStamp} aria-hidden="true">
-            <span>SYS / HOME</span>
-            <span>corpus :: 31 papers</span>
-            <span>mode :: governed-rag</span>
-            <span>audit :: enabled</span>
-          </aside>
         </header>
 
         <section className={styles.heroPanel} aria-labelledby="home-entry-title">
@@ -75,21 +64,99 @@ export default function Home() {
           </div>
         </section>
 
+        <section
+          className={styles.processPanel}
+          aria-labelledby="home-document-flow-title"
+        >
+          <div className={styles.blockHeader}>
+            <span className={styles.blockIndex}>[ 02 ] Adicao de documentos</span>
+            <span className={styles.blockMeta}>
+              flow :: drive -&gt; ingestion -&gt; indexing
+            </span>
+          </div>
+
+          <div className={styles.processBody}>
+            <div className={styles.processIntro}>
+              <div>
+                <h2 id="home-document-flow-title" className={styles.panelTitle}>
+                  Como colocar novos PDFs na base
+                </h2>
+                <p className={styles.panelCopy}>
+                  A adicao de documentos acontece em duas etapas manuais
+                  separadas. Primeiro a plataforma busca e processa os PDFs no
+                  Drive. Depois ela gera chunks e vetores para liberar esse
+                  conteudo nas consultas RAG.
+                </p>
+              </div>
+
+              <div className={styles.routeGroup}>
+                <Link className={styles.btnSecondary} href="/ingestion">
+                  Abrir ingestao
+                </Link>
+                <Link className={styles.btnSecondary} href="/indexing">
+                  Abrir indexacao
+                </Link>
+              </div>
+            </div>
+
+            <ol className={styles.stepGrid}>
+              <li className={styles.stepCard}>
+                <span className={styles.stepNumber}>01</span>
+                <h3>Enviar os arquivos para o Drive</h3>
+                <p>
+                  Coloque os PDFs na pasta configurada do Google Drive. Esse
+                  folder e a origem oficial dos novos documentos da base.
+                </p>
+              </li>
+
+              <li className={styles.stepCard}>
+                <span className={styles.stepNumber}>02</span>
+                <h3>Executar a ingestao</h3>
+                <p>
+                  Acesse <code>/ingestion</code>, informe o segredo do operador e
+                  inicie a execucao para importar, extrair e refinar os textos.
+                </p>
+              </li>
+
+              <li className={styles.stepCard}>
+                <span className={styles.stepNumber}>03</span>
+                <h3>Confirmar documentos processados</h3>
+                <p>
+                  Espere a execucao terminar e verifique se os arquivos ficaram
+                  prontos para indexacao. Somente documentos processados seguem
+                  para a etapa de vetores.
+                </p>
+              </li>
+
+              <li className={styles.stepCard}>
+                <span className={styles.stepNumber}>04</span>
+                <h3>Gerar chunks e vetores</h3>
+                <p>
+                  Acesse <code>/indexing</code> para criar embeddings dos
+                  documentos processados. Use <code>documentId</code> ou{" "}
+                  <code>force</code> quando precisar reindexar um item
+                  especifico.
+                </p>
+              </li>
+            </ol>
+          </div>
+        </section>
+
         <section className={styles.grid} aria-label="Capacidades principais">
           <article className={styles.card}>
-            <span className={styles.cardIndex}>[ 02 ]</span>
+            <span className={styles.cardIndex}>[ 03 ]</span>
             <h2>Governanca</h2>
             <p>Status, versao de pipeline e origem documentada em cada registro.</p>
           </article>
 
           <article className={styles.card}>
-            <span className={styles.cardIndex}>[ 03 ]</span>
+            <span className={styles.cardIndex}>[ 04 ]</span>
             <h2>Rastreabilidade</h2>
             <p>Respostas ligadas a fontes numeradas, trechos e metadados.</p>
           </article>
 
           <article className={styles.card}>
-            <span className={styles.cardIndex}>[ 04 ]</span>
+            <span className={styles.cardIndex}>[ 05 ]</span>
             <h2>Auditoria</h2>
             <p>Historico persistido com custo, latencia, modelos e termos.</p>
           </article>
