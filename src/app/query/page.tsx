@@ -1875,28 +1875,39 @@ export default function QueryPage() {
         </section>
         </div>
 
-        <section className={styles.panel}>
-          <header className={styles.panelHeader}>
-            <div>
-              <h2 className={styles.panelTitle}>Historico recente</h2>
+        <details className={styles.runsPanel}>
+          <summary className={styles.runsPanelSummary}>
+            <span className={styles.runsPanelTitleGroup}>
+              <span className={styles.runsPanelEyebrow}>Auditoria</span>
+              <span className={styles.runsPanelTitle}>
+                Historico de execucoes
+              </span>
+            </span>
+            <span aria-hidden className={styles.runsPanelChevron}>
+              ▾
+            </span>
+          </summary>
+
+          <div className={styles.runsPanelBody}>
+            <header className={styles.runsPanelToolbar}>
               <p className={styles.panelCopy}>
                 O carregamento e manual. Nenhuma consulta adicional e feita
                 automaticamente apos o ask atual.
               </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                void loadRecentRuns();
-              }}
-              disabled={
-                trimmedSecret.length === 0 || recentRunsState.status === "loading"
-              }
-              className={`${styles.btn} ${styles.btnSecondary}`}
-            >
-              {historyButtonLabel}
-            </button>
-          </header>
+              <button
+                type="button"
+                onClick={() => {
+                  void loadRecentRuns();
+                }}
+                disabled={
+                  trimmedSecret.length === 0 ||
+                  recentRunsState.status === "loading"
+                }
+                className={`${styles.btn} ${styles.btnSecondary}`}
+              >
+                {historyButtonLabel}
+              </button>
+            </header>
 
           {recentRunsState.error === "unauthorized" ? (
             <StatusAlert kind="unauthorized" message={RAG_UNAUTHORIZED_MESSAGE} />
@@ -1930,55 +1941,64 @@ export default function QueryPage() {
 
                 return (
                   <li key={run.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void loadRunDetail(run.id);
-                      }}
-                      className={`${styles.historyButton} ${
-                        isSelected ? styles.historyButtonActive : ""
+                    <details
+                      className={`${styles.historyItem} ${
+                        isSelected ? styles.historyItemActive : ""
                       }`}
                     >
-                      <span className={styles.historyQuestion}>{run.question}</span>
-                      <span className={styles.historyMeta}>
-                        status :: {formatRunStatus(run.status)}
-                      </span>
-                      <span className={styles.historyMeta}>
-                        strategy :: {formatStrategy(run.retrievalStrategy)}
-                      </span>
-                      <span className={styles.historyMeta}>
-                        top-k :: {run.topK}
-                      </span>
-                      <span className={styles.historyMeta}>
-                        latency :: {run.latencyMs} ms
-                      </span>
-                      <span className={styles.historyMeta}>
-                        total :: {formatUsd(run.totalCostUsd)}
-                      </span>
-                      <span className={styles.historyMeta}>
-                        created :: {formatTimestamp(run.createdAt)}
-                      </span>
-                      {isLoading ? (
-                        <span className={styles.historyMeta}>abrindo...</span>
-                      ) : null}
-                    </button>
+                      <summary className={styles.historyItemSummary}>
+                        <span className={styles.historyItemHead}>
+                          <span className={styles.historyQuestion}>
+                            {run.question}
+                          </span>
+                          <span className={styles.historyItemInlineMeta}>
+                            {formatTimestamp(run.createdAt)} ·{" "}
+                            {formatRunStatus(run.status)}
+                          </span>
+                        </span>
+                        <span
+                          aria-hidden
+                          className={styles.historyItemChevron}
+                        >
+                          ▾
+                        </span>
+                      </summary>
+
+                      <div className={styles.historyItemBody}>
+                        <span className={styles.historyMeta}>
+                          strategy :: {formatStrategy(run.retrievalStrategy)}
+                        </span>
+                        <span className={styles.historyMeta}>
+                          top-k :: {run.topK}
+                        </span>
+                        <span className={styles.historyMeta}>
+                          latency :: {run.latencyMs} ms
+                        </span>
+                        <span className={styles.historyMeta}>
+                          total :: {formatUsd(run.totalCostUsd)}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void loadRunDetail(run.id);
+                          }}
+                          disabled={isLoading}
+                          className={`${styles.btn} ${styles.btnSecondary} ${styles.historyItemAction}`}
+                        >
+                          {isLoading
+                            ? "abrindo execucao..."
+                            : isSelected
+                              ? "recarregar execucao"
+                              : "ver execucao auditada"}
+                        </button>
+                      </div>
+                    </details>
                   </li>
                 );
               })}
             </ol>
           ) : null}
-        </section>
-
-        <section className={styles.panel}>
-          <header className={styles.panelHeader}>
-            <div>
-              <h2 className={styles.panelTitle}>Execucao selecionada</h2>
-              <p className={styles.panelCopy}>
-                Inspecione a trilha persistida sem reconstruir a resposta no
-                navegador.
-              </p>
-            </div>
-          </header>
 
           {selectedRunState.error === "unauthorized" ? (
             <StatusAlert kind="unauthorized" message={RAG_UNAUTHORIZED_MESSAGE} />
@@ -2054,7 +2074,8 @@ export default function QueryPage() {
               />
             </section>
           ) : null}
-        </section>
+          </div>
+        </details>
       </div>
     </main>
   );

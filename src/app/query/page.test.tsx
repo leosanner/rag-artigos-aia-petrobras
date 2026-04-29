@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -511,6 +511,29 @@ function clickLoadHistory(): void {
   fireEvent.click(
     screen.getByRole("button", { name: /carregar historico recente/i }),
   );
+}
+
+function openHistoryRun(question: RegExp): void {
+  const summary = screen.getByText(question).closest("summary");
+
+  if (!summary) {
+    throw new Error("history summary not found for question");
+  }
+
+  const details = summary.closest("details") as HTMLDetailsElement | null;
+
+  if (!details) {
+    throw new Error("history details element not found");
+  }
+
+  if (!details.open) {
+    fireEvent.click(summary);
+  }
+
+  const action = within(details).getByRole("button", {
+    name: /(ver|recarregar) execucao/i,
+  });
+  fireEvent.click(action);
 }
 
 function clickNewConversation(): void {
@@ -1294,11 +1317,7 @@ describe("/query page", () => {
     });
 
     await act(async () => {
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: /quais tecnicas aparecem com maior frequencia\?/i,
-        }),
-      );
+      openHistoryRun(/quais tecnicas aparecem com maior frequencia\?/i);
     });
 
     await act(async () => {
@@ -1394,17 +1413,11 @@ describe("/query page", () => {
       }),
     );
     expect(
-      screen.getByRole("button", {
-        name: /quais tecnicas aparecem com maior frequencia\?/i,
-      }),
+      screen.getByText(/quais tecnicas aparecem com maior frequencia\?/i),
     ).toBeInTheDocument();
 
     await act(async () => {
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: /quais tecnicas aparecem com maior frequencia\?/i,
-        }),
-      );
+      openHistoryRun(/quais tecnicas aparecem com maior frequencia\?/i);
     });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -1443,9 +1456,7 @@ describe("/query page", () => {
     });
 
     expect(
-      screen.getByRole("button", {
-        name: /quais tecnicas aparecem com maior frequencia\?/i,
-      }),
+      screen.getByText(/quais tecnicas aparecem com maior frequencia\?/i),
     ).toBeInTheDocument();
 
     await act(async () => {
@@ -1458,9 +1469,7 @@ describe("/query page", () => {
       screen.getAllByText(/secret de consulta foi rejeitado/i).length,
     ).toBeGreaterThan(0);
     expect(
-      screen.queryByRole("button", {
-        name: /quais tecnicas aparecem com maior frequencia\?/i,
-      }),
+      screen.queryByText(/quais tecnicas aparecem com maior frequencia\?/i),
     ).not.toBeInTheDocument();
     expect(sessionStorage.getItem("query:secret")).toBeNull();
     expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe("");
@@ -1480,20 +1489,14 @@ describe("/query page", () => {
     });
 
     await act(async () => {
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: /quais tecnicas aparecem com maior frequencia\?/i,
-        }),
-      );
+      openHistoryRun(/quais tecnicas aparecem com maior frequencia\?/i);
     });
 
     expect(
       screen.getAllByText(/secret de consulta foi rejeitado/i).length,
     ).toBeGreaterThan(0);
     expect(
-      screen.queryByRole("button", {
-        name: /quais tecnicas aparecem com maior frequencia\?/i,
-      }),
+      screen.queryByText(/quais tecnicas aparecem com maior frequencia\?/i),
     ).not.toBeInTheDocument();
     expect(sessionStorage.getItem("query:secret")).toBeNull();
     expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe("");
@@ -1521,11 +1524,7 @@ describe("/query page", () => {
     });
 
     await act(async () => {
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: /existe evidencia suficiente para uma resposta\?/i,
-        }),
-      );
+      openHistoryRun(/existe evidencia suficiente para uma resposta\?/i);
     });
 
     expect(screen.getAllByText(/falha segura/i).length).toBeGreaterThan(0);
