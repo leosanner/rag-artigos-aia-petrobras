@@ -17,6 +17,8 @@ import {
   type RagAnswerAudit,
   type RagAnswerMetadata,
   type RagConversationStreamEvent,
+  type RagRunAuditResponse,
+  type RagRunMetadataResponse,
   type RagQueryRunDetailResponse,
   type RagQueryRunSummaryResponse,
   type RagSource,
@@ -72,6 +74,11 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
     generationModel: "gpt-4.1-mini",
     embeddingModel: "text-embedding-3-large",
   };
+  const traceMetadata: RagRunMetadataResponse = {
+    ...metadata,
+    rerankerProvider: null,
+    rerankerModel: null,
+  };
   const audit: RagAnswerAudit = {
     latencyMs: 2430,
     embedding: { inputTokens: 24, estimatedCostUsd: 0.00000312 },
@@ -82,6 +89,10 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
       estimatedCostUsd: 0.00021048,
     },
     totalCostUsd: 0.0002136,
+  };
+  const traceAudit: RagRunAuditResponse = {
+    ...audit,
+    reranking: null,
   };
 
   return {
@@ -115,8 +126,8 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
           documentId: null,
           status: "answered",
           errorCode: null,
-          metadata,
-          audit,
+          metadata: traceMetadata,
+          audit: traceAudit,
           createdAt: "2026-04-26T12:00:32.000Z",
           relatedTerms: [
             { rank: 1, term: "random forest", ngramSize: 2, frequency: 18, sourceCoverageCount: 9 },
@@ -133,7 +144,8 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
               chunkIndex: 4,
               excerpt:
                 "Entre os 31 estudos revisados, Random Forest aparece em 19 trabalhos como classificador principal, frequentemente comparado a SVM em cenarios de cobertura do solo.",
-              score: 0.87,
+              retrievalScore: 0.87,
+              rerankScore: null,
               documentPipelineVersion: "ingest-v1",
               chunkingVersion: "chunk-v1",
               embeddingModel: "text-embedding-3-large",
@@ -147,7 +159,8 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
               chunkIndex: 7,
               excerpt:
                 "A arquitetura U-Net foi usada para segmentar areas degradadas com IoU medio de 0.78, superando metodos baseados em indices espectrais isolados.",
-              score: 0.81,
+              retrievalScore: 0.81,
+              rerankScore: null,
               documentPipelineVersion: "ingest-v1",
               chunkingVersion: "chunk-v1",
               embeddingModel: "text-embedding-3-large",
@@ -161,7 +174,8 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
               chunkIndex: 2,
               excerpt:
                 "Modelos do tipo gradient boosting alimentados por NDVI, NDWI e EVI superaram baselines tradicionais em 4 das 6 bacias estudadas.",
-              score: 0.74,
+              retrievalScore: 0.74,
+              rerankScore: null,
               documentPipelineVersion: "ingest-v1",
               chunkingVersion: "chunk-v1",
               embeddingModel: "text-embedding-3-large",
@@ -2257,8 +2271,8 @@ type AuditSummaryBlockProps = {
   metaLabel: string;
   traceId: string;
   question: string;
-  metadata: RagAnswerMetadata;
-  audit: RagAnswerAudit;
+  metadata: RagRunMetadataResponse;
+  audit: RagRunAuditResponse;
   status?: RagQueryRunDetailResponse["status"];
   errorCode?: RagQueryRunDetailResponse["errorCode"];
   createdAt?: string;
@@ -2289,6 +2303,14 @@ function AuditSummaryBlock({
         <MetaItem label="// candidates" value={String(metadata.candidateTopK)} />
         <MetaItem label="// generation" value={metadata.generationModel} />
         <MetaItem label="// embedding" value={metadata.embeddingModel} />
+        <MetaItem
+          label="// reranker"
+          value={
+            metadata.rerankerProvider && metadata.rerankerModel
+              ? `${metadata.rerankerProvider} :: ${metadata.rerankerModel}`
+              : "nao aplicado"
+          }
+        />
         <MetaItem label="// latency" value={`${audit.latencyMs} ms`} />
         <MetaItem
           label="// embedding tokens"
@@ -2312,6 +2334,30 @@ function AuditSummaryBlock({
             audit.generation
               ? formatUsd(audit.generation.estimatedCostUsd)
               : RAG_NO_GENERATION_AUDIT_MESSAGE
+          }
+        />
+        <MetaItem
+          label="// rerank latency"
+          value={
+            audit.reranking
+              ? `${audit.reranking.latencyMs} ms`
+              : "nao aplicado"
+          }
+        />
+        <MetaItem
+          label="// rerank tokens"
+          value={
+            audit.reranking
+              ? String(audit.reranking.inputTokens)
+              : "nao aplicado"
+          }
+        />
+        <MetaItem
+          label="// rerank cost"
+          value={
+            audit.reranking
+              ? formatUsd(audit.reranking.estimatedCostUsd)
+              : "nao aplicado"
           }
         />
         <MetaItem label="// total cost" value={formatUsd(audit.totalCostUsd)} />
@@ -2372,9 +2418,17 @@ function RelatedTermsBlock({
   );
 }
 
-type SourceCard = RagSource & {
-  citedInAnswer?: boolean;
-};
+type SourceCard =
+  | (RagSource & { citedInAnswer?: boolean })
+  | RagQueryRunDetailResponse["sources"][number];
+
+function getRetrievalScore(source: SourceCard): number {
+  return "retrievalScore" in source ? source.retrievalScore : source.score;
+}
+
+function getRerankScore(source: SourceCard): number | null {
+  return "rerankScore" in source ? source.rerankScore : null;
+}
 
 function SourcesBlock({
   blockIndex,
@@ -2422,8 +2476,13 @@ function SourcesBlock({
                     </p>
                     <div className={styles.sourceMetaRow}>
                       <span className={styles.sourceChip}>
-                        score :: {source.score.toFixed(2)}
+                        retrieval :: {getRetrievalScore(source).toFixed(2)}
                       </span>
+                      {getRerankScore(source) !== null ? (
+                        <span className={styles.sourceChip}>
+                          rerank :: {getRerankScore(source)!.toFixed(2)}
+                        </span>
+                      ) : null}
                       <span className={styles.sourceChip}>
                         chunk :: {source.chunkIndex}
                       </span>
