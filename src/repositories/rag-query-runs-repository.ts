@@ -7,14 +7,18 @@ import {
   ragQueryRunSources,
   ragQueryRuns,
 } from "@/db/schema";
-import type {
-  RagQueryRunErrorCode,
-  RagQueryRunStatus,
-  RagRetrievalStrategy,
-  RelatedTerm,
-} from "@/domain/rag";
+import type { RelatedTerm } from "@/domain/rag";
 
 type DatabaseClient = NodePgDatabase<typeof schema>;
+type PersistedRagQueryRunStatus =
+  | "answered"
+  | "answered_no_evidence"
+  | "generation_failed"
+  | "generation_unavailable";
+type PersistedRagQueryRunErrorCode =
+  | "generation_failed"
+  | "generation_unavailable";
+type PersistedRagRetrievalStrategy = "standard" | "explore";
 
 export type PersistedRagSourceSnapshot = {
   sourceNumber: number;
@@ -35,10 +39,10 @@ export type PersistRagQueryRunInput = {
   answer: string | null;
   mode: "global" | "focused";
   documentId: string | null;
-  status: RagQueryRunStatus;
-  errorCode: RagQueryRunErrorCode | null;
+  status: PersistedRagQueryRunStatus;
+  errorCode: PersistedRagQueryRunErrorCode | null;
   topK: number;
-  retrievalStrategy: RagRetrievalStrategy;
+  retrievalStrategy: PersistedRagRetrievalStrategy;
   candidateTopK: number;
   promptVersion: string;
   generationModel: string;
@@ -59,7 +63,7 @@ export type RagRunMetadata = {
   mode: "global" | "focused";
   documentId: string | null;
   topK: number;
-  retrievalStrategy: RagRetrievalStrategy;
+  retrievalStrategy: PersistedRagRetrievalStrategy;
   candidateTopK: number;
   promptVersion: string;
   generationModel: string;
@@ -88,9 +92,9 @@ export type RagRunAudit = {
 export type RagRunSummary = {
   id: string;
   question: string;
-  status: RagQueryRunStatus;
+  status: PersistedRagQueryRunStatus;
   topK: number;
-  retrievalStrategy: RagRetrievalStrategy;
+  retrievalStrategy: PersistedRagRetrievalStrategy;
   latencyMs: number;
   totalCostUsd: number;
   createdAt: Date;
@@ -102,8 +106,8 @@ export type RagRunDetail = {
   answer: string | null;
   mode: "global" | "focused";
   documentId: string | null;
-  status: RagQueryRunStatus;
-  errorCode: RagQueryRunErrorCode | null;
+  status: PersistedRagQueryRunStatus;
+  errorCode: PersistedRagQueryRunErrorCode | null;
   sources: PersistedRagSourceSnapshot[];
   relatedTerms: RelatedTerm[];
   metadata: RagRunMetadata;
