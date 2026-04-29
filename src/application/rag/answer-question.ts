@@ -10,9 +10,12 @@ import {
   isNoEvidenceAnswer,
   normalizeRetrievalSettings,
   toSafeGenerationFailureCode,
+  type RagQueryRunErrorCode,
+  type RagQueryRunStatus,
   type RagRetrievalSettings,
-  type RagRetrievalStrategy,
   type RagSource,
+  type RetrievedChunkMatch,
+  type RerankedChunkMatch,
 } from "@/domain/rag";
 import type {
   PersistRagQueryRunInput,
@@ -28,14 +31,18 @@ import type {
   GenerationUsage,
 } from "./ports";
 import type {
-  AnswerQuestionResult,
+  AnswerQuestionAudit,
   AnswerQuestionInput,
-  RagAnswerAudit,
-  RagAnswerMetadata,
+  AnswerQuestionMetadata,
+  AnswerQuestionResult,
   RelatedTerm,
 } from "./schemas";
 import { answerQuestionResultSchema } from "./schemas";
-import { RetrieveChunksFailure, type RetrieveChunks } from "./retrieve-chunks";
+import {
+  RerankingFailure,
+  RetrieveChunksFailure,
+  type RetrieveChunks,
+} from "./retrieve-chunks";
 
 export type AnswerQuestionDeps = {
   retrieveChunks: Pick<RetrieveChunks, "search" | "embeddingModel">;
@@ -127,7 +134,7 @@ export class AnswerQuestion {
     const retrievalQuestion =
       input.conversationContext?.transcript ?? input.question;
     const startedAtMs = this.nowMs();
-    const metadata = this.buildMetadata(mode, documentId, retrieval);
+    const baseMetadata = this.buildMetadata(mode, documentId, retrieval, null);
     let retrievalResult: Awaited<ReturnType<RetrieveChunks["search"]>>;
 
     try {
@@ -139,7 +146,9 @@ export class AnswerQuestion {
     } catch (error) {
       const failureCode = toApplicationFailureCode(error);
       logRagError(
-        "answer.retrieval_failed",
+        error instanceof RerankingFailure
+          ? "answer.reranking_failed"
+          : "answer.retrieval_failed",
         {
           requestTraceId: input.requestTraceId,
           failureCode,
@@ -150,14 +159,16 @@ export class AnswerQuestion {
         error,
       );
       const embedding =
-        error instanceof RetrieveChunksFailure && error.embedding !== null
+        (error instanceof RetrieveChunksFailure ||
+          error instanceof RerankingFailure) &&
+        error.embedding !== null
           ? error.embedding
           : ZERO_EMBEDDING_USAGE;
       const relatedTerms = extractRelatedTerms({
         question: input.question,
         sourceExcerpts: [],
       });
-      const audit = this.buildAudit(startedAtMs, embedding, null);
+      const audit = this.buildAudit(startedAtMs, embedding, null, null);
 
       await this.persistRun(
         this.buildPersistInput({
@@ -165,7 +176,7 @@ export class AnswerQuestion {
           answer: null,
           status: failureCode,
           errorCode: failureCode,
-          metadata,
+          metadata: baseMetadata,
           audit,
           sources: [],
           relatedTerms,
@@ -180,14 +191,25 @@ export class AnswerQuestion {
       });
     }
 
-    const { matches, embedding } = retrievalResult;
+    const { matches, embedding, reranking } = retrievalResult;
+    const metadata = this.buildMetadata(
+      mode,
+      documentId,
+      retrieval,
+      reranking?.metadata ?? null,
+    );
 
     if (matches.length === 0) {
       const relatedTerms = extractRelatedTerms({
         question: input.question,
         sourceExcerpts: [],
       });
-      const audit = this.buildAudit(startedAtMs, embedding, null);
+      const audit = this.buildAudit(
+        startedAtMs,
+        embedding,
+        reranking?.audit ?? null,
+        null,
+      );
       const persisted = await this.persistRun(
         this.buildPersistInput({
           question: input.question,
@@ -216,10 +238,11 @@ export class AnswerQuestion {
       });
     }
 
-    const { sources, promptContext } = assembleRagContext(matches);
+    const publicMatches = matches.map(toPublicRetrievedChunkMatch);
+    const { sources, promptContext } = assembleRagContext(publicMatches);
     const relatedTerms = extractRelatedTerms({
       question: input.question,
-      sourceExcerpts: sources.map((source) => source.excerpt),
+      sourceExcerpts: matches.map((match) => match.excerpt),
     });
 
     let generation: GenerationUsage | null = null;
@@ -254,7 +277,12 @@ export class AnswerQuestion {
           question: input.question,
           sourceExcerpts: [],
         });
-        const audit = this.buildAudit(startedAtMs, embedding, generation);
+        const audit = this.buildAudit(
+          startedAtMs,
+          embedding,
+          reranking?.audit ?? null,
+          generation,
+        );
         const persisted = await this.persistRun(
           this.buildPersistInput({
             question: input.question,
@@ -306,7 +334,12 @@ export class AnswerQuestion {
         },
         error,
       );
-      const audit = this.buildAudit(startedAtMs, embedding, generation);
+      const audit = this.buildAudit(
+        startedAtMs,
+        embedding,
+        reranking?.audit ?? null,
+        generation,
+      );
 
       await this.persistRun(
         this.buildPersistInput({
@@ -316,7 +349,7 @@ export class AnswerQuestion {
           errorCode: failureCode,
           metadata,
           audit,
-          sources: toPersistedSources(sources, new Set<number>()),
+          sources: toPersistedSources(matches, new Set<number>()),
           relatedTerms,
           generation,
         }),
@@ -329,7 +362,12 @@ export class AnswerQuestion {
       });
     }
 
-    const audit = this.buildAudit(startedAtMs, embedding, generation);
+    const audit = this.buildAudit(
+      startedAtMs,
+      embedding,
+      reranking?.audit ?? null,
+      generation,
+    );
     const persisted = await this.persistRun(
       this.buildPersistInput({
         question: input.question,
@@ -338,7 +376,7 @@ export class AnswerQuestion {
         errorCode: null,
         metadata,
         audit,
-        sources: toPersistedSources(sources, citedSourceNumbers),
+        sources: toPersistedSources(matches, citedSourceNumbers),
         relatedTerms,
         generation,
       }),
@@ -383,7 +421,13 @@ export class AnswerQuestion {
     mode: "global" | "focused",
     documentId: string | null,
     retrieval: RagRetrievalSettings,
-  ): RagAnswerMetadata {
+    reranking:
+      | {
+          rerankerProvider: string;
+          rerankerModel: string;
+        }
+      | null,
+  ): AnswerQuestionMetadata {
     return {
       mode,
       documentId,
@@ -393,34 +437,43 @@ export class AnswerQuestion {
       promptVersion: this.promptVersion,
       generationModel: this.generationModel,
       embeddingModel: this.retrieveChunks.embeddingModel,
+      rerankerProvider: reranking?.rerankerProvider ?? null,
+      rerankerModel: reranking?.rerankerModel ?? null,
     };
   }
 
   private buildAudit(
     startedAtMs: number,
     embedding: EmbeddingUsage,
+    reranking:
+      | {
+          latencyMs: number;
+          candidatesEvaluated: number;
+          inputTokens: number;
+          estimatedCostUsd: number;
+        }
+      | null,
     generation: GenerationUsage | null,
-  ): RagAnswerAudit {
+  ): AnswerQuestionAudit {
     return {
       latencyMs: Math.max(0, Math.round(this.nowMs() - startedAtMs)),
       embedding,
+      reranking,
       generation,
       totalCostUsd:
-        embedding.estimatedCostUsd + (generation?.estimatedCostUsd ?? 0),
+        embedding.estimatedCostUsd +
+        (reranking?.estimatedCostUsd ?? 0) +
+        (generation?.estimatedCostUsd ?? 0),
     };
   }
 
   private buildPersistInput(input: {
     question: string;
     answer: string | null;
-    status:
-      | "answered"
-      | "answered_no_evidence"
-      | "generation_failed"
-      | "generation_unavailable";
-    errorCode: "generation_failed" | "generation_unavailable" | null;
-    metadata: RagAnswerMetadata;
-    audit: RagAnswerAudit;
+    status: RagQueryRunStatus;
+    errorCode: RagQueryRunErrorCode | null;
+    metadata: AnswerQuestionMetadata;
+    audit: AnswerQuestionAudit;
     sources: PersistedRagSourceSnapshot[];
     relatedTerms: RelatedTerm[];
     generation: GenerationUsage | null;
@@ -433,19 +486,18 @@ export class AnswerQuestion {
       status: input.status,
       errorCode: input.errorCode,
       topK: input.metadata.topK,
-      retrievalStrategy: toPersistedRetrievalStrategy(
-        input.metadata.retrievalStrategy,
-      ),
+      retrievalStrategy: input.metadata.retrievalStrategy,
       candidateTopK: input.metadata.candidateTopK,
       promptVersion: input.metadata.promptVersion,
       generationModel: input.metadata.generationModel,
       embeddingModel: input.metadata.embeddingModel,
-      rerankerProvider: null,
-      rerankerModel: null,
-      rerankingLatencyMs: null,
-      rerankingCandidatesEvaluated: null,
-      rerankingInputTokens: null,
-      rerankingCostUsd: null,
+      rerankerProvider: input.metadata.rerankerProvider,
+      rerankerModel: input.metadata.rerankerModel,
+      rerankingLatencyMs: input.audit.reranking?.latencyMs ?? null,
+      rerankingCandidatesEvaluated:
+        input.audit.reranking?.candidatesEvaluated ?? null,
+      rerankingInputTokens: input.audit.reranking?.inputTokens ?? null,
+      rerankingCostUsd: input.audit.reranking?.estimatedCostUsd ?? null,
       latencyMs: input.audit.latencyMs,
       embeddingInputTokens: input.audit.embedding.inputTokens,
       embeddingCostUsd: input.audit.embedding.estimatedCostUsd,
@@ -476,29 +528,51 @@ export class AnswerQuestion {
   }
 }
 
-function toPersistedSources(
-  sources: RagSource[],
-  citedSourceNumbers: Set<number>,
-): PersistedRagSourceSnapshot[] {
-  return sources.map((source) => ({
-    sourceNumber: source.sourceNumber,
-    chunkId: source.chunkId,
-    documentId: source.documentId,
-    documentTitle: source.documentTitle,
-    chunkIndex: source.chunkIndex,
-    excerpt: source.excerpt,
-    retrievalScore: source.score,
-    rerankScore: null,
-    documentPipelineVersion: source.documentPipelineVersion,
-    chunkingVersion: source.chunkingVersion,
-    embeddingModel: source.embeddingModel,
-    citedInAnswer: citedSourceNumbers.has(source.sourceNumber),
-  }));
+function toPublicRetrievedChunkMatch(
+  match: RerankedChunkMatch,
+): RetrievedChunkMatch {
+  return {
+    chunkId: match.chunkId,
+    documentId: match.documentId,
+    documentTitle: match.documentTitle,
+    chunkIndex: match.chunkIndex,
+    excerpt: match.excerpt,
+    score: match.retrievalScore,
+    documentPipelineVersion: match.documentPipelineVersion,
+    chunkingVersion: match.chunkingVersion,
+    embeddingModel: match.embeddingModel,
+  };
 }
 
-function toApplicationFailureCode(
-  error: unknown,
-): "generation_failed" | "generation_unavailable" {
+function toPersistedSources(
+  matches: RerankedChunkMatch[],
+  citedSourceNumbers: Set<number>,
+): PersistedRagSourceSnapshot[] {
+  return matches.map((match, index) => {
+    const sourceNumber = index + 1;
+
+    return {
+      sourceNumber,
+      chunkId: match.chunkId,
+      documentId: match.documentId,
+      documentTitle: match.documentTitle,
+      chunkIndex: match.chunkIndex,
+      excerpt: match.excerpt,
+      retrievalScore: match.retrievalScore,
+      rerankScore: match.rerankScore,
+      documentPipelineVersion: match.documentPipelineVersion,
+      chunkingVersion: match.chunkingVersion,
+      embeddingModel: match.embeddingModel,
+      citedInAnswer: citedSourceNumbers.has(sourceNumber),
+    };
+  });
+}
+
+function toApplicationFailureCode(error: unknown): RagQueryRunErrorCode {
+  if (error instanceof RerankingFailure) {
+    return error.code;
+  }
+
   const failure = unwrapApplicationFailure(error);
 
   if (failure instanceof GenerationFailure) {
@@ -552,14 +626,4 @@ function extractMessage(error: unknown): string {
 
   const value = Reflect.get(error, "message");
   return typeof value === "string" ? value : "";
-}
-
-function toPersistedRetrievalStrategy(
-  strategy: RagRetrievalStrategy,
-): "standard" | "explore" {
-  if (strategy === "rerank") {
-    throw new Error("rerank_persistence_unavailable_before_block_02");
-  }
-
-  return strategy;
 }
