@@ -43,6 +43,13 @@
       "when": 1777378093073,
       "tag": "0005_dapper_smiling_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777482491548,
+      "tag": "0006_past_captain_cross",
+      "breakpoints": true
     }
   ]
 }
