@@ -11,6 +11,7 @@ import {
   normalizeRetrievalSettings,
   toSafeGenerationFailureCode,
   type RagRetrievalSettings,
+  type RagRetrievalStrategy,
   type RagSource,
 } from "@/domain/rag";
 import type {
@@ -432,7 +433,9 @@ export class AnswerQuestion {
       status: input.status,
       errorCode: input.errorCode,
       topK: input.metadata.topK,
-      retrievalStrategy: input.metadata.retrievalStrategy,
+      retrievalStrategy: toPersistedRetrievalStrategy(
+        input.metadata.retrievalStrategy,
+      ),
       candidateTopK: input.metadata.candidateTopK,
       promptVersion: input.metadata.promptVersion,
       generationModel: input.metadata.generationModel,
@@ -542,4 +545,14 @@ function extractMessage(error: unknown): string {
 
   const value = Reflect.get(error, "message");
   return typeof value === "string" ? value : "";
+}
+
+function toPersistedRetrievalStrategy(
+  strategy: RagRetrievalStrategy,
+): "standard" | "explore" {
+  if (strategy === "rerank") {
+    throw new Error("rerank_persistence_unavailable_before_block_02");
+  }
+
+  return strategy;
 }
