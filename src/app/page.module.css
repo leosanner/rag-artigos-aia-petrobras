@@ -272,6 +272,18 @@
   color: var(--blue);
 }
 
+.btnIngest:hover {
+  background: var(--yellow);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.btnIndex:hover {
+  background: var(--lime);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
 .btnSecondary:active {
   filter: brightness(0.96);
 }

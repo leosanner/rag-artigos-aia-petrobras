@@ -94,10 +94,16 @@ export default function Home() {
               </div>
 
               <div className={styles.routeGroup}>
-                <Link className={styles.btnSecondary} href="/ingestion">
+                <Link
+                  className={`${styles.btnSecondary} ${styles.btnIngest}`}
+                  href="/ingestion"
+                >
                   Abrir ingestao
                 </Link>
-                <Link className={styles.btnSecondary} href="/indexing">
+                <Link
+                  className={`${styles.btnSecondary} ${styles.btnIndex}`}
+                  href="/indexing"
+                >
                   Abrir indexacao
                 </Link>
               </div>
