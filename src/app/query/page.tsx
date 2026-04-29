@@ -2642,8 +2642,15 @@ function formatUsd(value: number): string {
   return `US$ ${value.toFixed(8)}`;
 }
 
-function formatStrategy(strategy: QuerySubmissionStrategy): string {
-  return strategy === "explore" ? "explore" : "standard";
+function formatStrategy(strategy: RagRetrievalStrategy): string {
+  switch (strategy) {
+    case "standard":
+      return "standard";
+    case "explore":
+      return "explore";
+    case "rerank":
+      return "rerank";
+  }
 }
 
 function formatRunStatus(status: RagQueryRunSummaryResponse["status"]): string {
@@ -2656,6 +2663,10 @@ function formatRunStatus(status: RagQueryRunSummaryResponse["status"]): string {
       return "falha segura";
     case "generation_unavailable":
       return "geracao indisponivel";
+    case "reranking_failed":
+      return "reranking com falha segura";
+    case "reranking_unavailable":
+      return "reranking indisponivel";
   }
 }
 
