@@ -851,6 +851,11 @@ describe("/query page", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(screen.getAllByText(SUCCESS_RESPONSE.answer).length).toBeGreaterThan(0);
+
+    await act(async () => {
+      clickViewAudit();
+    });
+
     expect(screen.getByText(CURRENT_TRACE_ID)).toBeInTheDocument();
     expect(
       screen.getAllByText(/classificacao supervisionada/i).length,
@@ -940,6 +945,10 @@ describe("/query page", () => {
         ).at(-1)!,
       );
       stream.close();
+    });
+
+    await act(async () => {
+      clickViewAudit();
     });
 
     expect(await screen.findByText(CURRENT_TRACE_ID)).toBeInTheDocument();
@@ -1292,6 +1301,10 @@ describe("/query page", () => {
       clickSubmit();
     });
 
+    await act(async () => {
+      clickViewAudit();
+    });
+
     const preview = truncateExcerptPreview(LONG_EXCERPT);
 
     expect(screen.getByText(preview)).toBeInTheDocument();
@@ -1382,6 +1395,11 @@ describe("/query page", () => {
     expect(
       screen.getAllByText(/nao encontrei evidencias suficientes/i).length,
     ).toBeGreaterThan(0);
+
+    await act(async () => {
+      clickViewAudit();
+    });
+
     expect(
       screen.getByText(/nenhuma fonte foi recuperada para esta pergunta/i),
     ).toBeInTheDocument();

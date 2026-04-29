@@ -710,7 +710,6 @@ export default function QueryPage() {
         parsed.data.userMessage,
         parsed.data.assistantMessage,
       ]);
-      expandAudit(parsed.data.assistantMessage.id);
       setQuestion("");
       setAskState({ kind: "idle" });
       return;
@@ -914,7 +913,6 @@ export default function QueryPage() {
         if (event.type === "done") {
           sawTerminalEvent = true;
           appendTranscriptMessages([event.assistantMessage]);
-          expandAudit(event.assistantMessage.id);
           setStreamingAssistantState(createInitialStreamingAssistantState());
           setAskState({ kind: "idle" });
           return;
@@ -1297,18 +1295,6 @@ export default function QueryPage() {
         next.add(messageId);
       }
 
-      return next;
-    });
-  }
-
-  function expandAudit(messageId: string) {
-    setExpandedAuditMessageIds((current) => {
-      if (current.has(messageId)) {
-        return current;
-      }
-
-      const next = new Set(current);
-      next.add(messageId);
       return next;
     });
   }
