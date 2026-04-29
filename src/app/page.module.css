@@ -10,6 +10,7 @@
   --paper: #fafaf7;
   --paper-deep: #f0efe7;
   --lime: #c2f04a;
+  --lime-deep: #a9dc2e;
   --blue: #2b4bff;
   --blue-deep: #1f36c2;
   --yellow: #ffd60a;
@@ -51,9 +52,33 @@
 
 .header {
   display: grid;
-  gap: 18px;
-  padding-bottom: 20px;
+  gap: 16px;
+  padding-bottom: 24px;
   border-bottom: var(--border);
+  animation: reveal 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  padding: 6px 12px;
+  background: var(--ink);
+  color: var(--lime);
+  font-family: var(--font-mono), "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.eyebrow::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: var(--lime);
+  animation: pulse 1.6s ease-in-out infinite;
 }
 
 .title {
@@ -64,6 +89,15 @@
   font-weight: 700;
   line-height: 0.94;
   letter-spacing: -0.02em;
+}
+
+.titleAccent {
+  display: inline;
+  background-image: linear-gradient(var(--yellow), var(--yellow));
+  background-repeat: no-repeat;
+  background-size: 100% 38%;
+  background-position: 0 88%;
+  padding: 0 4px;
 }
 
 .lede {
@@ -78,13 +112,15 @@
 .heroPanel {
   border: var(--border);
   background: var(--paper);
-  animation: reveal 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: reveal 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 80ms;
 }
 
 .processPanel {
   border: var(--border);
   background: var(--paper-deep);
-  animation: reveal 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: reveal 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 200ms;
 }
 
 .blockHeader {
@@ -256,30 +292,51 @@
 
 .stepCard {
   display: grid;
-  gap: 10px;
+  grid-template-columns: 64px 1fr;
+  gap: 18px;
+  align-items: start;
   min-height: 100%;
-  padding: 20px;
+  padding: 22px;
   border: var(--border);
   background: var(--paper);
+  transition: background 160ms ease, border-color 160ms ease;
+  animation: reveal 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-.stepNumber {
-  display: inline-flex;
-  width: fit-content;
-  padding: 5px 10px;
-  background: var(--ink);
-  color: var(--paper);
-  font-family: var(--font-mono), "IBM Plex Mono", monospace;
-  font-size: 0.72rem;
+.stepCard:nth-child(1) { animation-delay: 280ms; }
+.stepCard:nth-child(2) { animation-delay: 360ms; }
+.stepCard:nth-child(3) { animation-delay: 440ms; }
+.stepCard:nth-child(4) { animation-delay: 520ms; }
+
+.stepCard:hover {
+  background: var(--paper-deep);
+}
+
+.stepNumeral {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border: var(--border);
+  background: var(--lime);
+  font-family: var(--font-display), "Fraunces", serif;
+  font-style: italic;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.stepBody {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
 }
 
 .stepCard h3 {
   margin: 0;
   font-family: var(--font-display), "Fraunces", serif;
   font-size: 1.35rem;
-  line-height: 1.08;
+  line-height: 1.15;
 }
 
 .stepCard p {
@@ -304,15 +361,34 @@
 }
 
 .card {
+  position: relative;
   display: grid;
-  gap: 10px;
-  padding: 22px;
+  gap: 12px;
+  padding: 26px 22px 22px;
   border: var(--border);
   background: var(--paper);
+  overflow: hidden;
+  transition: background 160ms ease, border-color 160ms ease;
+  animation: reveal 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-.card:nth-child(2),
-.card:nth-child(3) {
+.card:nth-child(1) { animation-delay: 600ms; }
+.card:nth-child(2) { animation-delay: 680ms; }
+.card:nth-child(3) { animation-delay: 760ms; }
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 6px;
+  background: var(--ink);
+}
+
+.cardLime::before { background: var(--lime); }
+.cardBlue::before { background: var(--blue); }
+.cardYellow::before { background: var(--yellow); }
+
+.card:hover {
   background: var(--paper-deep);
 }
 
@@ -321,8 +397,13 @@
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.22em;
-  color: var(--blue);
+  color: var(--ink);
+  opacity: 0.6;
 }
+
+.cardLime .cardIndex { color: var(--ink); }
+.cardBlue .cardIndex { color: var(--blue); opacity: 1; }
+.cardYellow .cardIndex { color: var(--ink); }
 
 .card h2 {
   margin: 0;
@@ -349,8 +430,12 @@
   }
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
 @media (max-width: 860px) {
-  .header,
   .blockBody,
   .processIntro,
   .stepGrid,
@@ -370,6 +455,17 @@
 
   .btnSecondary {
     width: 100%;
+  }
+}
+
+@media (max-width: 540px) {
+  .stepCard {
+    grid-template-columns: 1fr;
+  }
+  .stepNumeral {
+    width: 56px;
+    height: 56px;
+    font-size: 1.7rem;
   }
 }
 
