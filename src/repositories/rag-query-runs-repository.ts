@@ -7,18 +7,18 @@ import {
   ragQueryRunSources,
   ragQueryRuns,
 } from "@/db/schema";
-import type { RelatedTerm } from "@/domain/rag";
+import type {
+  RagQueryRunErrorCode,
+  RagQueryRunStatus,
+  RagRetrievalStrategy,
+  RagRerankingAudit,
+  RelatedTerm,
+} from "@/domain/rag";
 
 type DatabaseClient = NodePgDatabase<typeof schema>;
-type PersistedRagQueryRunStatus =
-  | "answered"
-  | "answered_no_evidence"
-  | "generation_failed"
-  | "generation_unavailable";
-type PersistedRagQueryRunErrorCode =
-  | "generation_failed"
-  | "generation_unavailable";
-type PersistedRagRetrievalStrategy = "standard" | "explore";
+type PersistedRagQueryRunStatus = RagQueryRunStatus;
+type PersistedRagQueryRunErrorCode = RagQueryRunErrorCode;
+type PersistedRagRetrievalStrategy = RagRetrievalStrategy;
 
 export type PersistedRagSourceSnapshot = {
   sourceNumber: number;
@@ -27,7 +27,8 @@ export type PersistedRagSourceSnapshot = {
   documentTitle: string;
   chunkIndex: number;
   excerpt: string;
-  score: number;
+  retrievalScore: number;
+  rerankScore: number | null;
   documentPipelineVersion: string;
   chunkingVersion: string;
   embeddingModel: string;
@@ -47,6 +48,12 @@ export type PersistRagQueryRunInput = {
   promptVersion: string;
   generationModel: string;
   embeddingModel: string;
+  rerankerProvider: string | null;
+  rerankerModel: string | null;
+  rerankingLatencyMs: number | null;
+  rerankingCandidatesEvaluated: number | null;
+  rerankingInputTokens: number | null;
+  rerankingCostUsd: number | null;
   latencyMs: number;
   embeddingInputTokens: number;
   embeddingCostUsd: number;
@@ -68,12 +75,16 @@ export type RagRunMetadata = {
   promptVersion: string;
   generationModel: string;
   embeddingModel: string;
+  rerankerProvider: string | null;
+  rerankerModel: string | null;
 };
 
 export type RagRunEmbeddingAudit = {
   inputTokens: number;
   estimatedCostUsd: number;
 };
+
+export type RagRunRerankingAudit = RagRerankingAudit;
 
 export type RagRunGenerationAudit = {
   inputTokens: number;
@@ -85,6 +96,7 @@ export type RagRunGenerationAudit = {
 export type RagRunAudit = {
   latencyMs: number;
   embedding: RagRunEmbeddingAudit;
+  reranking: RagRunRerankingAudit | null;
   generation: RagRunGenerationAudit | null;
   totalCostUsd: number;
 };
@@ -137,6 +149,12 @@ export class RagQueryRunsRepository {
           promptVersion: input.promptVersion,
           generationModel: input.generationModel,
           embeddingModel: input.embeddingModel,
+          rerankerProvider: input.rerankerProvider,
+          rerankerModel: input.rerankerModel,
+          rerankingLatencyMs: input.rerankingLatencyMs,
+          rerankingCandidatesEvaluated: input.rerankingCandidatesEvaluated,
+          rerankingInputTokens: input.rerankingInputTokens,
+          rerankingCostUsd: input.rerankingCostUsd,
           latencyMs: input.latencyMs,
           embeddingInputTokens: input.embeddingInputTokens,
           embeddingCostUsd: input.embeddingCostUsd,
@@ -161,7 +179,8 @@ export class RagQueryRunsRepository {
             documentTitle: source.documentTitle,
             chunkIndex: source.chunkIndex,
             excerpt: source.excerpt,
-            score: source.score,
+            retrievalScore: source.retrievalScore,
+            rerankScore: source.rerankScore,
             documentPipelineVersion: source.documentPipelineVersion,
             chunkingVersion: source.chunkingVersion,
             embeddingModel: source.embeddingModel,
@@ -254,7 +273,8 @@ export class RagQueryRunsRepository {
           documentTitle: source.documentTitle,
           chunkIndex: source.chunkIndex,
           excerpt: source.excerpt,
-          score: source.score,
+          retrievalScore: source.retrievalScore,
+          rerankScore: source.rerankScore,
           documentPipelineVersion: source.documentPipelineVersion,
           chunkingVersion: source.chunkingVersion,
           embeddingModel: source.embeddingModel,
@@ -276,6 +296,8 @@ export class RagQueryRunsRepository {
           promptVersion: run.promptVersion,
           generationModel: run.generationModel,
           embeddingModel: run.embeddingModel,
+          rerankerProvider: run.rerankerProvider,
+          rerankerModel: run.rerankerModel,
         },
         audit: {
           latencyMs: run.latencyMs,
@@ -283,6 +305,7 @@ export class RagQueryRunsRepository {
             inputTokens: run.embeddingInputTokens,
             estimatedCostUsd: run.embeddingCostUsd,
           },
+          reranking: mapRerankingAudit(run),
           generation: mapGenerationAudit(run),
           totalCostUsd: run.totalCostUsd,
         },
@@ -329,6 +352,47 @@ function mapGenerationAudit(
     inputTokens,
     outputTokens,
     totalTokens,
+    estimatedCostUsd,
+  };
+}
+
+function mapRerankingAudit(
+  run: Pick<
+    schema.RagQueryRun,
+    | "rerankingLatencyMs"
+    | "rerankingCandidatesEvaluated"
+    | "rerankingInputTokens"
+    | "rerankingCostUsd"
+  >,
+): RagRunRerankingAudit | null {
+  const latencyMs = run.rerankingLatencyMs;
+  const candidatesEvaluated = run.rerankingCandidatesEvaluated;
+  const inputTokens = run.rerankingInputTokens;
+  const estimatedCostUsd = run.rerankingCostUsd;
+  const values = [
+    latencyMs,
+    candidatesEvaluated,
+    inputTokens,
+    estimatedCostUsd,
+  ];
+
+  if (values.every((value) => value === null)) {
+    return null;
+  }
+
+  if (
+    latencyMs === null ||
+    candidatesEvaluated === null ||
+    inputTokens === null ||
+    estimatedCostUsd === null
+  ) {
+    throw new Error("Inconsistent reranking audit metrics for persisted query run");
+  }
+
+  return {
+    latencyMs,
+    candidatesEvaluated,
+    inputTokens,
     estimatedCostUsd,
   };
 }
