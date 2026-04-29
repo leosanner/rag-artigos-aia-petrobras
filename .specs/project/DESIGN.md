@@ -211,7 +211,7 @@ Sempre traz: o que está vazio + por quê + ação opcional. Ex.: "Nenhuma fonte
 
 ## 5. Layout e responsividade
 
-- Container central: `max-width: 1080px`, margem horizontal automática.
+- Container central: `max-width: 1320px`, margem horizontal automática (16px lateral).
 - Grid principal: 1 coluna por padrão; vira 2 colunas (`auditAside` à esquerda, conteúdo à direita) quando há auditoria aberta, em viewports ≥ 1024px.
 - Breakpoints: **720px** (composer/toolbar empilham), **860px** (header empilha, source cards perdem coluna do numeral), **1024px** (audit aside vira topo em vez de lateral).
 - Sticky: o composer (`.composerWrap`) permanece sticky no rodapé do chat; aside de auditoria sticky no topo (24px de offset).
