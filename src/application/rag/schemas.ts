@@ -9,6 +9,7 @@ import {
   RAG_RETRIEVAL_MIN_TOP_K,
   RagRetrievalStrategySchema,
   type FocusedDocumentRejectionReason,
+  type RagRetrievalInput,
   type RagSource as DomainRagSource,
   type RagQueryRunErrorCode as DomainRagQueryRunErrorCode,
   type RagQueryRunStatus as DomainRagQueryRunStatus,
@@ -68,10 +69,17 @@ type AnswerQuestionInputExtensions = {
   conversationContext?: AnswerQuestionConversationContext;
   requestTraceId?: string;
 };
-export type GlobalAnswerQuestionInput = GlobalRagAskInput &
-  AnswerQuestionInputExtensions;
-export type FocusedAnswerQuestionInput = FocusedRagAskInput &
-  AnswerQuestionInputExtensions;
+export type GlobalAnswerQuestionInput = {
+  question: string;
+  mode: "global";
+  retrieval?: RagRetrievalInput;
+} & AnswerQuestionInputExtensions;
+export type FocusedAnswerQuestionInput = {
+  question: string;
+  mode: "focused";
+  documentId: string;
+  retrieval?: RagRetrievalInput;
+} & AnswerQuestionInputExtensions;
 export type AnswerQuestionInput =
   | GlobalAnswerQuestionInput
   | FocusedAnswerQuestionInput;
@@ -167,6 +175,12 @@ export type RagRunMetadataResponse = z.infer<
   typeof ragRunMetadataResponseSchema
 >;
 
+export const answerQuestionMetadataSchema = ragRunMetadataResponseSchema;
+
+export type AnswerQuestionMetadata = z.infer<
+  typeof answerQuestionMetadataSchema
+>;
+
 export const embeddingUsageSchema = z
   .object({
     inputTokens: z.number().int().nonnegative(),
@@ -218,6 +232,10 @@ export const ragRunAuditResponseSchema = ragAnswerAuditSchema
   .strip();
 
 export type RagRunAuditResponse = z.infer<typeof ragRunAuditResponseSchema>;
+
+export const answerQuestionAuditSchema = ragRunAuditResponseSchema;
+
+export type AnswerQuestionAudit = z.infer<typeof answerQuestionAuditSchema>;
 
 export const ragAnsweredResponseSchema = z
   .object({
@@ -626,8 +644,8 @@ export const answerQuestionAnsweredResultSchema = z
     mode: z.enum(["global", "focused"]),
     sources: z.array(ragSourceSchema),
     relatedTerms: z.array(relatedTermSchema),
-    metadata: ragAnswerMetadataSchema,
-    audit: ragAnswerAuditSchema,
+    metadata: answerQuestionMetadataSchema,
+    audit: answerQuestionAuditSchema,
   })
   .strip();
 
