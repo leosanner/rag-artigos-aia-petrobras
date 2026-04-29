@@ -128,6 +128,8 @@ function assistantMessage() {
         promptVersion: "f05-audit-v1",
         generationModel: "gpt-4.1-mini",
         embeddingModel: "text-embedding-3-large",
+        rerankerProvider: null,
+        rerankerModel: null,
       },
       audit: {
         latencyMs: 123,
@@ -135,6 +137,7 @@ function assistantMessage() {
           inputTokens: 11,
           estimatedCostUsd: 0.000001,
         },
+        reranking: null,
         generation: null,
         totalCostUsd: 0.000001,
       },
