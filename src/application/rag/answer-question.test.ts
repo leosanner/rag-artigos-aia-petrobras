@@ -16,6 +16,14 @@ const EMBEDDING_MODEL = "text-embedding-3-large";
 const PROMPT_VERSION = "f04-global-rag-v1";
 const CREATED_RUN_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const FOCUSED_DOCUMENT_ID = "44444444-4444-4444-8444-444444444444";
+const NULL_RERANK_PERSISTENCE = {
+  rerankerProvider: null,
+  rerankerModel: null,
+  rerankingLatencyMs: null,
+  rerankingCandidatesEvaluated: null,
+  rerankingInputTokens: null,
+  rerankingCostUsd: null,
+} as const;
 
 function buildMatch(
   overrides: Partial<RetrievedChunkMatch> = {},
@@ -53,6 +61,27 @@ function buildGenerationUsage(
     totalTokens: 162,
     estimatedCostUsd: 0.000048,
     ...overrides,
+  };
+}
+
+function toPersistedSource(input: {
+  match: RetrievedChunkMatch;
+  sourceNumber: number;
+  citedInAnswer: boolean;
+}) {
+  return {
+    sourceNumber: input.sourceNumber,
+    chunkId: input.match.chunkId,
+    documentId: input.match.documentId,
+    documentTitle: input.match.documentTitle,
+    chunkIndex: input.match.chunkIndex,
+    excerpt: input.match.excerpt,
+    retrievalScore: input.match.score,
+    rerankScore: null,
+    documentPipelineVersion: input.match.documentPipelineVersion,
+    chunkingVersion: input.match.chunkingVersion,
+    embeddingModel: input.match.embeddingModel,
+    citedInAnswer: input.citedInAnswer,
   };
 }
 
@@ -378,6 +407,7 @@ describe("AnswerQuestion", () => {
       promptVersion: PROMPT_VERSION,
       generationModel: GENERATION_MODEL,
       embeddingModel: EMBEDDING_MODEL,
+      ...NULL_RERANK_PERSISTENCE,
       latencyMs: 245,
       embeddingInputTokens: embeddingUsage.inputTokens,
       embeddingCostUsd: embeddingUsage.estimatedCostUsd,
@@ -492,6 +522,7 @@ describe("AnswerQuestion", () => {
       promptVersion: PROMPT_VERSION,
       generationModel: GENERATION_MODEL,
       embeddingModel: EMBEDDING_MODEL,
+      ...NULL_RERANK_PERSISTENCE,
       latencyMs: 432,
       embeddingInputTokens: embeddingUsage.inputTokens,
       embeddingCostUsd: embeddingUsage.estimatedCostUsd,
@@ -502,16 +533,16 @@ describe("AnswerQuestion", () => {
       totalCostUsd:
         embeddingUsage.estimatedCostUsd + generationUsage.estimatedCostUsd,
       sources: [
-        {
+        toPersistedSource({
+          match: matches[0]!,
           sourceNumber: 1,
-          ...matches[0],
           citedInAnswer: false,
-        },
-        {
+        }),
+        toPersistedSource({
+          match: matches[1]!,
           sourceNumber: 2,
-          ...matches[1],
           citedInAnswer: true,
-        },
+        }),
       ],
       relatedTerms: expectedRelatedTerms,
     });
@@ -682,6 +713,7 @@ describe("AnswerQuestion", () => {
       promptVersion: PROMPT_VERSION,
       generationModel: GENERATION_MODEL,
       embeddingModel: EMBEDDING_MODEL,
+      ...NULL_RERANK_PERSISTENCE,
       latencyMs: 432,
       embeddingInputTokens: embeddingUsage.inputTokens,
       embeddingCostUsd: embeddingUsage.estimatedCostUsd,
@@ -692,16 +724,16 @@ describe("AnswerQuestion", () => {
       totalCostUsd:
         embeddingUsage.estimatedCostUsd + generationUsage.estimatedCostUsd,
       sources: [
-        {
+        toPersistedSource({
+          match: matches[0]!,
           sourceNumber: 1,
-          ...matches[0],
           citedInAnswer: false,
-        },
-        {
+        }),
+        toPersistedSource({
+          match: matches[1]!,
           sourceNumber: 2,
-          ...matches[1],
           citedInAnswer: false,
-        },
+        }),
       ],
       relatedTerms: expectedRelatedTerms,
     });
@@ -743,6 +775,7 @@ describe("AnswerQuestion", () => {
       promptVersion: PROMPT_VERSION,
       generationModel: GENERATION_MODEL,
       embeddingModel: EMBEDDING_MODEL,
+      ...NULL_RERANK_PERSISTENCE,
       latencyMs: 432,
       embeddingInputTokens: embeddingUsage.inputTokens,
       embeddingCostUsd: embeddingUsage.estimatedCostUsd,
@@ -752,16 +785,16 @@ describe("AnswerQuestion", () => {
       generationCostUsd: null,
       totalCostUsd: embeddingUsage.estimatedCostUsd,
       sources: [
-        {
+        toPersistedSource({
+          match: matches[0]!,
           sourceNumber: 1,
-          ...matches[0],
           citedInAnswer: false,
-        },
-        {
+        }),
+        toPersistedSource({
+          match: matches[1]!,
           sourceNumber: 2,
-          ...matches[1],
           citedInAnswer: false,
-        },
+        }),
       ],
       relatedTerms: expectedRelatedTerms,
     });
@@ -862,6 +895,7 @@ describe("AnswerQuestion", () => {
       promptVersion: PROMPT_VERSION,
       generationModel: GENERATION_MODEL,
       embeddingModel: EMBEDDING_MODEL,
+      ...NULL_RERANK_PERSISTENCE,
       latencyMs: 187,
       embeddingInputTokens: embeddingUsage.inputTokens,
       embeddingCostUsd: embeddingUsage.estimatedCostUsd,
