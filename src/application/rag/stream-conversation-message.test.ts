@@ -51,6 +51,8 @@ function buildAnsweredResult(
       promptVersion: "f10-streaming-v1",
       generationModel: "gpt-4.1-mini",
       embeddingModel: "text-embedding-3-large",
+      rerankerProvider: null,
+      rerankerModel: null,
     },
     audit: {
       latencyMs: 120,
@@ -58,6 +60,7 @@ function buildAnsweredResult(
         inputTokens: 14,
         estimatedCostUsd: 0.0000014,
       },
+      reranking: null,
       generation: {
         inputTokens: 90,
         outputTokens: 18,
@@ -247,6 +250,7 @@ describe("StreamConversationMessage", () => {
               inputTokens: 10,
               estimatedCostUsd: 0.000001,
             },
+            reranking: null,
             generation: null,
             totalCostUsd: 0.000001,
           },
