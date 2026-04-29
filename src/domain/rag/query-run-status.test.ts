@@ -13,6 +13,8 @@ describe("RAG_QUERY_RUN_STATUSES", () => {
       "answered_no_evidence",
       "generation_failed",
       "generation_unavailable",
+      "reranking_failed",
+      "reranking_unavailable",
     ]);
   });
 
@@ -26,6 +28,8 @@ describe("RAG_QUERY_RUN_ERROR_CODES", () => {
     expect(RAG_QUERY_RUN_ERROR_CODES).toEqual([
       "generation_failed",
       "generation_unavailable",
+      "reranking_failed",
+      "reranking_unavailable",
     ]);
   });
 
@@ -40,5 +44,7 @@ describe("isFailedRunStatus", () => {
     expect(isFailedRunStatus("answered_no_evidence")).toBe(false);
     expect(isFailedRunStatus("generation_failed")).toBe(true);
     expect(isFailedRunStatus("generation_unavailable")).toBe(true);
+    expect(isFailedRunStatus("reranking_failed")).toBe(true);
+    expect(isFailedRunStatus("reranking_unavailable")).toBe(true);
   });
 });
