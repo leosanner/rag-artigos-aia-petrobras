@@ -98,6 +98,12 @@ function buildPersistInput(
     promptVersion: "f05-audit-v1",
     generationModel: "gpt-4.1-mini",
     embeddingModel: EMBEDDING_MODEL,
+    rerankerProvider: null,
+    rerankerModel: null,
+    rerankingLatencyMs: null,
+    rerankingCandidatesEvaluated: null,
+    rerankingInputTokens: null,
+    rerankingCostUsd: null,
     latencyMs: 432,
     embeddingInputTokens: 17,
     embeddingCostUsd: 0.000002,
@@ -114,7 +120,8 @@ function buildPersistInput(
         documentTitle: "artigo-original.pdf",
         chunkIndex: 0,
         excerpt: "Trecho original do chunk.",
-        score: 0.91,
+        retrievalScore: 0.91,
+        rerankScore: null,
         documentPipelineVersion: pipelineVersion,
         chunkingVersion: CHUNKING_VERSION,
         embeddingModel: EMBEDDING_MODEL,
@@ -127,7 +134,8 @@ function buildPersistInput(
         documentTitle: "artigo-secundario.pdf",
         chunkIndex: 1,
         excerpt: "Trecho complementar.",
-        score: 0.84,
+        retrievalScore: 0.84,
+        rerankScore: null,
         documentPipelineVersion: pipelineVersion,
         chunkingVersion: CHUNKING_VERSION,
         embeddingModel: EMBEDDING_MODEL,
@@ -205,6 +213,8 @@ describe("RagQueryRunsRepository", () => {
         promptVersion: input.promptVersion,
         generationModel: input.generationModel,
         embeddingModel: input.embeddingModel,
+        rerankerProvider: null,
+        rerankerModel: null,
       },
       audit: {
         latencyMs: input.latencyMs,
@@ -212,6 +222,7 @@ describe("RagQueryRunsRepository", () => {
           inputTokens: input.embeddingInputTokens,
           estimatedCostUsd: input.embeddingCostUsd,
         },
+        reranking: null,
         generation: {
           inputTokens: input.generationInputTokens!,
           outputTokens: input.generationOutputTokens!,
@@ -238,10 +249,77 @@ describe("RagQueryRunsRepository", () => {
     expect(storedTerms).toHaveLength(2);
   });
 
-  it("persists an answered_no_evidence run without sources and maps null generation audit to null", async () => {
+  it("persists an explore run with null rerank scores and no rerank audit", async () => {
+    const input = buildPersistInput({
+      retrievalStrategy: "explore",
+      candidateTopK: 18,
+    });
+
+    const created = await repository.create(input);
+    const detail = await repository.getById(created.id);
+
+    expect(detail?.metadata.retrievalStrategy).toBe("explore");
+    expect(detail?.metadata.rerankerProvider).toBeNull();
+    expect(detail?.sources.every((source) => source.rerankScore === null)).toBe(
+      true,
+    );
+    expect(detail?.audit.reranking).toBeNull();
+  });
+
+  it("persists a rerank success run with rerank metadata, audit, and split source scores", async () => {
+    const input = buildPersistInput({
+      retrievalStrategy: "rerank",
+      candidateTopK: 18,
+      rerankerProvider: "openai",
+      rerankerModel: "rerank-1",
+      rerankingLatencyMs: 89,
+      rerankingCandidatesEvaluated: 18,
+      rerankingInputTokens: 54,
+      rerankingCostUsd: 0.00013,
+      sources: [
+        {
+          ...buildPersistInput().sources[0]!,
+          retrievalScore: 0.91,
+          rerankScore: 0.83,
+        },
+        {
+          ...buildPersistInput().sources[1]!,
+          retrievalScore: 0.84,
+          rerankScore: 0.77,
+        },
+      ],
+    });
+
+    const created = await repository.create(input);
+    const detail = await repository.getById(created.id);
+
+    expect(detail).toMatchObject({
+      id: created.id,
+      status: "answered",
+      metadata: {
+        retrievalStrategy: "rerank",
+        candidateTopK: 18,
+        rerankerProvider: "openai",
+        rerankerModel: "rerank-1",
+      },
+      audit: {
+        reranking: {
+          latencyMs: 89,
+          candidatesEvaluated: 18,
+          inputTokens: 54,
+          estimatedCostUsd: 0.00013,
+        },
+      },
+    });
+    expect(detail?.sources).toEqual(input.sources);
+  });
+
+  it("persists a rerank answered_no_evidence run without rerank audit and maps null generation audit to null", async () => {
     const input = buildPersistInput({
       answer: "Nao encontrei nada relacionado a essa pergunta na base de dados.",
       status: "answered_no_evidence",
+      retrievalStrategy: "rerank",
+      candidateTopK: 18,
       sources: [],
       relatedTerms: [
         {
@@ -263,9 +341,74 @@ describe("RagQueryRunsRepository", () => {
     const detail = await repository.getById(created.id);
 
     expect(detail?.status).toBe("answered_no_evidence");
+    expect(detail?.metadata.retrievalStrategy).toBe("rerank");
+    expect(detail?.metadata.rerankerProvider).toBeNull();
     expect(detail?.sources).toEqual([]);
+    expect(detail?.audit.reranking).toBeNull();
     expect(detail?.audit.generation).toBeNull();
     expect(detail?.relatedTerms).toEqual(input.relatedTerms);
+  });
+
+  it("persists a reranking_failed run with null generation and reranking audit", async () => {
+    const input = buildPersistInput({
+      answer: null,
+      status: "reranking_failed",
+      errorCode: "reranking_failed",
+      retrievalStrategy: "rerank",
+      candidateTopK: 18,
+      sources: [],
+      relatedTerms: [buildPersistInput().relatedTerms[0]!],
+      generationInputTokens: null,
+      generationOutputTokens: null,
+      generationTotalTokens: null,
+      generationCostUsd: null,
+      totalCostUsd: 0.000002,
+    });
+
+    const created = await repository.create(input);
+    const detail = await repository.getById(created.id);
+
+    expect(detail).toMatchObject({
+      id: created.id,
+      answer: null,
+      status: "reranking_failed",
+      errorCode: "reranking_failed",
+      sources: [],
+      relatedTerms: input.relatedTerms,
+    });
+    expect(detail?.audit.reranking).toBeNull();
+    expect(detail?.audit.generation).toBeNull();
+  });
+
+  it("persists a reranking_unavailable run with the safe failure vocabulary", async () => {
+    const input = buildPersistInput({
+      answer: null,
+      status: "reranking_unavailable",
+      errorCode: "reranking_unavailable",
+      retrievalStrategy: "rerank",
+      candidateTopK: 18,
+      sources: [],
+      relatedTerms: [buildPersistInput().relatedTerms[0]!],
+      generationInputTokens: null,
+      generationOutputTokens: null,
+      generationTotalTokens: null,
+      generationCostUsd: null,
+      totalCostUsd: 0.000002,
+    });
+
+    const created = await repository.create(input);
+    const detail = await repository.getById(created.id);
+
+    expect(detail).toMatchObject({
+      id: created.id,
+      answer: null,
+      status: "reranking_unavailable",
+      errorCode: "reranking_unavailable",
+      sources: [],
+      relatedTerms: input.relatedTerms,
+    });
+    expect(detail?.audit.reranking).toBeNull();
+    expect(detail?.audit.generation).toBeNull();
   });
 
   it("persists a failed run with null answer and null generation usage metrics", async () => {
@@ -449,6 +592,16 @@ describe("RagQueryRunsRepository", () => {
     await expect(repository.create(input)).rejects.toThrow();
   });
 
+  it("rejects a rerank run with partially populated reranking metadata or audit", async () => {
+    const input = buildPersistInput({
+      retrievalStrategy: "rerank",
+      candidateTopK: 18,
+      rerankerProvider: "openai",
+    });
+
+    await expect(repository.create(input)).rejects.toThrow();
+  });
+
   it("rolls back the entire create transaction when a child snapshot violates a constraint", async () => {
     const input = buildPersistInput({
       sources: [
@@ -494,6 +647,29 @@ describe("RagQueryRunsRepository", () => {
     const detail = await repository.getById(created.id);
 
     expect(detail?.sources[0]).toEqual(input.sources[0]);
+  });
+
+  it("reads a migrated legacy source row as retrievalScore with rerankScore null", async () => {
+    const created = await repository.create(
+      buildPersistInput({
+        sources: [
+          {
+            ...buildPersistInput().sources[0]!,
+            retrievalScore: 0.73,
+            rerankScore: null,
+          },
+        ],
+      }),
+    );
+
+    const detail = await repository.getById(created.id);
+
+    expect(detail?.sources).toEqual([
+      expect.objectContaining({
+        retrievalScore: 0.73,
+        rerankScore: null,
+      }),
+    ]);
   });
 
   it("cascades child snapshots when the parent run is deleted", async () => {
