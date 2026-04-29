@@ -299,6 +299,8 @@ function createFakeAnswerQuestion(
           promptVersion: "f05-audit-v1",
           generationModel: "gpt-4.1-mini",
           embeddingModel: "text-embedding-3-large",
+          rerankerProvider: null,
+          rerankerModel: null,
         },
         audit: {
           latencyMs: 432,
@@ -306,6 +308,7 @@ function createFakeAnswerQuestion(
             inputTokens: 17,
             estimatedCostUsd: 0.000002,
           },
+          reranking: null,
           generation:
             outcome.status === "answered_no_evidence"
               ? null
