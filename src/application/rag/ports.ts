@@ -1,4 +1,11 @@
-import type { RagRetrievalStrategy, RetrievedChunkMatch } from "@/domain/rag";
+import type {
+  FirstPassChunkMatch,
+  RagRerankingAudit,
+  RagRerankingMetadata,
+  RagRetrievalStrategy,
+  RetrievedChunkMatch,
+  RerankedChunkMatch,
+} from "@/domain/rag";
 import type {
   FocusedDocumentClassification,
   SelectableDocumentRow,
@@ -35,6 +42,19 @@ export interface QuestionEmbeddingProvider {
   embedQuestion(question: string): Promise<{
     embedding: number[];
     usage: EmbeddingUsage;
+  }>;
+}
+
+export interface RerankingProvider {
+  rerank(input: {
+    question: string;
+    matches: FirstPassChunkMatch[];
+    topK: number;
+    candidateTopK: number;
+  }): Promise<{
+    matches: RerankedChunkMatch[];
+    metadata: RagRerankingMetadata;
+    audit: RagRerankingAudit;
   }>;
 }
 
