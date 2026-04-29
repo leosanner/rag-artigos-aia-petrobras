@@ -168,6 +168,13 @@ export class StreamConversationMessage {
     );
 
     if (turnResult.kind === "error") {
+      if (
+        turnResult.error !== "generation_failed" &&
+        turnResult.error !== "generation_unavailable"
+      ) {
+        throw new Error("unsupported_conversation_stream_error_code");
+      }
+
       await options.onEvent({
         type: "error",
         status: turnResult.error,
