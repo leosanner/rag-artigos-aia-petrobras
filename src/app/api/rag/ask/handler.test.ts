@@ -44,6 +44,8 @@ function buildAnsweredResult(
       promptVersion: "f04-global-rag-v1",
       generationModel: "gpt-4.1-mini",
       embeddingModel: "text-embedding-3-large",
+      rerankerProvider: null,
+      rerankerModel: null,
     },
     relatedTerms: [
       {
@@ -60,6 +62,7 @@ function buildAnsweredResult(
         inputTokens: 11,
         estimatedCostUsd: 0.00000143,
       },
+      reranking: null,
       generation: {
         inputTokens: 42,
         outputTokens: 16,
@@ -218,6 +221,8 @@ describe("POST /api/rag/ask handler", () => {
           promptVersion: "f04-global-rag-v1",
           generationModel: "gpt-4.1-mini",
           embeddingModel: "text-embedding-3-large",
+          rerankerProvider: null,
+          rerankerModel: null,
         },
       }),
     );
