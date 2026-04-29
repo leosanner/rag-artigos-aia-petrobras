@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { ragAskRequestSchema } from "./schemas";
+import {
+  answerQuestionResultSchema,
+  ragAskRequestSchema,
+  ragAskSuccessResponseSchema,
+} from "./schemas";
 
 describe("ragAskRequestSchema", () => {
   it("keeps rerank unavailable on the public global ask surface until Block 04", () => {
@@ -28,5 +32,138 @@ describe("ragAskRequestSchema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it("accepts rerank-only metadata on the internal answer result while stripping it from the public ask payload", () => {
+    const internalResult = answerQuestionResultSchema.parse({
+      kind: "answered",
+      status: "answered",
+      traceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      answer: "Resposta [1].",
+      mode: "global",
+      sources: [
+        {
+          sourceNumber: 1,
+          chunkId: "11111111-1111-4111-8111-111111111111",
+          documentId: "22222222-2222-4222-8222-222222222222",
+          documentTitle: "artigo.pdf",
+          chunkIndex: 0,
+          excerpt: "Trecho recuperado.",
+          score: 0.91,
+          documentPipelineVersion: "documents-v1",
+          chunkingVersion: "hybrid-v1-900-150",
+          embeddingModel: "text-embedding-3-large",
+        },
+      ],
+      relatedTerms: [
+        {
+          rank: 1,
+          term: "segmentacao",
+          ngramSize: 1,
+          frequency: 2,
+          sourceCoverageCount: 1,
+        },
+      ],
+      metadata: {
+        mode: "global",
+        documentId: null,
+        topK: 6,
+        retrievalStrategy: "rerank",
+        candidateTopK: 18,
+        promptVersion: "f08-rerank-v1",
+        generationModel: "gpt-4.1-mini",
+        embeddingModel: "text-embedding-3-large",
+        rerankerProvider: "test-reranker",
+        rerankerModel: "rerank-v1",
+      },
+      audit: {
+        latencyMs: 123,
+        embedding: {
+          inputTokens: 11,
+          estimatedCostUsd: 0.00000143,
+        },
+        reranking: {
+          latencyMs: 41,
+          candidatesEvaluated: 6,
+          inputTokens: 22,
+          estimatedCostUsd: 0.000031,
+        },
+        generation: {
+          inputTokens: 42,
+          outputTokens: 16,
+          totalTokens: 58,
+          estimatedCostUsd: 0.0000192,
+        },
+        totalCostUsd: 0.00005163,
+      },
+    });
+
+    expect(internalResult).toMatchObject({
+      metadata: {
+        retrievalStrategy: "rerank",
+        rerankerProvider: "test-reranker",
+        rerankerModel: "rerank-v1",
+      },
+      audit: {
+        reranking: {
+          candidatesEvaluated: 6,
+        },
+      },
+    });
+
+    const publicPayload = ragAskSuccessResponseSchema.parse(internalResult);
+
+    expect(publicPayload).toEqual({
+      traceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      answer: "Resposta [1].",
+      mode: "global",
+      sources: [
+        {
+          sourceNumber: 1,
+          chunkId: "11111111-1111-4111-8111-111111111111",
+          documentId: "22222222-2222-4222-8222-222222222222",
+          documentTitle: "artigo.pdf",
+          chunkIndex: 0,
+          excerpt: "Trecho recuperado.",
+          score: 0.91,
+          documentPipelineVersion: "documents-v1",
+          chunkingVersion: "hybrid-v1-900-150",
+          embeddingModel: "text-embedding-3-large",
+        },
+      ],
+      relatedTerms: [
+        {
+          rank: 1,
+          term: "segmentacao",
+          ngramSize: 1,
+          frequency: 2,
+          sourceCoverageCount: 1,
+        },
+      ],
+      metadata: {
+        mode: "global",
+        documentId: null,
+        topK: 6,
+        retrievalStrategy: "rerank",
+        candidateTopK: 18,
+        promptVersion: "f08-rerank-v1",
+        generationModel: "gpt-4.1-mini",
+        embeddingModel: "text-embedding-3-large",
+      },
+      audit: {
+        latencyMs: 123,
+        embedding: {
+          inputTokens: 11,
+          estimatedCostUsd: 0.00000143,
+        },
+        generation: {
+          inputTokens: 42,
+          outputTokens: 16,
+          totalTokens: 58,
+          estimatedCostUsd: 0.0000192,
+        },
+        totalCostUsd: 0.00005163,
+      },
+    });
   });
 });
