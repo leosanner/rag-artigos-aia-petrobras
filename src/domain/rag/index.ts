@@ -8,5 +8,6 @@ export * from "./focused-rejection";
 export * from "./focused-request";
 export * from "./query-run-status";
 export * from "./related-terms";
+export * from "./reranking";
 export * from "./retrieval-settings";
 export * from "./selectable-document";
