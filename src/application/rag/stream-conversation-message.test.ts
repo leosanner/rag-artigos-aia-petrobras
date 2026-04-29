@@ -121,12 +121,21 @@ function createService(overrides: {
                 sources: [
                   {
                     ...buildSource(),
+                    retrievalScore: buildSource().score,
+                    rerankScore: null,
                     citedInAnswer: true,
                   },
                 ],
                 relatedTerms: [],
-                metadata: buildAnsweredResult().metadata,
-                audit: buildAnsweredResult().audit,
+                metadata: {
+                  ...buildAnsweredResult().metadata,
+                  rerankerProvider: null,
+                  rerankerModel: null,
+                },
+                audit: {
+                  ...buildAnsweredResult().audit,
+                  reranking: null,
+                },
                 createdAt: ASSISTANT_CREATED_AT,
               },
       },
