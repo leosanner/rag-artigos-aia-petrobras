@@ -3,13 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildNoEvidenceAnswer,
   extractRelatedTerms,
-  type RetrievedChunkMatch,
+  type RagRerankingAudit,
+  type RagRerankingMetadata,
+  type RerankedChunkMatch,
 } from "@/domain/rag";
 import type { FocusedDocumentClassification } from "@/repositories/documents-repository";
 
 import type { EmbeddingUsage, GenerationUsage } from "./ports";
 import { AnswerQuestion } from "./answer-question";
-import { RetrieveChunksFailure } from "./retrieve-chunks";
+import { RetrieveChunksFailure, RerankingFailure } from "./retrieve-chunks";
 
 const GENERATION_MODEL = "gpt-4.1-mini";
 const EMBEDDING_MODEL = "text-embedding-3-large";
@@ -26,15 +28,16 @@ const NULL_RERANK_PERSISTENCE = {
 } as const;
 
 function buildMatch(
-  overrides: Partial<RetrievedChunkMatch> = {},
-): RetrievedChunkMatch {
+  overrides: Partial<RerankedChunkMatch> = {},
+): RerankedChunkMatch {
   return {
     chunkId: "11111111-1111-4111-8111-111111111111",
     documentId: "22222222-2222-4222-8222-222222222222",
     documentTitle: "article.pdf",
     chunkIndex: 0,
     excerpt: "Chunk excerpt",
-    score: 0.91,
+    retrievalScore: 0.91,
+    rerankScore: null,
     documentPipelineVersion: "documents-v1",
     chunkingVersion: "hybrid-v1-900-150",
     embeddingModel: EMBEDDING_MODEL,
@@ -65,7 +68,7 @@ function buildGenerationUsage(
 }
 
 function toPersistedSource(input: {
-  match: RetrievedChunkMatch;
+  match: RerankedChunkMatch;
   sourceNumber: number;
   citedInAnswer: boolean;
 }) {
@@ -76,12 +79,52 @@ function toPersistedSource(input: {
     documentTitle: input.match.documentTitle,
     chunkIndex: input.match.chunkIndex,
     excerpt: input.match.excerpt,
-    retrievalScore: input.match.score,
-    rerankScore: null,
+    retrievalScore: input.match.retrievalScore,
+    rerankScore: input.match.rerankScore,
     documentPipelineVersion: input.match.documentPipelineVersion,
     chunkingVersion: input.match.chunkingVersion,
     embeddingModel: input.match.embeddingModel,
     citedInAnswer: input.citedInAnswer,
+  };
+}
+
+function toPublicSource(input: {
+  match: RerankedChunkMatch;
+  sourceNumber: number;
+}) {
+  return {
+    sourceNumber: input.sourceNumber,
+    chunkId: input.match.chunkId,
+    documentId: input.match.documentId,
+    documentTitle: input.match.documentTitle,
+    chunkIndex: input.match.chunkIndex,
+    excerpt: input.match.excerpt,
+    score: input.match.retrievalScore,
+    documentPipelineVersion: input.match.documentPipelineVersion,
+    chunkingVersion: input.match.chunkingVersion,
+    embeddingModel: input.match.embeddingModel,
+  };
+}
+
+function buildRerankingMetadata(
+  overrides: Partial<RagRerankingMetadata> = {},
+): RagRerankingMetadata {
+  return {
+    rerankerProvider: "test-reranker",
+    rerankerModel: "rerank-v1",
+    ...overrides,
+  };
+}
+
+function buildRerankingAudit(
+  overrides: Partial<RagRerankingAudit> = {},
+): RagRerankingAudit {
+  return {
+    latencyMs: 41,
+    candidatesEvaluated: 6,
+    inputTokens: 22,
+    estimatedCostUsd: 0.000031,
+    ...overrides,
   };
 }
 
@@ -91,7 +134,11 @@ function createNowMs(latencyMs: number) {
 
 function createService(
   overrides: {
-    matches?: RetrievedChunkMatch[];
+    matches?: RerankedChunkMatch[];
+    reranking?: {
+      metadata: RagRerankingMetadata;
+      audit: RagRerankingAudit;
+    } | null;
     embeddingUsage?: EmbeddingUsage;
     answer?: string;
     generationUsage?: GenerationUsage;
@@ -112,7 +159,7 @@ function createService(
         chunkId: "33333333-3333-4333-8333-333333333333",
         chunkIndex: 1,
         excerpt: "Second chunk excerpt",
-        score: 0.82,
+        retrievalScore: 0.82,
       }),
     ];
   const embeddingUsage = overrides.embeddingUsage ?? buildEmbeddingUsage();
@@ -125,6 +172,7 @@ function createService(
         ? vi.fn().mockResolvedValue({
             matches,
             embedding: embeddingUsage,
+            reranking: overrides.reranking ?? null,
           })
         : vi.fn().mockRejectedValue(overrides.retrievalError),
   };
@@ -376,10 +424,13 @@ describe("AnswerQuestion", () => {
         promptVersion: PROMPT_VERSION,
         generationModel: GENERATION_MODEL,
         embeddingModel: EMBEDDING_MODEL,
+        rerankerProvider: null,
+        rerankerModel: null,
       },
       audit: {
         latencyMs: 245,
         embedding: embeddingUsage,
+        reranking: null,
         generation: null,
         totalCostUsd: embeddingUsage.estimatedCostUsd,
       },
@@ -466,14 +517,14 @@ describe("AnswerQuestion", () => {
       answer: "A síntese prioriza a segunda fonte [2].",
       mode: "global",
       sources: [
-        {
+        toPublicSource({
+          match: matches[0]!,
           sourceNumber: 1,
-          ...matches[0],
-        },
-        {
+        }),
+        toPublicSource({
+          match: matches[1]!,
           sourceNumber: 2,
-          ...matches[1],
-        },
+        }),
       ],
       relatedTerms: expectedRelatedTerms,
       metadata: {
@@ -485,10 +536,13 @@ describe("AnswerQuestion", () => {
         promptVersion: PROMPT_VERSION,
         generationModel: GENERATION_MODEL,
         embeddingModel: EMBEDDING_MODEL,
+        rerankerProvider: null,
+        rerankerModel: null,
       },
       audit: {
         latencyMs: 432,
         embedding: embeddingUsage,
+        reranking: null,
         generation: generationUsage,
         totalCostUsd:
           embeddingUsage.estimatedCostUsd + generationUsage.estimatedCostUsd,
@@ -592,6 +646,461 @@ describe("AnswerQuestion", () => {
         candidateTopK: 18,
       }),
     );
+  });
+
+  it("persists rerank metadata, reranking audit, and split source scores when reranking succeeds", async () => {
+    const nowMs = createNowMs(387);
+    const embeddingUsage = buildEmbeddingUsage({
+      inputTokens: 21,
+      estimatedCostUsd: 0.00000273,
+    });
+    const generationUsage = buildGenerationUsage({
+      inputTokens: 136,
+      outputTokens: 31,
+      totalTokens: 167,
+      estimatedCostUsd: 0.000059,
+    });
+    const reranking = {
+      metadata: buildRerankingMetadata(),
+      audit: buildRerankingAudit(),
+    };
+    const matches = [
+      buildMatch({
+        chunkId: "33333333-3333-4333-8333-333333333333",
+        chunkIndex: 1,
+        excerpt: "Second chunk excerpt",
+        retrievalScore: 0.82,
+        rerankScore: 0.97,
+      }),
+      buildMatch({
+        retrievalScore: 0.91,
+        rerankScore: 0.94,
+      }),
+    ];
+    const { service, generationProvider, runsRepository, retrieveChunks } =
+      createService({
+        matches,
+        reranking,
+        embeddingUsage,
+        generationUsage,
+        nowMs,
+        answer: "A fonte reranqueada mais forte é a primeira [1].",
+      });
+    const question = "Quais evidências ficaram mais relevantes após reranqueamento?";
+    const expectedRelatedTerms = extractRelatedTerms({
+      question,
+      sourceExcerpts: matches.map((match) => match.excerpt),
+    });
+
+    const result = await service.execute({
+      question,
+      mode: "global",
+      retrieval: {
+        topK: 6,
+        strategy: "rerank",
+      },
+    });
+
+    expect(result).toEqual({
+      kind: "answered",
+      status: "answered",
+      traceId: CREATED_RUN_ID,
+      answer: "A fonte reranqueada mais forte é a primeira [1].",
+      mode: "global",
+      sources: [
+        toPublicSource({
+          match: matches[0]!,
+          sourceNumber: 1,
+        }),
+        toPublicSource({
+          match: matches[1]!,
+          sourceNumber: 2,
+        }),
+      ],
+      relatedTerms: expectedRelatedTerms,
+      metadata: {
+        mode: "global",
+        documentId: null,
+        topK: 6,
+        retrievalStrategy: "rerank",
+        candidateTopK: 18,
+        promptVersion: PROMPT_VERSION,
+        generationModel: GENERATION_MODEL,
+        embeddingModel: EMBEDDING_MODEL,
+        rerankerProvider: reranking.metadata.rerankerProvider,
+        rerankerModel: reranking.metadata.rerankerModel,
+      },
+      audit: {
+        latencyMs: 387,
+        embedding: embeddingUsage,
+        reranking: reranking.audit,
+        generation: generationUsage,
+        totalCostUsd:
+          embeddingUsage.estimatedCostUsd +
+          reranking.audit.estimatedCostUsd +
+          generationUsage.estimatedCostUsd,
+      },
+    });
+
+    expect(retrieveChunks.search).toHaveBeenCalledWith({
+      question,
+      retrieval: {
+        topK: 6,
+        strategy: "rerank",
+      },
+    });
+    expect(generationProvider.generateAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        retrievalStrategy: "rerank",
+      }),
+    );
+    expect(runsRepository.create).toHaveBeenCalledWith({
+      question,
+      answer: "A fonte reranqueada mais forte é a primeira [1].",
+      mode: "global",
+      documentId: null,
+      status: "answered",
+      errorCode: null,
+      topK: 6,
+      retrievalStrategy: "rerank",
+      candidateTopK: 18,
+      promptVersion: PROMPT_VERSION,
+      generationModel: GENERATION_MODEL,
+      embeddingModel: EMBEDDING_MODEL,
+      rerankerProvider: reranking.metadata.rerankerProvider,
+      rerankerModel: reranking.metadata.rerankerModel,
+      rerankingLatencyMs: reranking.audit.latencyMs,
+      rerankingCandidatesEvaluated: reranking.audit.candidatesEvaluated,
+      rerankingInputTokens: reranking.audit.inputTokens,
+      rerankingCostUsd: reranking.audit.estimatedCostUsd,
+      latencyMs: 387,
+      embeddingInputTokens: embeddingUsage.inputTokens,
+      embeddingCostUsd: embeddingUsage.estimatedCostUsd,
+      generationInputTokens: generationUsage.inputTokens,
+      generationOutputTokens: generationUsage.outputTokens,
+      generationTotalTokens: generationUsage.totalTokens,
+      generationCostUsd: generationUsage.estimatedCostUsd,
+      totalCostUsd:
+        embeddingUsage.estimatedCostUsd +
+        reranking.audit.estimatedCostUsd +
+        generationUsage.estimatedCostUsd,
+      sources: [
+        toPersistedSource({
+          match: matches[0]!,
+          sourceNumber: 1,
+          citedInAnswer: true,
+        }),
+        toPersistedSource({
+          match: matches[1]!,
+          sourceNumber: 2,
+          citedInAnswer: false,
+        }),
+      ],
+      relatedTerms: expectedRelatedTerms,
+    });
+  });
+
+  it("returns answered_no_evidence for rerank when retrieval finds no candidates, without calling generation or persisting rerank metadata", async () => {
+    const nowMs = createNowMs(245);
+    const embeddingUsage = buildEmbeddingUsage({
+      inputTokens: 23,
+      estimatedCostUsd: 0.00000299,
+    });
+    const { service, generationProvider, runsRepository } = createService({
+      matches: [],
+      embeddingUsage,
+      nowMs,
+    });
+    const question = "O que resta relevante quando tentamos reranquear?";
+
+    await expect(
+      service.execute({
+        question,
+        mode: "global",
+        retrieval: {
+          topK: 6,
+          strategy: "rerank",
+        },
+      }),
+    ).resolves.toEqual({
+      kind: "answered",
+      status: "answered_no_evidence",
+      traceId: CREATED_RUN_ID,
+      answer: buildNoEvidenceAnswer(),
+      mode: "global",
+      sources: [],
+      relatedTerms: extractRelatedTerms({
+        question,
+        sourceExcerpts: [],
+      }),
+      metadata: {
+        mode: "global",
+        documentId: null,
+        topK: 6,
+        retrievalStrategy: "rerank",
+        candidateTopK: 18,
+        promptVersion: PROMPT_VERSION,
+        generationModel: GENERATION_MODEL,
+        embeddingModel: EMBEDDING_MODEL,
+        rerankerProvider: null,
+        rerankerModel: null,
+      },
+      audit: {
+        latencyMs: 245,
+        embedding: embeddingUsage,
+        reranking: null,
+        generation: null,
+        totalCostUsd: embeddingUsage.estimatedCostUsd,
+      },
+    });
+
+    expect(generationProvider.generateAnswer).not.toHaveBeenCalled();
+    expect(runsRepository.create).toHaveBeenCalledWith({
+      question,
+      answer: buildNoEvidenceAnswer(),
+      mode: "global",
+      documentId: null,
+      status: "answered_no_evidence",
+      errorCode: null,
+      topK: 6,
+      retrievalStrategy: "rerank",
+      candidateTopK: 18,
+      promptVersion: PROMPT_VERSION,
+      generationModel: GENERATION_MODEL,
+      embeddingModel: EMBEDDING_MODEL,
+      ...NULL_RERANK_PERSISTENCE,
+      latencyMs: 245,
+      embeddingInputTokens: embeddingUsage.inputTokens,
+      embeddingCostUsd: embeddingUsage.estimatedCostUsd,
+      generationInputTokens: null,
+      generationOutputTokens: null,
+      generationTotalTokens: null,
+      generationCostUsd: null,
+      totalCostUsd: embeddingUsage.estimatedCostUsd,
+      sources: [],
+      relatedTerms: extractRelatedTerms({
+        question,
+        sourceExcerpts: [],
+      }),
+    });
+  });
+
+  it("preserves rerank metadata and audit when generation still resolves to no evidence", async () => {
+    const embeddingUsage = buildEmbeddingUsage({
+      inputTokens: 20,
+      estimatedCostUsd: 0.0000026,
+    });
+    const generationUsage = buildGenerationUsage({
+      inputTokens: 132,
+      outputTokens: 18,
+      totalTokens: 150,
+      estimatedCostUsd: 0.000052,
+    });
+    const reranking = {
+      metadata: buildRerankingMetadata(),
+      audit: buildRerankingAudit({
+        latencyMs: 35,
+        candidatesEvaluated: 4,
+        inputTokens: 18,
+        estimatedCostUsd: 0.000024,
+      }),
+    };
+    const { service, runsRepository } = createService({
+      matches: [
+        buildMatch({
+          rerankScore: 0.93,
+        }),
+      ],
+      reranking,
+      embeddingUsage,
+      generationUsage,
+      answer: buildNoEvidenceAnswer(),
+    });
+    const question = "Existe evidência suficiente mesmo após reranquear?";
+    const expectedRelatedTerms = extractRelatedTerms({
+      question,
+      sourceExcerpts: [],
+    });
+
+    const result = await service.execute({
+      question,
+      mode: "global",
+      retrieval: {
+        topK: 6,
+        strategy: "rerank",
+      },
+    });
+
+    expect(result).toMatchObject({
+      kind: "answered",
+      status: "answered_no_evidence",
+      traceId: CREATED_RUN_ID,
+      answer: buildNoEvidenceAnswer(),
+      mode: "global",
+      sources: [],
+      relatedTerms: expectedRelatedTerms,
+      metadata: {
+        retrievalStrategy: "rerank",
+        candidateTopK: 18,
+        rerankerProvider: reranking.metadata.rerankerProvider,
+        rerankerModel: reranking.metadata.rerankerModel,
+      },
+      audit: {
+        embedding: embeddingUsage,
+        reranking: reranking.audit,
+        generation: generationUsage,
+        totalCostUsd:
+          embeddingUsage.estimatedCostUsd +
+          reranking.audit.estimatedCostUsd +
+          generationUsage.estimatedCostUsd,
+      },
+    });
+    expect(runsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "answered_no_evidence",
+        errorCode: null,
+        retrievalStrategy: "rerank",
+        rerankerProvider: reranking.metadata.rerankerProvider,
+        rerankerModel: reranking.metadata.rerankerModel,
+        rerankingLatencyMs: reranking.audit.latencyMs,
+        rerankingCandidatesEvaluated: reranking.audit.candidatesEvaluated,
+        rerankingInputTokens: reranking.audit.inputTokens,
+        rerankingCostUsd: reranking.audit.estimatedCostUsd,
+        generationInputTokens: generationUsage.inputTokens,
+        generationOutputTokens: generationUsage.outputTokens,
+        generationTotalTokens: generationUsage.totalTokens,
+        generationCostUsd: generationUsage.estimatedCostUsd,
+        sources: [],
+        relatedTerms: expectedRelatedTerms,
+      }),
+    );
+  });
+
+  it("persists a reranking_failed run and does not call generation", async () => {
+    const nowMs = createNowMs(187);
+    const embeddingUsage = buildEmbeddingUsage({
+      inputTokens: 12,
+      estimatedCostUsd: 0.00000156,
+    });
+    const retrievalError = new RerankingFailure(
+      "reranking_failed",
+      new Error("invalid rerank payload"),
+      embeddingUsage,
+    );
+    const { service, generationProvider, runsRepository } = createService({
+      retrievalError,
+      nowMs,
+    });
+    const question = "Quais abordagens falham no reranqueamento?";
+
+    await expect(
+      service.execute({
+        question,
+        mode: "global",
+        retrieval: {
+          topK: 6,
+          strategy: "rerank",
+        },
+      }),
+    ).resolves.toEqual({
+      kind: "error",
+      error: "reranking_failed",
+    });
+
+    expect(generationProvider.generateAnswer).not.toHaveBeenCalled();
+    expect(runsRepository.create).toHaveBeenCalledWith({
+      question,
+      answer: null,
+      mode: "global",
+      documentId: null,
+      status: "reranking_failed",
+      errorCode: "reranking_failed",
+      topK: 6,
+      retrievalStrategy: "rerank",
+      candidateTopK: 18,
+      promptVersion: PROMPT_VERSION,
+      generationModel: GENERATION_MODEL,
+      embeddingModel: EMBEDDING_MODEL,
+      ...NULL_RERANK_PERSISTENCE,
+      latencyMs: 187,
+      embeddingInputTokens: embeddingUsage.inputTokens,
+      embeddingCostUsd: embeddingUsage.estimatedCostUsd,
+      generationInputTokens: null,
+      generationOutputTokens: null,
+      generationTotalTokens: null,
+      generationCostUsd: null,
+      totalCostUsd: embeddingUsage.estimatedCostUsd,
+      sources: [],
+      relatedTerms: extractRelatedTerms({
+        question,
+        sourceExcerpts: [],
+      }),
+    });
+  });
+
+  it("persists a reranking_unavailable run and does not call generation", async () => {
+    const nowMs = createNowMs(187);
+    const embeddingUsage = buildEmbeddingUsage({
+      inputTokens: 12,
+      estimatedCostUsd: 0.00000156,
+    });
+    const retrievalError = new RerankingFailure(
+      "reranking_unavailable",
+      {
+        statusCode: 503,
+        message: "reranker unavailable",
+      },
+      embeddingUsage,
+    );
+    const { service, generationProvider, runsRepository } = createService({
+      retrievalError,
+      nowMs,
+    });
+    const question = "Quais abordagens ficam indisponíveis ao reranquear?";
+
+    await expect(
+      service.execute({
+        question,
+        mode: "global",
+        retrieval: {
+          topK: 6,
+          strategy: "rerank",
+        },
+      }),
+    ).resolves.toEqual({
+      kind: "error",
+      error: "reranking_unavailable",
+    });
+
+    expect(generationProvider.generateAnswer).not.toHaveBeenCalled();
+    expect(runsRepository.create).toHaveBeenCalledWith({
+      question,
+      answer: null,
+      mode: "global",
+      documentId: null,
+      status: "reranking_unavailable",
+      errorCode: "reranking_unavailable",
+      topK: 6,
+      retrievalStrategy: "rerank",
+      candidateTopK: 18,
+      promptVersion: PROMPT_VERSION,
+      generationModel: GENERATION_MODEL,
+      embeddingModel: EMBEDDING_MODEL,
+      ...NULL_RERANK_PERSISTENCE,
+      latencyMs: 187,
+      embeddingInputTokens: embeddingUsage.inputTokens,
+      embeddingCostUsd: embeddingUsage.estimatedCostUsd,
+      generationInputTokens: null,
+      generationOutputTokens: null,
+      generationTotalTokens: null,
+      generationCostUsd: null,
+      totalCostUsd: embeddingUsage.estimatedCostUsd,
+      sources: [],
+      relatedTerms: extractRelatedTerms({
+        question,
+        sourceExcerpts: [],
+      }),
+    });
   });
 
   it("returns answered_no_evidence with empty sources when generation says nothing is related to the base", async () => {
