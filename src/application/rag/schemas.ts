@@ -97,7 +97,17 @@ export type RagSource = z.infer<typeof ragSourceSchema>;
 
 export const ragRunSourceResponseSchema = z
   .object({
-    ...ragSourceShape,
+    sourceNumber: z.number().int().positive(),
+    chunkId: z.string().uuid(),
+    documentId: z.string().uuid(),
+    documentTitle: z.string().min(1),
+    chunkIndex: z.number().int().nonnegative(),
+    excerpt: z.string(),
+    retrievalScore: z.number(),
+    rerankScore: z.number().nullable(),
+    documentPipelineVersion: z.string().min(1),
+    chunkingVersion: z.string().min(1),
+    embeddingModel: z.string().min(1),
     citedInAnswer: z.boolean(),
   })
   .strip();
@@ -146,6 +156,17 @@ export const ragAnswerMetadataSchema = z
 
 export type RagAnswerMetadata = z.infer<typeof ragAnswerMetadataSchema>;
 
+export const ragRunMetadataResponseSchema = ragAnswerMetadataSchema
+  .extend({
+    rerankerProvider: z.string().min(1).nullable(),
+    rerankerModel: z.string().min(1).nullable(),
+  })
+  .strip();
+
+export type RagRunMetadataResponse = z.infer<
+  typeof ragRunMetadataResponseSchema
+>;
+
 export const embeddingUsageSchema = z
   .object({
     inputTokens: z.number().int().nonnegative(),
@@ -176,6 +197,27 @@ export const ragAnswerAuditSchema = z
   .strip();
 
 export type RagAnswerAudit = z.infer<typeof ragAnswerAuditSchema>;
+
+export const ragRerankingAuditResponseSchema = z
+  .object({
+    latencyMs: z.number().int().nonnegative(),
+    candidatesEvaluated: z.number().int().positive(),
+    inputTokens: z.number().int().nonnegative(),
+    estimatedCostUsd: z.number().nonnegative(),
+  })
+  .strip();
+
+export type RagRerankingAuditResponse = z.infer<
+  typeof ragRerankingAuditResponseSchema
+>;
+
+export const ragRunAuditResponseSchema = ragAnswerAuditSchema
+  .extend({
+    reranking: ragRerankingAuditResponseSchema.nullable(),
+  })
+  .strip();
+
+export type RagRunAuditResponse = z.infer<typeof ragRunAuditResponseSchema>;
 
 export const ragAnsweredResponseSchema = z
   .object({
@@ -253,8 +295,8 @@ export const ragQueryRunDetailResponseSchema = z
     errorCode: ragQueryRunErrorCodeSchema.nullable(),
     sources: z.array(ragRunSourceResponseSchema),
     relatedTerms: z.array(relatedTermSchema),
-    metadata: ragAnswerMetadataSchema,
-    audit: ragAnswerAuditSchema,
+    metadata: ragRunMetadataResponseSchema,
+    audit: ragRunAuditResponseSchema,
     createdAt: z.string().datetime({ offset: true }),
   })
   .strip();
