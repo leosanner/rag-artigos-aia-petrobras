@@ -51,11 +51,15 @@ export const ragQueryRunStatus = pgEnum("rag_query_run_status", [
   "answered_no_evidence",
   "generation_failed",
   "generation_unavailable",
+  "reranking_failed",
+  "reranking_unavailable",
 ]);
 
 export const ragQueryRunErrorCode = pgEnum("rag_query_run_error_code", [
   "generation_failed",
   "generation_unavailable",
+  "reranking_failed",
+  "reranking_unavailable",
 ]);
 
 export const ragConversationMessageRole = pgEnum(
@@ -299,12 +303,18 @@ export const ragQueryRuns = pgTable(
     errorCode: ragQueryRunErrorCode("error_code"),
     topK: integer("top_k").notNull(),
     retrievalStrategy: text("retrieval_strategy")
-      .$type<"standard" | "explore">()
+      .$type<"standard" | "explore" | "rerank">()
       .notNull(),
     candidateTopK: integer("candidate_top_k").notNull(),
     promptVersion: text("prompt_version").notNull(),
     generationModel: text("generation_model").notNull(),
     embeddingModel: text("embedding_model").notNull(),
+    rerankerProvider: text("reranker_provider"),
+    rerankerModel: text("reranker_model"),
+    rerankingLatencyMs: integer("reranking_latency_ms"),
+    rerankingCandidatesEvaluated: integer("reranking_candidates_evaluated"),
+    rerankingInputTokens: integer("reranking_input_tokens"),
+    rerankingCostUsd: doublePrecision("reranking_cost_usd"),
     latencyMs: integer("latency_ms").notNull(),
     embeddingInputTokens: integer("embedding_input_tokens").notNull(),
     embeddingCostUsd: doublePrecision("embedding_cost_usd").notNull(),
@@ -337,11 +347,27 @@ export const ragQueryRuns = pgTable(
     check("rag_query_runs_top_k_positive", sql`${table.topK} > 0`),
     check(
       "rag_query_runs_retrieval_strategy_valid",
-      sql`${table.retrievalStrategy} in ('standard', 'explore')`,
+      sql`${table.retrievalStrategy} in ('standard', 'explore', 'rerank')`,
     ),
     check(
       "rag_query_runs_candidate_top_k_positive",
       sql`${table.candidateTopK} > 0`,
+    ),
+    check(
+      "rag_query_runs_reranking_latency_ms_non_negative",
+      sql`${table.rerankingLatencyMs} is null or ${table.rerankingLatencyMs} >= 0`,
+    ),
+    check(
+      "rag_query_runs_reranking_candidates_evaluated_positive",
+      sql`${table.rerankingCandidatesEvaluated} is null or ${table.rerankingCandidatesEvaluated} > 0`,
+    ),
+    check(
+      "rag_query_runs_reranking_input_tokens_non_negative",
+      sql`${table.rerankingInputTokens} is null or ${table.rerankingInputTokens} >= 0`,
+    ),
+    check(
+      "rag_query_runs_reranking_cost_usd_non_negative",
+      sql`${table.rerankingCostUsd} is null or ${table.rerankingCostUsd} >= 0`,
     ),
     check(
       "rag_query_runs_latency_ms_non_negative",
@@ -392,17 +418,45 @@ export const ragQueryRuns = pgTable(
       `,
     ),
     check(
+      "rag_query_runs_reranking_metrics_all_or_none",
+      sql`
+        (
+          ${table.rerankerProvider} is null and
+          ${table.rerankerModel} is null and
+          ${table.rerankingLatencyMs} is null and
+          ${table.rerankingCandidatesEvaluated} is null and
+          ${table.rerankingInputTokens} is null and
+          ${table.rerankingCostUsd} is null
+        ) or (
+          ${table.rerankerProvider} is not null and
+          ${table.rerankerModel} is not null and
+          ${table.rerankingLatencyMs} is not null and
+          ${table.rerankingCandidatesEvaluated} is not null and
+          ${table.rerankingInputTokens} is not null and
+          ${table.rerankingCostUsd} is not null and
+          ${table.retrievalStrategy} = 'rerank' and
+          ${table.status} = 'answered'
+        )
+      `,
+    ),
+    check(
       "rag_query_runs_error_code_matches_status",
       sql`
         (
-          ${table.status} in ('answered', 'answered_no_evidence') and
+          (${table.status})::text in ('answered', 'answered_no_evidence') and
           ${table.errorCode} is null
         ) or (
-          ${table.status} = 'generation_failed' and
-          ${table.errorCode} = 'generation_failed'
+          (${table.status})::text = 'generation_failed' and
+          (${table.errorCode})::text = 'generation_failed'
         ) or (
-          ${table.status} = 'generation_unavailable' and
-          ${table.errorCode} = 'generation_unavailable'
+          (${table.status})::text = 'generation_unavailable' and
+          (${table.errorCode})::text = 'generation_unavailable'
+        ) or (
+          (${table.status})::text = 'reranking_failed' and
+          (${table.errorCode})::text = 'reranking_failed'
+        ) or (
+          (${table.status})::text = 'reranking_unavailable' and
+          (${table.errorCode})::text = 'reranking_unavailable'
         )
       `,
     ),
@@ -422,7 +476,8 @@ export const ragQueryRunSources = pgTable(
     documentTitle: text("document_title").notNull(),
     chunkIndex: integer("chunk_index").notNull(),
     excerpt: text("excerpt").notNull(),
-    score: doublePrecision("score").notNull(),
+    retrievalScore: doublePrecision("retrieval_score").notNull(),
+    rerankScore: doublePrecision("rerank_score"),
     documentPipelineVersion: text("document_pipeline_version").notNull(),
     chunkingVersion: text("chunking_version").notNull(),
     embeddingModel: text("embedding_model").notNull(),
