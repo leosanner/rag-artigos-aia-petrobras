@@ -6,7 +6,8 @@
 - Extend the shared retrieval request shape to accept
   `strategy?: "standard" | "explore" | "rerank"`.
 - Keep `standard` and `explore` intact while adding `rerank` as an explicit
-  operator-facing strategy on `POST /api/rag/ask` and `/query`.
+  operator-facing strategy on `POST /api/rag/ask` and the global single-turn
+  controls on `/query`.
 - Reuse the existing first-pass global vector search with
   `candidateTopK = min(24, topK * 3)` and add a second-pass reranking stage for
   `rerank`.
@@ -26,6 +27,8 @@
   the evolved retrieval contract.
 - Focused/document-scoped reranking; that remains F-07 after it rebases on the
   evolved retrieval contract.
+- Streaming-specific rerank transport or live rerank events; that remains
+  follow-up sync work on F-10 after the shared rerank contract lands.
 - Locking a concrete reranker vendor, SDK, or model in this documentation pass.
 - Learned diversification, agent planning, or multi-hop retrieval.
 
@@ -43,9 +46,37 @@ same product intent: `explore` is still the explicit broad-question path with
 deterministic diversification, while `rerank` is the explicit precision path
 with a second-pass relevance scorer.
 
-This feature updates the shared `/query` retrieval contract before F-06 and
-F-07 continue, so future conversation and focused-retrieval work builds on the
-same governed strategy vocabulary, trace model, and source audit fields.
+This feature defines the shared `/query` retrieval contract that future
+conversation and focused-retrieval work must build on, so later surfaces reuse
+the same governed strategy vocabulary, trace model, and source audit fields.
+
+F-06, F-07, and F-10 have since landed around this still-open retrieval
+contract, but F-08 itself remains scoped to the global single-turn path.
+Conversation, focused, and streaming surfaces must adopt the evolved rerank
+contract through explicit follow-up verification and spec sync rather than by
+widening the core F-08 scope.
+
+## Implementation Blocks
+
+This feature should now be implemented in the same small-block style used by
+F-01 through F-10. Read this overview first, then open only the block document
+needed for the current task:
+
+- [01 - Domain: Rerank Contract and Failures](01-domain-rerank-contract-and-failures.md):
+  pure retrieval-strategy vocabulary, split score types, reranking audit
+  types, and safe reranking failure rules.
+- [02 - Persistence: Rerank Traces and Source Scores](02-persistence-rerank-traces-and-source-scores.md):
+  Drizzle schema and repository contract changes for rerank-aware trace rows,
+  source snapshots, and legacy score preservation.
+- [03 - Application: Rerank Orchestration and Provider Boundary](03-application-rerank-orchestration-and-provider-boundary.md):
+  `RetrieveChunks`, `AnswerQuestion`, the new `RerankingProvider` port, and
+  rerank-aware metadata/audit assembly.
+- [04 - Interface: Ask, Query Runs, and Query Page](04-interface-ask-query-runs-and-query-page.md):
+  Zod request/response updates, ask/query-run handlers, and the global
+  single-turn rerank controls on the shared `/query` shell.
+- [05 - Integration and Review](05-integration-and-review.md):
+  end-to-end verification, follow-up hooks for F-06/F-07/F-10, doc sync, and
+  the required fresh-thread independent review packet.
 
 ## Business Rules
 
