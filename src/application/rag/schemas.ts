@@ -3,15 +3,12 @@ import { z } from "zod";
 import {
   EXPLORE_RETRIEVAL_MAX_CANDIDATES,
   FOCUSED_DOCUMENT_REJECTION_REASONS,
-  FocusedRagAskRequestSchema,
   RAG_QUERY_RUN_ERROR_CODES,
   RAG_QUERY_RUN_STATUSES,
   RAG_RETRIEVAL_MAX_TOP_K,
   RAG_RETRIEVAL_MIN_TOP_K,
-  RagRetrievalSettingsSchema,
   RagRetrievalStrategySchema,
   type FocusedDocumentRejectionReason,
-  type FocusedRagAskRequest,
   type RagSource as DomainRagSource,
   type RagQueryRunErrorCode as DomainRagQueryRunErrorCode,
   type RagQueryRunStatus as DomainRagQueryRunStatus,
@@ -22,7 +19,21 @@ import {
 
 const ragRetrievalStrategySchema = RagRetrievalStrategySchema;
 
-export const ragRetrievalInputSchema = RagRetrievalSettingsSchema;
+const publicRagRetrievalStrategySchema = z.enum(["standard", "explore"]);
+
+// Block 04 owns public rerank exposure. Keep request validation pinned here
+// even after the shared domain retrieval contract grows to include rerank.
+export const ragRetrievalInputSchema = z
+  .object({
+    topK: z
+      .number()
+      .int()
+      .min(RAG_RETRIEVAL_MIN_TOP_K)
+      .max(RAG_RETRIEVAL_MAX_TOP_K)
+      .optional(),
+    strategy: publicRagRetrievalStrategySchema.optional(),
+  })
+  .strict();
 
 export const globalRagAskInputSchema = z
   .object({
@@ -32,13 +43,22 @@ export const globalRagAskInputSchema = z
   })
   .strict();
 
+const focusedRagAskInputSchema = z
+  .object({
+    question: z.string().trim().min(1),
+    mode: z.literal("focused"),
+    documentId: z.string().uuid(),
+    retrieval: ragRetrievalInputSchema.optional(),
+  })
+  .strict();
+
 export const ragAskRequestSchema = z.discriminatedUnion("mode", [
   globalRagAskInputSchema,
-  FocusedRagAskRequestSchema,
+  focusedRagAskInputSchema,
 ]);
 
 export type RagAskRequest = z.infer<typeof ragAskRequestSchema>;
-export type FocusedRagAskInput = FocusedRagAskRequest;
+export type FocusedRagAskInput = z.infer<typeof focusedRagAskInputSchema>;
 
 export type GlobalRagAskInput = z.infer<typeof globalRagAskInputSchema>;
 export type AnswerQuestionConversationContext = {
@@ -50,7 +70,7 @@ type AnswerQuestionInputExtensions = {
 };
 export type GlobalAnswerQuestionInput = GlobalRagAskInput &
   AnswerQuestionInputExtensions;
-export type FocusedAnswerQuestionInput = FocusedRagAskRequest &
+export type FocusedAnswerQuestionInput = FocusedRagAskInput &
   AnswerQuestionInputExtensions;
 export type AnswerQuestionInput =
   | GlobalAnswerQuestionInput
