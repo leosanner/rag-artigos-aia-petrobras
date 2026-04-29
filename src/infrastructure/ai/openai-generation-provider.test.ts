@@ -139,6 +139,56 @@ describe("OpenAiGenerationProvider", () => {
     );
   });
 
+  it("treats rerank like the standard synthesis branch instead of adding explore instructions", async () => {
+    const model = { provider: "openai", modelId: GENERATION_MODEL };
+    const modelFactory = vi.fn().mockReturnValue(model);
+    const generateText = vi.fn().mockResolvedValue({
+      text: "Resposta reranqueada [1].",
+      usage: {
+        inputTokens: 92,
+        outputTokens: 23,
+        totalTokens: 115,
+        inputTokenDetails: {
+          cacheReadTokens: 0,
+        },
+      },
+    });
+    const provider = new OpenAiGenerationProvider({
+      defaultGenerationModel: GENERATION_MODEL,
+      modelFactory,
+      generateText,
+    });
+
+    await expect(
+      provider.generateAnswer({
+        question: "O que os documentos priorizam após reranqueamento?",
+        promptContext: "[1] Título: artigo.pdf\nChunk: 0\nTrecho:\nTexto",
+        promptVersion: PROMPT_VERSION,
+        generationModel: GENERATION_MODEL,
+        retrievalStrategy: "rerank",
+      }),
+    ).resolves.toEqual({
+      answer: "Resposta reranqueada [1].",
+      usage: {
+        inputTokens: 92,
+        outputTokens: 23,
+        totalTokens: 115,
+        estimatedCostUsd: 0.0000736,
+      },
+    });
+
+    expect(generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.not.stringContaining("2 a 4 perspectivas"),
+      }),
+    );
+    expect(generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.not.stringContaining("cite cada perspectiva"),
+      }),
+    );
+  });
+
   it("includes the optional conversation transcript in the generation prompt without replacing the latest question", async () => {
     const model = { provider: "openai", modelId: GENERATION_MODEL };
     const modelFactory = vi.fn().mockReturnValue(model);
@@ -276,6 +326,57 @@ describe("OpenAiGenerationProvider", () => {
       system: expect.stringContaining("Responda sempre em português do Brasil."),
       prompt: expect.stringContaining("Pergunta:\nO que os documentos dizem?"),
     });
+  });
+
+  it("streams rerank answers through the standard branch without explore instructions", async () => {
+    const model = { provider: "openai", modelId: GENERATION_MODEL };
+    const modelFactory = vi.fn().mockReturnValue(model);
+    const streamText = vi.fn().mockReturnValue({
+      textStream: streamChunks(["Resposta", " reranqueada", " [1]."]),
+      text: Promise.resolve("Resposta reranqueada [1]."),
+      usage: Promise.resolve({
+        inputTokens: 88,
+        outputTokens: 17,
+        totalTokens: 105,
+        inputTokenDetails: {
+          cacheReadTokens: 0,
+        },
+      }),
+    });
+    const provider = new OpenAiGenerationProvider({
+      defaultGenerationModel: GENERATION_MODEL,
+      modelFactory,
+      streamText,
+    });
+
+    await expect(
+      provider.streamAnswer({
+        question: "O que os documentos priorizam após reranqueamento?",
+        promptContext: "[1] Título: artigo.pdf\nChunk: 0\nTrecho:\nTexto",
+        promptVersion: PROMPT_VERSION,
+        generationModel: GENERATION_MODEL,
+        retrievalStrategy: "rerank",
+      }),
+    ).resolves.toEqual({
+      answer: "Resposta reranqueada [1].",
+      usage: {
+        inputTokens: 88,
+        outputTokens: 17,
+        totalTokens: 105,
+        estimatedCostUsd: 0.0000624,
+      },
+    });
+
+    expect(streamText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.not.stringContaining("2 a 4 perspectivas"),
+      }),
+    );
+    expect(streamText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.not.stringContaining("cite cada perspectiva"),
+      }),
+    );
   });
 
   it("rejects an empty streamed answer with a sanitized generation_failed error", async () => {
