@@ -985,390 +985,47 @@
 }
 
 /* =========================================================================
-   Audit aside — minimalist exception inside the neo-brutalist layout.
-   Hairlines, no offset shadows, no dark slabs, no colored accents.
-   The rest of the page keeps its brutalist character.
+   Audit aside — same brutalist language as the rest of the page.
    ========================================================================= */
 
 .auditAside {
-  --aside-rule: rgba(20, 19, 14, 0.10);
-  --aside-rule-strong: rgba(20, 19, 14, 0.22);
-  --aside-muted: #6a665b;
-  --aside-muted-soft: #8c887d;
-  --aside-amber: #c08410;
-  --aside-amber-soft: #fbeec7;
-  --aside-sage: #2f7d4f;
-  --aside-sage-soft: #dcecd9;
-  --aside-indigo: #2b4bff;
-  --aside-indigo-soft: #e2e6fa;
-  --aside-rose: #b8326b;
-
   position: sticky;
   top: 24px;
   display: grid;
+  gap: 20px;
+  padding: 22px;
+  border: var(--border);
+  background: var(--paper-deep);
+  animation: auditAsideIn 240ms ease-out both;
+}
+
+.auditAside .conversationAudit {
+  display: grid;
   gap: 18px;
-  padding: 20px;
-  border: 1px solid var(--aside-rule-strong);
-  border-radius: 10px;
-  background: #fbf9f3;
-  box-shadow: none;
-  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
-  animation: auditAsideIn 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .auditAsideHeader {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--aside-rule);
+  padding-bottom: 12px;
+  border-bottom: var(--border);
 }
 
 .auditAsideHeader .subHeadline {
-  display: none;
-}
-
-/* Hide the "trace :: <id>" meta on the first block — the title alone is enough. */
-.auditAside .metaBlockAccent .blockMeta {
-  display: none;
-}
-
-.auditAsideHeader .subHeadline {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
   margin: 0;
   font-family: var(--font-mono), monospace;
-  font-size: 0.66rem;
-  letter-spacing: 0.16em;
-  color: var(--aside-muted);
-  text-transform: uppercase;
-}
-
-.auditAsideHeader .subHeadline::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--aside-sage);
-  animation: pulse 2s ease-in-out infinite;
-}
-
-.auditAside .conversationAudit {
-  gap: 16px;
-}
-
-/* Sections become flat — no border, no shadow. Separated by hairlines. */
-.auditAside .resultBlock {
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  animation: none;
-}
-
-.auditAside .resultBlock + .resultBlock {
-  border-top: 1px solid var(--aside-rule);
-  padding-top: 14px;
-}
-
-/* Block headers: small mono caption on paper, no slab. */
-.auditAside .blockHeader,
-.auditAside .metaBlockAccent .blockHeader,
-.auditAside .termsBlockAccent .blockHeader,
-.auditAside .sourcesBlockAccent .blockHeader {
-  padding: 0 0 10px;
-  background: transparent;
-  color: var(--aside-muted);
-  border: none;
-  font-family: var(--font-mono), monospace;
-  font-size: 0.62rem;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-}
-
-.auditAside .blockIndex {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--ink);
-  letter-spacing: 0.16em;
-}
-
-.auditAside .blockIndex::before {
-  content: "";
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  background: var(--aside-muted);
-  border-radius: 2px;
-}
-
-/* Per-section accent dots in front of "[ NN ] ..." */
-.auditAside .metaBlockAccent .blockIndex::before {
-  background: var(--aside-amber);
-}
-
-.auditAside .termsBlockAccent .blockIndex::before {
-  background: var(--aside-sage);
-}
-
-.auditAside .sourcesBlockAccent .blockIndex::before {
-  background: var(--aside-indigo);
-}
-
-.auditAside .blockMeta {
-  color: var(--aside-muted-soft);
-  letter-spacing: 0.12em;
-}
-
-.auditAside .blockBody {
-  padding: 0;
-}
-
-/* Meta grid: hairline cells, no thick black borders. */
-.auditAside .metaBlockAccent {
-  background: transparent;
-}
-
-.auditAside .metaGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
-  border-top: 1px solid var(--aside-rule);
-  border-left: 1px solid var(--aside-rule);
-}
-
-.auditAside .metaItem {
-  padding: 8px 10px;
-  margin: 0;
-  border: none;
-  border-right: 1px solid var(--aside-rule);
-  border-bottom: 1px solid var(--aside-rule);
-  background: transparent;
-  display: grid;
-  gap: 2px;
-  font-family: var(--font-body), sans-serif;
-}
-
-.auditAside .metaKey {
-  font-family: var(--font-mono), monospace;
-  font-size: 0.58rem;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  color: var(--aside-muted-soft);
-  opacity: 1;
-  text-transform: uppercase;
-}
-
-.auditAside .metaValue {
-  font-family: var(--font-mono), monospace;
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--ink);
-}
-
-/* Subtle highlight on the "status / strategy" cells via key text. */
-.auditAside .metaItem:nth-child(3) .metaKey,
-.auditAside .metaItem:nth-child(3) .metaValue {
-  color: var(--aside-indigo);
-}
-
-/* Termos: clean list, no cards. */
-.auditAside .termList {
-  grid-template-columns: 1fr;
-  gap: 0;
-  border-top: 1px solid var(--aside-rule);
-}
-
-.auditAside .termCard {
-  display: grid;
-  gap: 2px;
-  padding: 8px 10px 10px;
-  border: none;
-  border-bottom: 1px solid var(--aside-rule);
-  background: transparent;
-  box-shadow: none;
-  position: relative;
-}
-
-.auditAside .termCard::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 12px;
-  bottom: 12px;
-  width: 2px;
-  background: var(--aside-sage);
-  border-radius: 2px;
-  opacity: 0.7;
-}
-
-.auditAside .termTitle {
-  font-family: var(--font-body), sans-serif;
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: var(--aside-sage);
-}
-
-.auditAside .termMeta {
-  font-family: var(--font-mono), monospace;
-  font-size: 0.66rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: none;
-  color: var(--aside-muted);
-  opacity: 1;
-}
-
-/* Fontes: editorial list. Lime tile is gone — italic serif numeral instead. */
-.auditAside .sourcesBlockAccent {
-  background: transparent;
-}
-
-.auditAside .sources {
-  display: grid;
-  gap: 0;
-  border-top: 1px solid var(--aside-rule);
-}
-
-.auditAside .sourceCard {
-  display: grid;
-  grid-template-columns: 28px 1fr;
-  gap: 12px;
-  padding: 12px 0;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--aside-rule);
-  box-shadow: none;
-  transition: background 160ms ease;
-}
-
-.auditAside .sourceCard:hover {
-  transform: none;
-  box-shadow: none;
-  background: rgba(20, 19, 14, 0.025);
-}
-
-.auditAside .sourceNumber {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: 50%;
-  background: var(--aside-indigo-soft);
-  font-family: var(--font-display), "Fraunces", serif;
-  font-style: italic;
-  font-weight: 600;
-  font-size: 0.95rem;
-  line-height: 1;
-  color: var(--aside-indigo);
-}
-
-.auditAside .sourceTitle {
-  margin: 0 0 6px;
-  font-family: var(--font-body), sans-serif;
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: var(--ink);
-  letter-spacing: -0.005em;
-}
-
-.auditAside .sourceExcerpt {
-  margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.55;
-  color: var(--aside-muted);
-  padding-left: 10px;
-  border-left: 2px solid var(--aside-rule-strong);
-  opacity: 1;
-}
-
-.auditAside .sourceMetaRow {
-  margin-top: 8px;
-  gap: 10px;
-}
-
-.auditAside .sourceActionRow {
-  margin-top: 10px;
-}
-
-.auditAside .sourceActionButton {
-  width: auto;
-  min-height: 0;
-  padding: 6px 10px;
-  border: 1px solid var(--aside-rule-strong);
-  border-radius: 999px;
-  background: transparent;
-  box-shadow: none;
-  color: var(--aside-indigo);
   font-size: 0.7rem;
-  letter-spacing: 0.05em;
-}
-
-.auditAside .sourceActionButton:hover {
-  transform: none;
-  box-shadow: none;
-  background: rgba(70, 82, 211, 0.08);
-}
-
-/* Source chips: tinted pills, color-coded. */
-.auditAside .sourceChip {
-  min-height: 0;
-  padding: 2px 8px;
-  border: none;
-  border-radius: 999px;
-  background: var(--aside-indigo-soft);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.66rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: none;
-  color: var(--aside-indigo);
-}
-
-.auditAside .sourceChip:nth-child(2) {
-  background: var(--aside-amber-soft);
-  color: var(--aside-amber);
-}
-
-.auditAside .sourceChip:nth-child(3) {
-  background: var(--aside-sage-soft);
-  color: var(--aside-sage);
-}
-
-/* Close button: ghost pill instead of brutalist tile. */
-.auditAside .auditToggle {
-  padding: 5px 10px;
-  border: 1px solid var(--aside-rule-strong);
-  border-radius: 999px;
-  background: transparent;
-  box-shadow: none;
-  font-family: var(--font-body), sans-serif;
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  text-transform: none;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
   color: var(--ink);
-}
-
-.auditAside .auditToggle:hover:not(:disabled) {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
-  transform: none;
-  box-shadow: none;
-}
-
-@media (max-width: 860px) {
-  .auditAside .metaGrid {
-    grid-template-columns: 1fr;
-  }
+  opacity: 0.8;
 }
 
 @keyframes auditAsideIn {
-  from { opacity: 0; transform: translateX(-12px); }
+  from { opacity: 0; transform: translateX(-8px); }
   to { opacity: 1; transform: translateX(0); }
 }
 

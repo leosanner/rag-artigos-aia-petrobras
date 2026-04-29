@@ -77,13 +77,11 @@ Padding interno padrão de cards: 18–24px. Gap padrão entre seções: 24–32
 
 - **Padrão único:** `2px solid var(--ink)`.
 - Empty/placeholder: `2px dashed var(--ink)`.
-- Hairlines (apenas em superfícies editoriais — ver §5 *Exceção `auditAside`*): `1px solid rgba(20,19,14,0.10–0.22)`.
 - **Proibido:** bordas > 2px no fluxo principal.
 
 ### 3.5 Raios
 
 - Padrão: `0` (cantos vivos — assinatura do brutalismo).
-- Pílulas (`999px`): permitidas **somente** dentro do `auditAside` para chips/ações ghost.
 - `2px` para indicadores decorativos (ex.: marcador `::before` de termo).
 
 ### 3.6 Sombras
@@ -211,22 +209,7 @@ Sempre traz: o que está vazio + por quê + ação opcional. Ex.: "Nenhuma fonte
 
 ---
 
-## 5. Exceção documentada — `auditAside`
-
-O painel lateral de auditoria em `/query` adota **linguagem editorial deliberada** que diverge do brutalismo:
-
-- Hairlines `1px rgba(ink, 0.10–0.22)` em vez de borda 2px ink.
-- Pílulas `border-radius: 999px` para chips e botões ghost.
-- Tipografia sans para metadados (em vez de mono uppercase) quando o conteúdo é narrativo (título de fonte, excerto).
-- Mono pequena, peso 500, para keys de meta-grid e captions.
-- Numeral itálico de fonte cita usa `Fraunces` em fundo `--aside-indigo-soft`.
-- Paleta complementar `--aside-amber / sage / indigo / rose` (variantes desaturadas) **só vive aqui**.
-
-**Quando aplicar essa exceção em outras telas:** painel/aside denso, dedicado a leitura/auditoria longa, em que o brutalismo do entorno geraria fadiga visual. Nunca em fluxo principal, nunca em ações primárias. Toda nova superfície que queira herdar essa linguagem deve referenciar esta seção.
-
----
-
-## 6. Layout e responsividade
+## 5. Layout e responsividade
 
 - Container central: `max-width: 1080px`, margem horizontal automática.
 - Grid principal: 1 coluna por padrão; vira 2 colunas (`auditAside` à esquerda, conteúdo à direita) quando há auditoria aberta, em viewports ≥ 1024px.
@@ -235,7 +218,7 @@ O painel lateral de auditoria em `/query` adota **linguagem editorial deliberada
 
 ---
 
-## 7. Não-fazer
+## 6. Não-fazer
 
 1. **Sem sombras offset** (`Npx Npx 0 0 ink`). Profundidade = borda + fundo.
 2. **Sem bordas > 2px** no fluxo principal. 3px e 4px ficam apenas em referências históricas (a serem migradas).
@@ -247,7 +230,7 @@ O painel lateral de auditoria em `/query` adota **linguagem editorial deliberada
 
 ---
 
-## 8. Histórico de aplicação
+## 7. Histórico de aplicação
 
 - Aplicação inicial em `/query`: ver entrada correspondente em [CHANGELOG.md](./CHANGELOG.md) quando concluída.
 - `/` (home), `/ingestion`, `/indexing`: pendentes — serão migrados em iterações próprias.
