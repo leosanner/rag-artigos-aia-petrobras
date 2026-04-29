@@ -3,9 +3,20 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_RAG_RETRIEVAL_SETTINGS,
   EXPLORE_RETRIEVAL_MAX_CANDIDATES,
+  RagRetrievalSettingsSchema,
+  RagRetrievalStrategySchema,
   getCandidateTopK,
   normalizeRetrievalSettings,
 } from "./retrieval-settings";
+
+describe("RagRetrievalStrategySchema", () => {
+  it("accepts the closed retrieval-strategy catalog including rerank", () => {
+    expect(RagRetrievalStrategySchema.safeParse("standard").success).toBe(true);
+    expect(RagRetrievalStrategySchema.safeParse("explore").success).toBe(true);
+    expect(RagRetrievalStrategySchema.safeParse("rerank").success).toBe(true);
+    expect(RagRetrievalStrategySchema.safeParse("auto").success).toBe(false);
+  });
+});
 
 describe("normalizeRetrievalSettings", () => {
   it("defaults omitted retrieval controls to the standard global RAG baseline", () => {
@@ -43,6 +54,29 @@ describe("normalizeRetrievalSettings", () => {
       strategy: "explore",
     });
   });
+
+  it("preserves rerank as an explicit retrieval strategy", () => {
+    expect(
+      normalizeRetrievalSettings({
+        topK: 8,
+        strategy: "rerank",
+      }),
+    ).toEqual({
+      topK: 8,
+      strategy: "rerank",
+    });
+  });
+});
+
+describe("RagRetrievalSettingsSchema", () => {
+  it("accepts rerank within the shared retrieval settings contract", () => {
+    const result = RagRetrievalSettingsSchema.safeParse({
+      topK: 6,
+      strategy: "rerank",
+    });
+
+    expect(result.success).toBe(true);
+  });
 });
 
 describe("getCandidateTopK", () => {
@@ -61,6 +95,14 @@ describe("getCandidateTopK", () => {
       EXPLORE_RETRIEVAL_MAX_CANDIDATES,
     );
     expect(getCandidateTopK({ topK: 12, strategy: "explore" })).toBe(
+      EXPLORE_RETRIEVAL_MAX_CANDIDATES,
+    );
+  });
+
+  it("applies the same bounded candidate expansion to rerank", () => {
+    expect(getCandidateTopK({ topK: 3, strategy: "rerank" })).toBe(9);
+    expect(getCandidateTopK({ topK: 6, strategy: "rerank" })).toBe(18);
+    expect(getCandidateTopK({ topK: 9, strategy: "rerank" })).toBe(
       EXPLORE_RETRIEVAL_MAX_CANDIDATES,
     );
   });

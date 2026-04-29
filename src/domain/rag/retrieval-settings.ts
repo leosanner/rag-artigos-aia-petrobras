@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export type RagRetrievalStrategy = "standard" | "explore";
+export type RagRetrievalStrategy = "standard" | "explore" | "rerank";
 
 export type RagRetrievalSettings = {
   topK: number;
@@ -15,7 +15,11 @@ export const RAG_RETRIEVAL_DEFAULT_TOP_K = 6;
 export const RAG_RETRIEVAL_DEFAULT_STRATEGY = "standard";
 export const EXPLORE_RETRIEVAL_MAX_CANDIDATES = 24;
 
-export const RagRetrievalStrategySchema = z.enum(["standard", "explore"]);
+export const RagRetrievalStrategySchema = z.enum([
+  "standard",
+  "explore",
+  "rerank",
+]);
 
 export const RagRetrievalSettingsSchema = z
   .object({
