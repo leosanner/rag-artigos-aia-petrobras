@@ -128,6 +128,34 @@ Files:
 - `.specs/project/STATE.md`
 - `.specs/project/CHANGELOG.md`
 
+## (unreleased) - docs(rag): split F-08 into implementation blocks
+
+Date: 2026-04-29
+
+Changed:
+
+- Expanded `.specs/features/F-08-reranked-retrieval/spec.md` with an
+  `Implementation Blocks` overview and clarified that F-08 remains scoped to
+  the global single-turn rerank path even though conversation, focused, and
+  streaming shells already exist around it.
+- Added F-08 Blocks 01-05 covering the domain rerank vocabulary and safe
+  failures, trace persistence and split score evidence, application
+  orchestration plus the `RerankingProvider` boundary, interface DTOs and
+  `/query` controls, and the closeout plus review workflow.
+- Kept the reranker provider abstract while locking the contract for
+  `retrievalScore`, nullable `rerankScore`, rerank-specific metadata or audit,
+  and follow-up hooks for F-06, F-07, and F-10 once the shared contract lands.
+
+Files:
+
+- `.specs/features/F-08-reranked-retrieval/spec.md`
+- `.specs/features/F-08-reranked-retrieval/01-domain-rerank-contract-and-failures.md`
+- `.specs/features/F-08-reranked-retrieval/02-persistence-rerank-traces-and-source-scores.md`
+- `.specs/features/F-08-reranked-retrieval/03-application-rerank-orchestration-and-provider-boundary.md`
+- `.specs/features/F-08-reranked-retrieval/04-interface-ask-query-runs-and-query-page.md`
+- `.specs/features/F-08-reranked-retrieval/05-integration-and-review.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - docs(rag): define the F-08 reranked retrieval contract
 
 Date: 2026-04-26
