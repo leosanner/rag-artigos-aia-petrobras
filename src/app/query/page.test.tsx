@@ -574,7 +574,7 @@ describe("/query page", () => {
     expect(screen.getByLabelText(/secret de consulta/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/base inteira/i)).toBeChecked();
     expect(screen.getByLabelText(/documento especifico/i)).not.toBeChecked();
-    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue(6);
+    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue("6");
     expect(screen.getByRole("button", { name: /consultar base/i })).toBeDisabled();
     expect(
       screen.getByRole("button", { name: /explorar perspectivas/i }),
@@ -643,7 +643,7 @@ describe("/query page", () => {
     ).toBeEnabled();
 
     clickGlobalMode();
-    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue(9);
+    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue("9");
     expect(
       screen.getByRole("button", { name: /consultar base/i }),
     ).toBeEnabled();
@@ -653,7 +653,7 @@ describe("/query page", () => {
     expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
       FOCUSED_DOCUMENT_ID,
     );
-    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue(9);
+    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue("9");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -1087,11 +1087,8 @@ describe("/query page", () => {
     render(<QueryPage />);
 
     expect(
-      await screen.findByText(
-        /envie uma pergunta para criar ou continuar uma conversa auditavel/i,
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText(/documento especifico/i)).toBeChecked();
+      await screen.findByLabelText(/documento especifico/i),
+    ).toBeChecked();
     expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
       SOURCE_HANDOFF_DOCUMENT_ID,
     );
@@ -1205,7 +1202,7 @@ describe("/query page", () => {
     expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
       SOURCE_HANDOFF_DOCUMENT_ID,
     );
-    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue(8);
+    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue("8");
     expect(screen.getByLabelText(/pergunta/i)).toHaveValue(
       "Agora quero aprofundar esse artigo.",
     );
@@ -1217,9 +1214,6 @@ describe("/query page", () => {
       `documentId=${SOURCE_HANDOFF_DOCUMENT_ID}`,
     );
     expect(screen.getByText(/conversa sem titulo/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/envie uma pergunta para criar ou continuar uma conversa auditavel/i),
-    ).toBeInTheDocument();
   });
 
   it("ignores repeated rapid clicks while a focused handoff is already starting", async () => {

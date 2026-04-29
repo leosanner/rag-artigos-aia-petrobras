@@ -1685,28 +1685,6 @@ export default function QueryPage() {
             </div>
           ) : null}
 
-          <div className={`${styles.field} ${styles.fieldControls}`}>
-            <label htmlFor="query-top-k" className={styles.label}>
-              <span>Fontes recuperadas</span>
-              <span className={styles.labelIndex}>[ 04 ]</span>
-            </label>
-            <div className={styles.controlRow}>
-              <input
-                id="query-top-k"
-                type="number"
-                min={RAG_RETRIEVAL_MIN_TOP_K}
-                max={RAG_RETRIEVAL_MAX_TOP_K}
-                step={1}
-                value={topK}
-                onChange={(event) => setTopK(readTopKInput(event.target.value))}
-                className={`${styles.input} ${styles.numberInput}`}
-              />
-              <span className={styles.rangeBadge}>
-                {RAG_RETRIEVAL_MIN_TOP_K}-{RAG_RETRIEVAL_MAX_TOP_K}
-              </span>
-            </div>
-          </div>
-
           <div className={styles.toolbarActions}>
             <button
               type="button"
@@ -1791,10 +1769,6 @@ export default function QueryPage() {
                 />
               ) : null}
             </ol>
-          ) : conversationState.status !== "loading" ? (
-            <p className={styles.emptyPanel}>
-              Envie uma pergunta para criar ou continuar uma conversa auditavel.
-            </p>
           ) : null}
 
 
@@ -1839,7 +1813,40 @@ export default function QueryPage() {
                 />
               </div>
 
-              <div className={styles.composerActions}>
+              <div className={styles.composerFooter}>
+                <label htmlFor="query-top-k" className={styles.composerTopK}>
+                  <span className={styles.composerTopKLabel}>
+                    Fontes recuperadas
+                  </span>
+                  <span className={styles.composerTopKSelectWrap}>
+                    <select
+                      id="query-top-k"
+                      value={topK}
+                      onChange={(event) =>
+                        setTopK(readTopKInput(event.target.value))
+                      }
+                      className={styles.composerTopKSelect}
+                    >
+                      {Array.from(
+                        {
+                          length:
+                            RAG_RETRIEVAL_MAX_TOP_K -
+                            RAG_RETRIEVAL_MIN_TOP_K +
+                            1,
+                        },
+                        (_, index) => RAG_RETRIEVAL_MIN_TOP_K + index,
+                      ).map((value) => (
+                        <option key={value} value={value}>
+                          {String(value).padStart(2, "0")}
+                        </option>
+                      ))}
+                    </select>
+                    <span aria-hidden className={styles.composerTopKChevron}>
+                      ▾
+                    </span>
+                  </span>
+                </label>
+                <div className={styles.composerActions}>
                 <button
                   type="submit"
                   disabled={!canSubmit}
@@ -1861,6 +1868,7 @@ export default function QueryPage() {
                 >
                   {exploreButtonLabel}
                 </button>
+                </div>
               </div>
             </form>
           </div>
