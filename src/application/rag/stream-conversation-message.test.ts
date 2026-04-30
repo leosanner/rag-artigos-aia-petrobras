@@ -29,6 +29,24 @@ function buildSource(overrides: Partial<RagSource> = {}): RagSource {
   };
 }
 
+function buildAnsweredSource() {
+  const source = buildSource();
+
+  return {
+    sourceNumber: source.sourceNumber,
+    chunkId: source.chunkId,
+    documentId: source.documentId,
+    documentTitle: source.documentTitle,
+    chunkIndex: source.chunkIndex,
+    excerpt: source.excerpt,
+    retrievalScore: source.score,
+    rerankScore: null,
+    documentPipelineVersion: source.documentPipelineVersion,
+    chunkingVersion: source.chunkingVersion,
+    embeddingModel: source.embeddingModel,
+  };
+}
+
 function buildAnsweredResult(
   overrides: Partial<
     Extract<AnswerQuestionResult, { kind: "answered" }>
@@ -40,7 +58,7 @@ function buildAnsweredResult(
     traceId: TRACE_ID,
     answer: "Resposta em stream [1].",
     mode: "global",
-    sources: [buildSource()],
+    sources: [buildAnsweredSource()],
     relatedTerms: [],
     metadata: {
       mode: "global",
@@ -123,8 +141,7 @@ function createService(overrides: {
                 errorCode: null,
                 sources: [
                   {
-                    ...buildSource(),
-                    retrievalScore: buildSource().score,
+                    ...buildAnsweredSource(),
                     rerankScore: null,
                     citedInAnswer: true,
                   },
