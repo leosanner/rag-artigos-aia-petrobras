@@ -11,6 +11,8 @@ import {
   ragGenerationFailedResponseSchema,
   ragGenerationUnavailableResponseSchema,
   ragInvalidRequestResponseSchema,
+  ragRerankingFailedResponseSchema,
+  ragRerankingUnavailableResponseSchema,
   ragTechnicalErrorResponseSchema,
   ragUnauthorizedResponseSchema,
 } from "@/application/rag/schemas";
@@ -78,6 +80,14 @@ export function createRagAskHandler(deps: RagAskHandlerDeps) {
 
       if (result.error === "generation_unavailable") {
         return generationUnavailableResponse();
+      }
+
+      if (result.error === "reranking_failed") {
+        return rerankingFailedResponse();
+      }
+
+      if (result.error === "reranking_unavailable") {
+        return rerankingUnavailableResponse();
       }
     }
 
@@ -151,6 +161,28 @@ function generationFailedResponse(): Response {
 function generationUnavailableResponse(): Response {
   const body = ragGenerationUnavailableResponseSchema.parse({
     error: "generation_unavailable",
+  });
+
+  return NextResponse.json(body, {
+    status: 503,
+    headers: NO_STORE_HEADERS,
+  });
+}
+
+function rerankingFailedResponse(): Response {
+  const body = ragRerankingFailedResponseSchema.parse({
+    error: "reranking_failed",
+  });
+
+  return NextResponse.json(body, {
+    status: 502,
+    headers: NO_STORE_HEADERS,
+  });
+}
+
+function rerankingUnavailableResponse(): Response {
+  const body = ragRerankingUnavailableResponseSchema.parse({
+    error: "reranking_unavailable",
   });
 
   return NextResponse.json(body, {

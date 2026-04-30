@@ -29,7 +29,8 @@ function buildAnsweredResult(
         documentTitle: "artigo.pdf",
         chunkIndex: 0,
         excerpt: "Trecho completo do chunk recuperado para a resposta.",
-        score: 0.91,
+        retrievalScore: 0.91,
+        rerankScore: null,
         documentPipelineVersion: "documents-v1",
         chunkingVersion: "hybrid-v1-900-150",
         embeddingModel: "text-embedding-3-large",
@@ -130,7 +131,8 @@ describe("POST /api/rag/ask handler", () => {
           documentTitle: "artigo.pdf",
           chunkIndex: 0,
           excerpt: "Trecho completo do chunk recuperado para a resposta.",
-          score: 0.91,
+          retrievalScore: 0.91,
+          rerankScore: null,
           documentPipelineVersion: "documents-v1",
           chunkingVersion: "hybrid-v1-900-150",
           embeddingModel: "text-embedding-3-large",
@@ -154,6 +156,8 @@ describe("POST /api/rag/ask handler", () => {
         promptVersion: "f04-global-rag-v1",
         generationModel: "gpt-4.1-mini",
         embeddingModel: "text-embedding-3-large",
+        rerankerProvider: null,
+        rerankerModel: null,
       },
       audit: {
         latencyMs: 123,
@@ -161,6 +165,7 @@ describe("POST /api/rag/ask handler", () => {
           inputTokens: 11,
           estimatedCostUsd: 0.00000143,
         },
+        reranking: null,
         generation: {
           inputTokens: 42,
           outputTokens: 16,
@@ -173,6 +178,112 @@ describe("POST /api/rag/ask handler", () => {
     expect(answerQuestion.execute).toHaveBeenCalledWith({
       question: QUESTION,
       mode: "global",
+    });
+  });
+
+  it("returns rerank-aware metadata, audit, and split scores for a reranked global ask", async () => {
+    const answerQuestion = buildAnswerQuestion(
+      buildAnsweredResult({
+        sources: [
+          {
+            sourceNumber: 1,
+            chunkId: CHUNK_ID,
+            documentId: DOCUMENT_ID,
+            documentTitle: "artigo.pdf",
+            chunkIndex: 0,
+            excerpt: "Trecho completo do chunk recuperado para a resposta.",
+            retrievalScore: 0.91,
+            rerankScore: 0.83,
+            documentPipelineVersion: "documents-v1",
+            chunkingVersion: "hybrid-v1-900-150",
+            embeddingModel: "text-embedding-3-large",
+          },
+        ],
+        metadata: {
+          mode: "global",
+          documentId: null,
+          topK: 6,
+          retrievalStrategy: "rerank",
+          candidateTopK: 18,
+          promptVersion: "f08-rerank-v1",
+          generationModel: "gpt-4.1-mini",
+          embeddingModel: "text-embedding-3-large",
+          rerankerProvider: "test-reranker",
+          rerankerModel: "rerank-v1",
+        },
+        audit: {
+          latencyMs: 123,
+          embedding: {
+            inputTokens: 11,
+            estimatedCostUsd: 0.00000143,
+          },
+          reranking: {
+            latencyMs: 41,
+            candidatesEvaluated: 6,
+            inputTokens: 22,
+            estimatedCostUsd: 0.000031,
+          },
+          generation: {
+            inputTokens: 42,
+            outputTokens: 16,
+            totalTokens: 58,
+            estimatedCostUsd: 0.0000192,
+          },
+          totalCostUsd: 0.00005163,
+        },
+      }),
+    );
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      post(
+        {
+          question: `  ${QUESTION}  `,
+          mode: "global",
+          retrieval: {
+            topK: 6,
+            strategy: "rerank",
+          },
+        },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(
+      expect.objectContaining({
+        sources: [
+          expect.objectContaining({
+            retrievalScore: 0.91,
+            rerankScore: 0.83,
+          }),
+        ],
+        metadata: expect.objectContaining({
+          retrievalStrategy: "rerank",
+          candidateTopK: 18,
+          rerankerProvider: "test-reranker",
+          rerankerModel: "rerank-v1",
+        }),
+        audit: expect.objectContaining({
+          reranking: {
+            latencyMs: 41,
+            candidatesEvaluated: 6,
+            inputTokens: 22,
+            estimatedCostUsd: 0.000031,
+          },
+        }),
+      }),
+    );
+    expect(answerQuestion.execute).toHaveBeenCalledWith({
+      question: QUESTION,
+      mode: "global",
+      retrieval: {
+        topK: 6,
+        strategy: "rerank",
+      },
     });
   });
 
@@ -486,6 +597,54 @@ describe("POST /api/rag/ask handler", () => {
     expect(response.status).toBe(503);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(await response.json()).toEqual({ error: "generation_unavailable" });
+    expect(body).not.toHaveProperty("sources");
+  });
+
+  it("maps reranking_failed to 502 without exposing sources", async () => {
+    const answerQuestion = buildAnswerQuestion({
+      kind: "error",
+      error: "reranking_failed",
+    });
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      post(
+        { question: QUESTION, mode: "global" },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+    );
+    const body = JSON.parse(await response.clone().text()) as Record<string, unknown>;
+
+    expect(response.status).toBe(502);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toEqual({ error: "reranking_failed" });
+    expect(body).not.toHaveProperty("sources");
+  });
+
+  it("maps reranking_unavailable to 503 without exposing sources", async () => {
+    const answerQuestion = buildAnswerQuestion({
+      kind: "error",
+      error: "reranking_unavailable",
+    });
+    const handler = createRagAskHandler({
+      answerQuestion,
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      post(
+        { question: QUESTION, mode: "global" },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+    );
+    const body = JSON.parse(await response.clone().text()) as Record<string, unknown>;
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toEqual({ error: "reranking_unavailable" });
     expect(body).not.toHaveProperty("sources");
   });
 
