@@ -35,6 +35,7 @@ import type {
   AnswerQuestionInput,
   AnswerQuestionMetadata,
   AnswerQuestionResult,
+  RagSource as PublicRagSource,
   RelatedTerm,
 } from "./schemas";
 import { answerQuestionResultSchema } from "./schemas";
@@ -238,8 +239,11 @@ export class AnswerQuestion {
       });
     }
 
-    const publicMatches = matches.map(toPublicRetrievedChunkMatch);
-    const { sources, promptContext } = assembleRagContext(publicMatches);
+    const streamingMatches = matches.map(toStreamingRetrievedChunkMatch);
+    const { sources, promptContext } = assembleRagContext(streamingMatches);
+    const publicSources = matches.map((match, index) =>
+      toPublicSource(match, index + 1),
+    );
     const relatedTerms = extractRelatedTerms({
       question: input.question,
       sourceExcerpts: matches.map((match) => match.excerpt),
@@ -384,15 +388,15 @@ export class AnswerQuestion {
     );
 
     return answerQuestionResultSchema.parse({
-      kind: "answered",
-      status: "answered",
-      traceId: persisted.id,
-      answer,
-      mode,
-      sources,
-      relatedTerms,
-      metadata,
-      audit,
+        kind: "answered",
+        status: "answered",
+        traceId: persisted.id,
+        answer,
+        mode,
+        sources: publicSources,
+        relatedTerms,
+        metadata,
+        audit,
     });
   }
 
@@ -528,7 +532,7 @@ export class AnswerQuestion {
   }
 }
 
-function toPublicRetrievedChunkMatch(
+function toStreamingRetrievedChunkMatch(
   match: RerankedChunkMatch,
 ): RetrievedChunkMatch {
   return {
@@ -538,6 +542,25 @@ function toPublicRetrievedChunkMatch(
     chunkIndex: match.chunkIndex,
     excerpt: match.excerpt,
     score: match.retrievalScore,
+    documentPipelineVersion: match.documentPipelineVersion,
+    chunkingVersion: match.chunkingVersion,
+    embeddingModel: match.embeddingModel,
+  };
+}
+
+function toPublicSource(
+  match: RerankedChunkMatch,
+  sourceNumber: number,
+): PublicRagSource {
+  return {
+    sourceNumber,
+    chunkId: match.chunkId,
+    documentId: match.documentId,
+    documentTitle: match.documentTitle,
+    chunkIndex: match.chunkIndex,
+    excerpt: match.excerpt,
+    retrievalScore: match.retrievalScore,
+    rerankScore: match.rerankScore,
     documentPipelineVersion: match.documentPipelineVersion,
     chunkingVersion: match.chunkingVersion,
     embeddingModel: match.embeddingModel,
