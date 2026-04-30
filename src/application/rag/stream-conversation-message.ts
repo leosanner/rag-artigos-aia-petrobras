@@ -9,7 +9,10 @@ import type { ConversationRepository } from "@/repositories/conversation-reposit
 import type { AnswerQuestion, AnswerQuestionStreamCallbacks } from "./answer-question";
 import type { ConversationMessageResponse } from "./conversation-types";
 import { toConversationMessageResponse } from "./conversation-types";
-import type { FocusedRagAskInput, GlobalRagAskInput } from "./schemas";
+import type {
+  ConversationRagRetrievalInput,
+  FocusedRagAskInput,
+} from "./schemas";
 import type {
   StreamConversationMessageListener,
   StreamConversationErrorStatus,
@@ -18,7 +21,7 @@ import type {
 type StreamConversationMessageInputBase = {
   conversationId: string;
   userMessageContent: string;
-  retrievalSettings?: GlobalRagAskInput["retrieval"];
+  retrievalSettings?: ConversationRagRetrievalInput;
   requestTraceId?: string;
 };
 
