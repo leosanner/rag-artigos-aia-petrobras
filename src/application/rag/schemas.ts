@@ -20,10 +20,17 @@ import {
 
 const ragRetrievalStrategySchema = RagRetrievalStrategySchema;
 
-const publicRagRetrievalStrategySchema = z.enum(["standard", "explore"]);
+const publicAskRetrievalStrategySchema = z.enum([
+  "standard",
+  "explore",
+  "rerank",
+]);
 
-// Block 04 owns public rerank exposure. Keep request validation pinned here
-// even after the shared domain retrieval contract grows to include rerank.
+const publicConversationRetrievalStrategySchema = z.enum([
+  "standard",
+  "explore",
+]);
+
 export const ragRetrievalInputSchema = z
   .object({
     topK: z
@@ -32,9 +39,25 @@ export const ragRetrievalInputSchema = z
       .min(RAG_RETRIEVAL_MIN_TOP_K)
       .max(RAG_RETRIEVAL_MAX_TOP_K)
       .optional(),
-    strategy: publicRagRetrievalStrategySchema.optional(),
+    strategy: publicAskRetrievalStrategySchema.optional(),
   })
   .strict();
+
+export const conversationRagRetrievalInputSchema = z
+  .object({
+    topK: z
+      .number()
+      .int()
+      .min(RAG_RETRIEVAL_MIN_TOP_K)
+      .max(RAG_RETRIEVAL_MAX_TOP_K)
+      .optional(),
+    strategy: publicConversationRetrievalStrategySchema.optional(),
+  })
+  .strict();
+
+export type ConversationRagRetrievalInput = z.infer<
+  typeof conversationRagRetrievalInputSchema
+>;
 
 export const globalRagAskInputSchema = z
   .object({
@@ -49,7 +72,7 @@ const focusedRagAskInputSchema = z
     question: z.string().trim().min(1),
     mode: z.literal("focused"),
     documentId: z.string().uuid(),
-    retrieval: ragRetrievalInputSchema.optional(),
+    retrieval: conversationRagRetrievalInputSchema.optional(),
   })
   .strict();
 
@@ -78,13 +101,31 @@ export type FocusedAnswerQuestionInput = {
   question: string;
   mode: "focused";
   documentId: string;
-  retrieval?: RagRetrievalInput;
+  retrieval?: z.infer<typeof conversationRagRetrievalInputSchema>;
 } & AnswerQuestionInputExtensions;
 export type AnswerQuestionInput =
   | GlobalAnswerQuestionInput
   | FocusedAnswerQuestionInput;
 
-const ragSourceShape = {
+const ragAskSourceShape = {
+  sourceNumber: z.number().int().positive(),
+  chunkId: z.string().uuid(),
+  documentId: z.string().uuid(),
+  documentTitle: z.string().min(1),
+  chunkIndex: z.number().int().nonnegative(),
+  excerpt: z.string(),
+  retrievalScore: z.number(),
+  rerankScore: z.number().nullable(),
+  documentPipelineVersion: z.string().min(1),
+  chunkingVersion: z.string().min(1),
+  embeddingModel: z.string().min(1),
+} satisfies z.ZodRawShape;
+
+export const ragSourceSchema = z.object(ragAskSourceShape).strip();
+
+export type RagSource = z.infer<typeof ragSourceSchema>;
+
+const ragStreamSourceShape = {
   sourceNumber: z.number().int().positive(),
   chunkId: z.string().uuid(),
   documentId: z.string().uuid(),
@@ -97,25 +138,14 @@ const ragSourceShape = {
   embeddingModel: z.string().min(1),
 } satisfies z.ZodRawShape;
 
-export const ragSourceSchema: z.ZodType<DomainRagSource> = z
-  .object(ragSourceShape)
+export const ragStreamSourceSchema: z.ZodType<DomainRagSource> = z
+  .object(ragStreamSourceShape)
   .strip();
 
-export type RagSource = z.infer<typeof ragSourceSchema>;
+export type RagStreamSource = z.infer<typeof ragStreamSourceSchema>;
 
-export const ragRunSourceResponseSchema = z
-  .object({
-    sourceNumber: z.number().int().positive(),
-    chunkId: z.string().uuid(),
-    documentId: z.string().uuid(),
-    documentTitle: z.string().min(1),
-    chunkIndex: z.number().int().nonnegative(),
-    excerpt: z.string(),
-    retrievalScore: z.number(),
-    rerankScore: z.number().nullable(),
-    documentPipelineVersion: z.string().min(1),
-    chunkingVersion: z.string().min(1),
-    embeddingModel: z.string().min(1),
+export const ragRunSourceResponseSchema = ragSourceSchema
+  .extend({
     citedInAnswer: z.boolean(),
   })
   .strip();
@@ -159,17 +189,14 @@ export const ragAnswerMetadataSchema = z
     promptVersion: z.string().min(1),
     generationModel: z.string().min(1),
     embeddingModel: z.string().min(1),
+    rerankerProvider: z.string().min(1).nullable(),
+    rerankerModel: z.string().min(1).nullable(),
   })
   .strip();
 
 export type RagAnswerMetadata = z.infer<typeof ragAnswerMetadataSchema>;
 
-export const ragRunMetadataResponseSchema = ragAnswerMetadataSchema
-  .extend({
-    rerankerProvider: z.string().min(1).nullable(),
-    rerankerModel: z.string().min(1).nullable(),
-  })
-  .strip();
+export const ragRunMetadataResponseSchema = ragAnswerMetadataSchema;
 
 export type RagRunMetadataResponse = z.infer<
   typeof ragRunMetadataResponseSchema
@@ -201,17 +228,6 @@ export const generationUsageSchema = z
 
 export type GenerationUsage = z.infer<typeof generationUsageSchema>;
 
-export const ragAnswerAuditSchema = z
-  .object({
-    latencyMs: z.number().int().nonnegative(),
-    embedding: embeddingUsageSchema,
-    generation: generationUsageSchema.nullable(),
-    totalCostUsd: z.number().nonnegative(),
-  })
-  .strip();
-
-export type RagAnswerAudit = z.infer<typeof ragAnswerAuditSchema>;
-
 export const ragRerankingAuditResponseSchema = z
   .object({
     latencyMs: z.number().int().nonnegative(),
@@ -225,11 +241,19 @@ export type RagRerankingAuditResponse = z.infer<
   typeof ragRerankingAuditResponseSchema
 >;
 
-export const ragRunAuditResponseSchema = ragAnswerAuditSchema
-  .extend({
+export const ragAnswerAuditSchema = z
+  .object({
+    latencyMs: z.number().int().nonnegative(),
+    embedding: embeddingUsageSchema,
     reranking: ragRerankingAuditResponseSchema.nullable(),
+    generation: generationUsageSchema.nullable(),
+    totalCostUsd: z.number().nonnegative(),
   })
   .strip();
+
+export type RagAnswerAudit = z.infer<typeof ragAnswerAuditSchema>;
+
+export const ragRunAuditResponseSchema = ragAnswerAuditSchema;
 
 export type RagRunAuditResponse = z.infer<typeof ragRunAuditResponseSchema>;
 
@@ -363,7 +387,7 @@ export type ConversationDetailResponse = z.infer<
 export const appendConversationMessageGlobalRequestSchema = z
   .object({
     content: z.string().trim().min(1),
-    retrievalSettings: ragRetrievalInputSchema.optional(),
+    retrievalSettings: conversationRagRetrievalInputSchema.optional(),
     mode: z.literal("global").optional(),
   })
   .strict();
@@ -371,7 +395,7 @@ export const appendConversationMessageGlobalRequestSchema = z
 export const appendConversationMessageFocusedRequestSchema = z
   .object({
     content: z.string().trim().min(1),
-    retrievalSettings: ragRetrievalInputSchema.optional(),
+    retrievalSettings: conversationRagRetrievalInputSchema.optional(),
     mode: z.literal("focused"),
     documentId: z.string().uuid(),
   })
@@ -458,7 +482,7 @@ export const ragConversationStreamPhaseEventSchema = z
 export const ragConversationStreamSourceEventSchema = z
   .object({
     type: z.literal("source"),
-    source: ragSourceSchema,
+    source: ragStreamSourceSchema,
   })
   .strip();
 
@@ -596,6 +620,18 @@ export const ragGenerationUnavailableResponseSchema = z
   })
   .strip();
 
+export const ragRerankingFailedResponseSchema = z
+  .object({
+    error: z.literal("reranking_failed"),
+  })
+  .strip();
+
+export const ragRerankingUnavailableResponseSchema = z
+  .object({
+    error: z.literal("reranking_unavailable"),
+  })
+  .strip();
+
 export const ragTechnicalErrorResponseSchema = z
   .object({
     error: z.literal("technical_error"),
@@ -612,6 +648,14 @@ export type RagGenerationFailedResponse = z.infer<
 
 export type RagGenerationUnavailableResponse = z.infer<
   typeof ragGenerationUnavailableResponseSchema
+>;
+
+export type RagRerankingFailedResponse = z.infer<
+  typeof ragRerankingFailedResponseSchema
+>;
+
+export type RagRerankingUnavailableResponse = z.infer<
+  typeof ragRerankingUnavailableResponseSchema
 >;
 
 export type RagTechnicalErrorResponse = z.infer<

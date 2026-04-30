@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  appendConversationMessageRequestSchema,
   answerQuestionResultSchema,
   ragAskRequestSchema,
   ragAskSuccessResponseSchema,
 } from "./schemas";
 
 describe("ragAskRequestSchema", () => {
-  it("keeps rerank unavailable on the public global ask surface until Block 04", () => {
+  it("accepts rerank on the public global ask surface", () => {
     const result = ragAskRequestSchema.safeParse({
       question: "Quais tecnicas aparecem com mais frequencia?",
       mode: "global",
@@ -17,10 +18,10 @@ describe("ragAskRequestSchema", () => {
       },
     });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
-  it("keeps rerank unavailable on the public focused ask surface until Block 04", () => {
+  it("keeps rerank unavailable on the public focused ask surface", () => {
     const result = ragAskRequestSchema.safeParse({
       question: "Quais tecnicas aparecem com mais frequencia?",
       mode: "focused",
@@ -34,7 +35,19 @@ describe("ragAskRequestSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts rerank-only metadata on the internal answer result while stripping it from the public ask payload", () => {
+  it("keeps rerank unavailable on the public conversation request surface", () => {
+    const result = appendConversationMessageRequestSchema.safeParse({
+      content: "Quais tecnicas aparecem com mais frequencia?",
+      retrievalSettings: {
+        topK: 6,
+        strategy: "rerank",
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("keeps split scores and rerank audit visible on the public ask payload", () => {
     const internalResult = answerQuestionResultSchema.parse({
       kind: "answered",
       status: "answered",
@@ -49,7 +62,8 @@ describe("ragAskRequestSchema", () => {
           documentTitle: "artigo.pdf",
           chunkIndex: 0,
           excerpt: "Trecho recuperado.",
-          score: 0.91,
+          retrievalScore: 0.91,
+          rerankScore: 0.84,
           documentPipelineVersion: "documents-v1",
           chunkingVersion: "hybrid-v1-900-150",
           embeddingModel: "text-embedding-3-large",
@@ -125,7 +139,8 @@ describe("ragAskRequestSchema", () => {
           documentTitle: "artigo.pdf",
           chunkIndex: 0,
           excerpt: "Trecho recuperado.",
-          score: 0.91,
+          retrievalScore: 0.91,
+          rerankScore: 0.84,
           documentPipelineVersion: "documents-v1",
           chunkingVersion: "hybrid-v1-900-150",
           embeddingModel: "text-embedding-3-large",
@@ -149,12 +164,20 @@ describe("ragAskRequestSchema", () => {
         promptVersion: "f08-rerank-v1",
         generationModel: "gpt-4.1-mini",
         embeddingModel: "text-embedding-3-large",
+        rerankerProvider: "test-reranker",
+        rerankerModel: "rerank-v1",
       },
       audit: {
         latencyMs: 123,
         embedding: {
           inputTokens: 11,
           estimatedCostUsd: 0.00000143,
+        },
+        reranking: {
+          latencyMs: 41,
+          candidatesEvaluated: 6,
+          inputTokens: 22,
+          estimatedCostUsd: 0.000031,
         },
         generation: {
           inputTokens: 42,
