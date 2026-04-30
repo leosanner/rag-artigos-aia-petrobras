@@ -32,7 +32,8 @@ const SUCCESS_RESPONSE = {
       documentTitle: "artigo-a.pdf",
       chunkIndex: 0,
       excerpt: LONG_EXCERPT,
-      score: 0.91,
+      retrievalScore: 0.91,
+      rerankScore: null,
       documentPipelineVersion: "documents-v1",
       chunkingVersion: "hybrid-v1-900-150",
       embeddingModel: "text-embedding-3-large",
@@ -44,7 +45,8 @@ const SUCCESS_RESPONSE = {
       documentTitle: "artigo-b.pdf",
       chunkIndex: 1,
       excerpt: "Trecho curto.",
-      score: 0.87,
+      retrievalScore: 0.87,
+      rerankScore: null,
       documentPipelineVersion: "documents-v1",
       chunkingVersion: "hybrid-v1-900-150",
       embeddingModel: "text-embedding-3-large",
@@ -75,6 +77,8 @@ const SUCCESS_RESPONSE = {
     promptVersion: "f05-audit-v1",
     generationModel: "gpt-4.1-mini",
     embeddingModel: "text-embedding-3-large",
+    rerankerProvider: null,
+    rerankerModel: null,
   },
   audit: {
     latencyMs: 123,
@@ -82,6 +86,7 @@ const SUCCESS_RESPONSE = {
       inputTokens: 11,
       estimatedCostUsd: 0.00000143,
     },
+    reranking: null,
     generation: {
       inputTokens: 42,
       outputTokens: 16,
@@ -103,8 +108,43 @@ const NO_EVIDENCE_RESPONSE = {
       inputTokens: 9,
       estimatedCostUsd: 0.00000117,
     },
+    reranking: null,
     generation: null,
     totalCostUsd: 0.00000117,
+  },
+};
+
+const RERANK_SUCCESS_RESPONSE = {
+  ...SUCCESS_RESPONSE,
+  traceId: "abababab-abab-4aba-8aba-abababababab",
+  sources: [
+    {
+      ...SUCCESS_RESPONSE.sources[0],
+      retrievalScore: 0.91,
+      rerankScore: 0.88,
+    },
+    {
+      ...SUCCESS_RESPONSE.sources[1],
+      retrievalScore: 0.87,
+      rerankScore: 0.81,
+    },
+  ],
+  metadata: {
+    ...SUCCESS_RESPONSE.metadata,
+    retrievalStrategy: "rerank" as const,
+    candidateTopK: 18,
+    rerankerProvider: "test-reranker",
+    rerankerModel: "rerank-v1",
+  },
+  audit: {
+    ...SUCCESS_RESPONSE.audit,
+    reranking: {
+      latencyMs: 41,
+      candidatesEvaluated: 6,
+      inputTokens: 22,
+      estimatedCostUsd: 0.000031,
+    },
+    totalCostUsd: 0.00005163,
   },
 };
 
@@ -310,13 +350,10 @@ type AskFixture = Omit<
   sources: AskSourceFixture[];
   mode: "global" | "focused";
   audit: typeof SUCCESS_RESPONSE.audit | typeof NO_EVIDENCE_RESPONSE.audit;
-  metadata: Omit<
-    typeof SUCCESS_RESPONSE.metadata,
-    "retrievalStrategy" | "mode" | "documentId"
-  > & {
+  metadata: Omit<typeof SUCCESS_RESPONSE.metadata, "retrievalStrategy" | "mode" | "documentId"> & {
     mode: "global" | "focused";
     documentId: string | null;
-    retrievalStrategy: "standard" | "explore";
+    retrievalStrategy: "standard" | "explore" | "rerank";
   };
 };
 
@@ -363,23 +400,16 @@ function appendResponseFromAsk(
           documentTitle: source.documentTitle,
           chunkIndex: source.chunkIndex,
           excerpt: source.excerpt,
-          retrievalScore: source.score,
-          rerankScore: null,
+          retrievalScore: source.retrievalScore,
+          rerankScore: source.rerankScore,
           documentPipelineVersion: source.documentPipelineVersion,
           chunkingVersion: source.chunkingVersion,
           embeddingModel: source.embeddingModel,
           citedInAnswer: source.citedInAnswer ?? true,
         })),
         relatedTerms: response.relatedTerms,
-        metadata: {
-          ...response.metadata,
-          rerankerProvider: null,
-          rerankerModel: null,
-        },
-        audit: {
-          ...response.audit,
-          reranking: null,
-        },
+        metadata: response.metadata,
+        audit: response.audit,
         createdAt: ASSISTANT_CREATED_AT,
       },
     },
@@ -449,8 +479,18 @@ function streamEventsFromAsk(
 ) {
   const appended = appendResponseFromAsk(response, question);
   const sourceEvents = response.sources.map((source) => {
-    const streamSource = { ...source };
-    delete streamSource.citedInAnswer;
+    const streamSource = {
+      sourceNumber: source.sourceNumber,
+      chunkId: source.chunkId,
+      documentId: source.documentId,
+      documentTitle: source.documentTitle,
+      chunkIndex: source.chunkIndex,
+      excerpt: source.excerpt,
+      score: source.retrievalScore,
+      documentPipelineVersion: source.documentPipelineVersion,
+      chunkingVersion: source.chunkingVersion,
+      embeddingModel: source.embeddingModel,
+    };
 
     return {
       type: "source" as const,
@@ -502,9 +542,21 @@ function streamEventsFromAsk(
 }
 
 function typeQuestion(value: string): void {
-  fireEvent.change(screen.getByLabelText(/pergunta/i), {
-    target: { value },
-  });
+  fireEvent.change(
+    within(getConversationSection()).getByLabelText(/pergunta/i),
+    {
+      target: { value },
+    },
+  );
+}
+
+function typeSingleTurnQuestion(value: string): void {
+  fireEvent.change(
+    within(getSingleTurnSection()).getByLabelText(/pergunta da consulta unica/i),
+    {
+      target: { value },
+    },
+  );
 }
 
 function typeSecret(value: string): void {
@@ -514,19 +566,69 @@ function typeSecret(value: string): void {
 }
 
 function setTopK(value: string): void {
-  fireEvent.change(screen.getByLabelText(/fontes recuperadas/i), {
-    target: { value },
-  });
+  fireEvent.change(
+    within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
+    {
+      target: { value },
+    },
+  );
+}
+
+function setSingleTurnTopK(value: string): void {
+  fireEvent.change(
+    within(getSingleTurnSection()).getByLabelText(/fontes da consulta unica/i),
+    {
+      target: { value },
+    },
+  );
 }
 
 function clickSubmit(): void {
-  fireEvent.click(screen.getByRole("button", { name: /consultar base/i }));
+  fireEvent.click(
+    within(getConversationSection()).getByRole("button", {
+      name: /consultar base/i,
+    }),
+  );
 }
 
 function clickExplore(): void {
   fireEvent.click(
-    screen.getByRole("button", { name: /explorar perspectivas/i }),
+    within(getConversationSection()).getByRole("button", {
+      name: /explorar perspectivas/i,
+    }),
   );
+}
+
+function clickSingleTurnRerank(): void {
+  fireEvent.click(
+    within(getSingleTurnSection()).getByRole("button", {
+      name: /rerank/i,
+    }),
+  );
+}
+
+function getSingleTurnSection(): HTMLElement {
+  const section = screen
+    .getByRole("heading", { name: /consulta unica global/i })
+    .closest("section");
+
+  if (!section) {
+    throw new Error("single-turn section not found");
+  }
+
+  return section;
+}
+
+function getConversationSection(): HTMLElement {
+  const section = screen
+    .getByRole("heading", { name: /^conversa$/i })
+    .closest("section");
+
+  if (!section) {
+    throw new Error("conversation section not found");
+  }
+
+  return section;
 }
 
 function clickLoadHistory(): void {
@@ -563,7 +665,9 @@ function clickNewConversation(): void {
 }
 
 function clickViewAudit(): void {
-  const toggle = screen.queryByRole("button", { name: /ver auditoria/i });
+  const toggle = within(getConversationSection()).queryByRole("button", {
+    name: /ver auditoria/i,
+  });
 
   if (toggle) {
     fireEvent.click(toggle);
@@ -615,14 +719,52 @@ describe("/query page", () => {
     expect(
       screen.getByRole("heading", { name: /consulta na base/i }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText(/pergunta/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /consulta unica global/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(getConversationSection()).getByLabelText(/pergunta/i),
+    ).toBeInTheDocument();
+    expect(
+      within(getSingleTurnSection()).getByLabelText(
+        /pergunta da consulta unica/i,
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText(/secret de consulta/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/base inteira/i)).toBeChecked();
     expect(screen.getByLabelText(/documento especifico/i)).not.toBeChecked();
-    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue("6");
-    expect(screen.getByRole("button", { name: /consultar base/i })).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: /explorar perspectivas/i }),
+      within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
+    ).toHaveValue("6");
+    expect(
+      within(getSingleTurnSection()).getByLabelText(
+        /fontes da consulta unica/i,
+      ),
+    ).toHaveValue("6");
+    expect(
+      within(getConversationSection()).getByRole("button", {
+        name: /consultar base/i,
+      }),
+    ).toBeDisabled();
+    expect(
+      within(getConversationSection()).getByRole("button", {
+        name: /explorar perspectivas/i,
+      }),
+    ).toBeDisabled();
+    expect(
+      within(getSingleTurnSection()).getByRole("button", {
+        name: /consultar base/i,
+      }),
+    ).toBeDisabled();
+    expect(
+      within(getSingleTurnSection()).getByRole("button", {
+        name: /explorar perspectivas/i,
+      }),
+    ).toBeDisabled();
+    expect(
+      within(getSingleTurnSection()).getByRole("button", {
+        name: /rerank/i,
+      }),
     ).toBeDisabled();
     expect(
       screen.getByRole("button", { name: /carregar historico recente/i }),
@@ -672,33 +814,53 @@ describe("/query page", () => {
     await screen.findByRole("option", { name: /artigo focado a\.pdf/i });
 
     expect(
-      screen.getByRole("button", { name: /consultar base/i }),
+      within(getConversationSection()).getByRole("button", {
+        name: /consultar base/i,
+      }),
     ).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: /explorar perspectivas/i }),
+      within(getConversationSection()).getByRole("button", {
+        name: /explorar perspectivas/i,
+      }),
+    ).toBeDisabled();
+    expect(
+      within(getSingleTurnSection()).getByRole("button", { name: /rerank/i }),
     ).toBeDisabled();
 
     selectFocusedDocument(FOCUSED_DOCUMENT_ID);
 
     expect(
-      screen.getByRole("button", { name: /consultar base/i }),
+      within(getConversationSection()).getByRole("button", {
+        name: /consultar base/i,
+      }),
     ).toBeEnabled();
     expect(
-      screen.getByRole("button", { name: /explorar perspectivas/i }),
+      within(getConversationSection()).getByRole("button", {
+        name: /explorar perspectivas/i,
+      }),
     ).toBeEnabled();
 
     clickGlobalMode();
-    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue("9");
     expect(
-      screen.getByRole("button", { name: /consultar base/i }),
+      within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
+    ).toHaveValue("9");
+    expect(
+      within(getConversationSection()).getByRole("button", {
+        name: /consultar base/i,
+      }),
     ).toBeEnabled();
+    expect(
+      within(getSingleTurnSection()).getByRole("button", { name: /rerank/i }),
+    ).toBeDisabled();
 
     clickFocusedMode();
 
     expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
       FOCUSED_DOCUMENT_ID,
     );
-    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue("9");
+    expect(
+      within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
+    ).toHaveValue("9");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -798,6 +960,49 @@ describe("/query page", () => {
         }),
       }),
     );
+  });
+
+  it("submits the dedicated global single-turn rerank flow through /api/rag/ask", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(RERANK_SUCCESS_RESPONSE));
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeSingleTurnQuestion("Quais evidencias devem ser reranqueadas?");
+    setSingleTurnTopK("6");
+
+    await act(async () => {
+      clickSingleTurnRerank();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rag/ask",
+      expect.objectContaining({
+        method: "POST",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${SECRET}`,
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          question: "Quais evidencias devem ser reranqueadas?",
+          mode: "global",
+          retrieval: {
+            topK: 6,
+            strategy: "rerank",
+          },
+        }),
+      }),
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/rag\/conversations\//),
+      expect.anything(),
+    );
+    expect(
+      await screen.findByText("Execucao global single-turn via ask."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/test-reranker :: rerank-v1/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/rerank :: 0\.88/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/41 ms/i)).toBeInTheDocument();
   });
 
   it("submits focused questions through the conversation route with mode and documentId", async () => {
@@ -921,7 +1126,9 @@ describe("/query page", () => {
       screen.getAllByText(/quais tecnicas aparecem com mais frequencia\?/i)
         .length,
     ).toBeGreaterThan(0);
-    expect(screen.getByLabelText(/pergunta/i)).toHaveValue("");
+    expect(
+      within(getConversationSection()).getByLabelText(/pergunta/i),
+    ).toHaveValue("");
 
     await act(async () => {
       for (const event of streamEventsFromAsk(SUCCESS_RESPONSE).slice(2, 4)) {
@@ -1256,8 +1463,12 @@ describe("/query page", () => {
     expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
       SOURCE_HANDOFF_DOCUMENT_ID,
     );
-    expect(screen.getByLabelText(/fontes recuperadas/i)).toHaveValue("8");
-    expect(screen.getByLabelText(/pergunta/i)).toHaveValue(
+    expect(
+      within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
+    ).toHaveValue("8");
+    expect(
+      within(getConversationSection()).getByLabelText(/pergunta/i),
+    ).toHaveValue(
       "Agora quero aprofundar esse artigo.",
     );
     expect(window.location.search).toContain(
@@ -1387,7 +1598,9 @@ describe("/query page", () => {
     expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
       RUN_DETAIL_SOURCE_DOCUMENT_ID,
     );
-    expect(screen.getByLabelText(/pergunta/i)).toHaveValue(
+    expect(
+      within(getConversationSection()).getByLabelText(/pergunta/i),
+    ).toHaveValue(
       "Quero revisar essa fonte no detalhe.",
     );
     expect(window.location.search).toContain(
