@@ -401,6 +401,8 @@ describe("F-07 focused RAG integration (real Postgres + real handlers)", () => {
       promptVersion: GLOBAL_RAG_PROMPT_VERSION,
       generationModel: GENERATION_MODEL,
       embeddingModel: EMBEDDING_MODEL,
+      rerankerProvider: null,
+      rerankerModel: null,
     });
     expect(body.sources.length).toBeGreaterThan(0);
     expect(body.relatedTerms.length).toBeGreaterThan(0);
@@ -409,6 +411,7 @@ describe("F-07 focused RAG integration (real Postgres + real handlers)", () => {
       inputTokens: 10,
       estimatedCostUsd: 0.0000013,
     });
+    expect(body.audit.reranking).toBeNull();
     expect(body.audit.generation).toEqual({
       inputTokens: 50,
       outputTokens: 20,
