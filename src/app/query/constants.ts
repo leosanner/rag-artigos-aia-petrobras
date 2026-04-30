@@ -15,6 +15,12 @@ export const RAG_GENERATION_FAILED_MESSAGE =
 export const RAG_GENERATION_UNAVAILABLE_MESSAGE =
   "Servico de geracao indisponivel no momento. Aguarde alguns instantes e tente de novo.";
 
+export const RAG_RERANKING_FAILED_MESSAGE =
+  "A etapa de reranking falhou antes da geracao da resposta. Tente novamente em instantes.";
+
+export const RAG_RERANKING_UNAVAILABLE_MESSAGE =
+  "Servico de reranking indisponivel no momento. Aguarde alguns instantes e tente de novo.";
+
 export const RAG_NETWORK_ERROR_MESSAGE =
   "Falha de rede ao falar com o servidor. Verifique a conexao e tente novamente.";
 
