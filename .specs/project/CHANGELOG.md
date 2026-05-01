@@ -2,6 +2,56 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - feat(rag): close F-08 reranked retrieval with a governed Cohere runtime
+
+Date: 2026-04-30
+
+Changed:
+
+- Added `src/infrastructure/ai/cohere-reranking-provider.ts`, which implements
+  a concrete Cohere reranking adapter behind the shared `RerankingProvider`
+  port. The adapter uses the existing AI SDK core `rerank()` contract with a
+  local Cohere model implementation, preserving the swappable application
+  boundary without introducing a new package dependency.
+- Added `src/app/api/rag/runtime.ts` so the shared RAG runtime composition now
+  wires an optional reranker once through env-validated configuration and reuses
+  that composition across the single-turn ask and conversation route stacks.
+- Extended `src/env/server.ts` and `src/env/server.test.ts` with
+  `COHERE_API_KEY`, `RAG_RERANKER_PROVIDER`, and the defaulted
+  `RAG_RERANKER_MODEL = rerank-v3.5`, requiring the Cohere key only when the
+  Cohere reranker is actually enabled outside test.
+- Added `src/app/api/rag/reranked-retrieval.integration.test.ts`, a real
+  Postgres integration probe that covers rerank success, zero-candidate
+  short-circuit, safe `reranking_failed`, safe `reranking_unavailable`, and
+  regression of `standard` and `explore`.
+- Synced `.specs/features/F-08-reranked-retrieval/spec.md` with implementation
+  evidence, updated F-08 Block 03/05 closeout notes, reopened the deferred
+  focused-rerank hook in `.specs/features/F-07-focused-rag/05-integration-and-review.md`,
+  and recorded explicit follow-up notes in the F-06 and F-10 closeout docs that
+  conversation/streaming rerank adoption remains separate work.
+- Recorded `AD-018` in `.specs/project/STATE.md` capturing the concrete Cohere
+  runtime decision, the global-only public surface, and the still-open follow-up
+  scope for focused/conversation/streaming rerank adoption.
+
+Files:
+
+- `src/infrastructure/ai/cohere-reranking-provider.ts`
+- `src/infrastructure/ai/cohere-reranking-provider.test.ts`
+- `src/app/api/rag/runtime.ts`
+- `src/app/api/rag/reranked-retrieval.integration.test.ts`
+- `src/app/api/rag/ask/route.ts`
+- `src/app/api/rag/conversations/[id]/messages/route.ts`
+- `src/env/server.ts`
+- `src/env/server.test.ts`
+- `.specs/features/F-08-reranked-retrieval/spec.md`
+- `.specs/features/F-08-reranked-retrieval/03-application-rerank-orchestration-and-provider-boundary.md`
+- `.specs/features/F-08-reranked-retrieval/05-integration-and-review.md`
+- `.specs/features/F-07-focused-rag/05-integration-and-review.md`
+- `.specs/features/F-06-conversational-query/05-integration-and-review.md`
+- `.specs/features/F-10-streaming-query-ux/05-integration-and-review.md`
+- `.specs/project/STATE.md`
+- `.specs/project/CHANGELOG.md`
+
 ## (unreleased) - feat(query): stream conversation turns, live sources, and answer text
 
 Date: 2026-04-28
