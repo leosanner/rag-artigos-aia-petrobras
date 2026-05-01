@@ -53,33 +53,44 @@ workflow.
 
 ## Functional Requirements
 
-- [ ] RF-B05-01: The parent `spec.md` remains the authoritative contract and
-  reflects any refinements discovered during Blocks 01-04.
-- [ ] RF-B05-02: End-to-end verification exercises one successful global rerank
+- [x] RF-B05-01: The parent `spec.md` remains the authoritative contract and
+  reflects the closeout refinements discovered during implementation,
+  including the concrete Cohere runtime, env contract, and acceptance-criteria
+  evidence pointers. Synced on 2026-04-30.
+- [x] RF-B05-02: End-to-end verification exercises one successful global rerank
   ask that persists reranker metadata, reranking audit, `retrievalScore`, and
-  `rerankScore`.
-- [ ] RF-B05-03: End-to-end verification exercises one rerank ask whose
+  `rerankScore`. Covered by
+  `src/app/api/rag/reranked-retrieval.integration.test.ts` scenario 1.
+- [x] RF-B05-03: End-to-end verification exercises one rerank ask whose
   first-pass retrieval returns zero candidates and proves the reranker is not
-  called.
-- [ ] RF-B05-04: End-to-end verification exercises one rerank ask that returns
-  safe `reranking_failed` and proves generation is skipped.
-- [ ] RF-B05-05: End-to-end verification exercises one rerank ask that returns
-  safe `reranking_unavailable` and proves generation is skipped.
-- [ ] RF-B05-06: Regression verification proves existing `standard` and
+  called. Covered by
+  `src/app/api/rag/reranked-retrieval.integration.test.ts` scenario 2.
+- [x] RF-B05-04: End-to-end verification exercises one rerank ask that returns
+  safe `reranking_failed` and proves generation is skipped. Covered by
+  `src/app/api/rag/reranked-retrieval.integration.test.ts` scenario 3.
+- [x] RF-B05-05: End-to-end verification exercises one rerank ask that returns
+  safe `reranking_unavailable` and proves generation is skipped. Covered by
+  `src/app/api/rag/reranked-retrieval.integration.test.ts` scenario 4.
+- [x] RF-B05-06: Regression verification proves existing `standard` and
   `explore` ask paths, query-run reads, and `/query` controls still behave as
-  documented.
-- [ ] RF-B05-07: The acceptance-criteria checklist from `spec.md`
-  `## Acceptance Criteria` is mapped 1-to-1 to verification evidence.
-- [ ] RF-B05-08: `pnpm lint`, `pnpm typecheck`, and `pnpm test` pass.
-- [ ] RF-B05-09: The F-07 Block 05 deferred focused-rerank sub-step is reopened
-  with a concrete note pointing back to the F-08 landing diff or verification
-  proof.
-- [ ] RF-B05-10: A follow-up note is recorded for F-06 and F-10 stating that
+  documented. Covered by
+  `src/app/api/rag/reranked-retrieval.integration.test.ts` scenario 5 plus
+  the pre-existing `/query` and query-run handler tests.
+- [x] RF-B05-07: The acceptance-criteria checklist from `spec.md`
+  `## Acceptance Criteria` is mapped 1-to-1 to verification evidence inline in
+  the parent spec.
+- [x] RF-B05-08: `pnpm lint`, `pnpm typecheck`, and `pnpm test` pass. Recorded
+  below in `## Verification Record`.
+- [x] RF-B05-09: The F-07 Block 05 deferred focused-rerank sub-step is reopened
+  with a concrete note pointing back to the F-08 landing proof while keeping
+  focused rerank as explicit follow-up scope.
+- [x] RF-B05-10: A follow-up note is recorded for F-06 and F-10 stating that
   conversation and streaming surfaces still need dedicated rerank adoption and
   verification beyond the global single-turn path.
-- [ ] RF-B05-11: A fresh independent review handoff is prepared using
+- [x] RF-B05-11: A fresh independent review handoff is prepared using
   `spec.md`, Blocks 01-05, the implementation diff, and the verification
-  summary only.
+  summary only. The packet is ready below; the actual fresh-thread review is
+  still pending.
 
 ## Rule Traceability
 
@@ -126,6 +137,32 @@ workflow.
 9. Reopen the deferred F-07 focused-rerank verification note and record the
    follow-up hooks for F-06 and F-10.
 10. Bundle the review packet and hand it off on a fresh independent thread.
+
+## Verification Record
+
+### Commands run on 2026-04-30
+
+```bash
+pnpm vitest run src/infrastructure/ai/cohere-reranking-provider.test.ts src/env/server.test.ts src/application/rag/retrieve-chunks.test.ts src/application/rag/answer-question.test.ts src/app/api/rag/ask/handler.test.ts src/app/query/page.test.tsx src/app/api/rag/reranked-retrieval.integration.test.ts
+pnpm lint
+pnpm typecheck
+pnpm test
+```
+
+### Results
+
+- The targeted rerank closeout suite passed with `7` passing test files and
+  `119` passing tests.
+- `pnpm lint` passed.
+- `pnpm typecheck` passed.
+- `pnpm test` passed with `78` passing test files and `578` passing tests.
+- The new real-Postgres integration probe proves rerank success, zero-candidate
+  short-circuit, safe `reranking_failed`, safe `reranking_unavailable`, and
+  `standard`/`explore` regression through the public ask and query-run detail
+  handlers.
+- `/query` rerank controls and safe audit rendering remain covered by the
+  existing page suite; focused and conversation request schemas still reject
+  rerank by design and are now called out explicitly as follow-up scope.
 
 ## Reviewer Handoff Packet
 
