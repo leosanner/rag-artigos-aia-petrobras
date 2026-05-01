@@ -5,6 +5,11 @@ const optionalNonEmptyString = z.preprocess(
   z.string().min(1).optional(),
 );
 
+const optionalRerankerProvider = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.enum(["cohere"]).optional(),
+);
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).optional(),
@@ -19,11 +24,16 @@ const envSchema = z
     INNGEST_DEV: optionalNonEmptyString,
     INNGEST_EVENT_KEY: optionalNonEmptyString,
     INNGEST_SIGNING_KEY: optionalNonEmptyString,
+    COHERE_API_KEY: optionalNonEmptyString,
     OPENAI_API_KEY: optionalNonEmptyString,
     RAG_EMBEDDING_MODEL: optionalNonEmptyString.transform(
       (value) => value ?? "text-embedding-3-large",
     ),
     RAG_GENERATION_MODEL: optionalNonEmptyString,
+    RAG_RERANKER_PROVIDER: optionalRerankerProvider,
+    RAG_RERANKER_MODEL: optionalNonEmptyString.transform(
+      (value) => value ?? "rerank-v3.5",
+    ),
     RAG_QUERY_SECRET: optionalNonEmptyString,
   })
   .superRefine((env, ctx) => {
@@ -59,6 +69,19 @@ const envSchema = z
       });
     }
 
+    if (
+      env.NODE_ENV !== "test" &&
+      env.RAG_RERANKER_PROVIDER === "cohere" &&
+      !env.COHERE_API_KEY
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["COHERE_API_KEY"],
+        message:
+          "COHERE_API_KEY is required when RAG_RERANKER_PROVIDER=cohere unless NODE_ENV=test",
+      });
+    }
+
     const mayOmitInngestCloudKeys =
       env.NODE_ENV === "test" || env.INNGEST_DEV !== undefined;
 
@@ -87,6 +110,7 @@ const envSchema = z
   .transform((env) => ({
     ...env,
     RAG_GENERATION_MODEL: env.RAG_GENERATION_MODEL ?? "test-rag-generation-model",
+    RAG_RERANKER_MODEL: env.RAG_RERANKER_MODEL ?? "rerank-v3.5",
   }));
 
 export type ServerEnv = z.infer<typeof envSchema>;
@@ -104,9 +128,11 @@ const testEnvDefaults = {
     "-----BEGIN PRIVATE KEY-----\\ntest\\n-----END PRIVATE KEY-----\\n",
   INGESTION_SYNC_SECRET: "test-ingestion-sync-secret",
   INNGEST_DEV: "1",
+  COHERE_API_KEY: "test-cohere-api-key",
   OPENAI_API_KEY: "test-openai-api-key",
   RAG_EMBEDDING_MODEL: "text-embedding-3-large",
   RAG_GENERATION_MODEL: "test-rag-generation-model",
+  RAG_RERANKER_MODEL: "rerank-v3.5",
   RAG_QUERY_SECRET: "test-rag-query-secret",
 };
 
