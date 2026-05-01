@@ -72,12 +72,17 @@ prepared.
      selected sources confirmed to belong to that document — covered by
      scenario 4 with a direct SQL inspection of the persisted
      `rag_query_runs` row.
-  6. **Deferred — pending F-08.** The shared retrieval-strategy contract in
-     `src/domain/rag/retrieval-settings.ts` currently exposes only
-     `"standard"` and `"explore"`; `"rerank"` will be added by `F-08 /
-     Reranked Retrieval`. Once F-08 lands, this sub-step must be added to
-     the same integration test and re-verified before F-07's review can
-     close.
+  6. **Reopened after F-08 landing, still intentionally deferred.** `F-08`
+     landed the shared `rerank` strategy on the global single-turn path and
+     proves that behavior in
+     `src/app/api/rag/reranked-retrieval.integration.test.ts`, but the public
+     focused ask surface still reuses
+     `src/application/rag/schemas.ts` `conversationRagRetrievalInputSchema`,
+     which accepts only `"standard"` and `"explore"`. Focused rerank therefore
+     remains a dedicated follow-up contract rather than silently widening F-07
+     here. When that focused-rerank contract is implemented, this same focused
+     integration test must gain the rerank scenario and cite the F-08 landing
+     diff or verification proof as the shared global baseline.
   7. The same focused request issued inside an F-06 conversation appends a
      valid assistant transcript row linked to the focused trace — covered
      by scenario 5 (conversation route + transcript trace inspection).
