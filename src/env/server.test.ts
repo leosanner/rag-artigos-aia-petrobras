@@ -137,4 +137,55 @@ describe("parseServerEnv", () => {
 
     expect(env.RAG_GENERATION_MODEL).toBe("test-rag-generation-model");
   });
+
+  it("defaults RAG_RERANKER_MODEL to rerank-v3.5", () => {
+    const env = parseServerEnv({
+      ...baseEnv,
+      RAG_RERANKER_MODEL: undefined,
+      NODE_ENV: "production",
+      INNGEST_EVENT_KEY: "event-key",
+      INNGEST_SIGNING_KEY: "signing-key",
+    });
+
+    expect(env.RAG_RERANKER_MODEL).toBe("rerank-v3.5");
+  });
+
+  it("rejects missing COHERE_API_KEY when the Cohere reranker is enabled outside tests", () => {
+    expect(() =>
+      parseServerEnv({
+        ...baseEnv,
+        COHERE_API_KEY: undefined,
+        RAG_RERANKER_PROVIDER: "cohere",
+        NODE_ENV: "production",
+        INNGEST_EVENT_KEY: "event-key",
+        INNGEST_SIGNING_KEY: "signing-key",
+      }),
+    ).toThrow(/COHERE_API_KEY/);
+  });
+
+  it("accepts the Cohere reranker configuration when its API key is present", () => {
+    const env = parseServerEnv({
+      ...baseEnv,
+      COHERE_API_KEY: "cohere-key",
+      RAG_RERANKER_PROVIDER: "cohere",
+      RAG_RERANKER_MODEL: "rerank-v4.0",
+      NODE_ENV: "production",
+      INNGEST_EVENT_KEY: "event-key",
+      INNGEST_SIGNING_KEY: "signing-key",
+    });
+
+    expect(env.RAG_RERANKER_PROVIDER).toBe("cohere");
+    expect(env.RAG_RERANKER_MODEL).toBe("rerank-v4.0");
+  });
+
+  it("allows test env to omit COHERE_API_KEY even if the Cohere reranker is selected", () => {
+    expect(() =>
+      parseServerEnv({
+        ...baseEnv,
+        COHERE_API_KEY: undefined,
+        RAG_RERANKER_PROVIDER: "cohere",
+        NODE_ENV: "test",
+      }),
+    ).not.toThrow();
+  });
 });
