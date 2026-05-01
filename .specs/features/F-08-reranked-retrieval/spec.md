@@ -247,12 +247,16 @@ needed for the current task:
   mapping.
 - `src/repositories/*` - persisted run and source snapshot structures for
   reranking metadata and score evidence.
-- `src/infrastructure/ai/*` - concrete reranking adapter once a provider/model
-  is selected.
+- `src/infrastructure/ai/cohere-reranking-provider.ts` - concrete Cohere
+  reranking adapter and runtime factory built on the existing AI SDK core
+  `rerank()` contract.
 - `src/app/api/rag/ask/*` - request validation, sanitized reranking error
   responses, and stable success serialization.
 - `src/app/api/rag/query-runs/*` - run-summary and run-detail DTOs that expose
   reranking metadata when present.
+- `src/app/api/rag/runtime.ts` - shared runtime composition that wires the
+  optional reranker into the global ask/conversation stack without widening the
+  public conversation contract.
 - `src/app/query/page.tsx` - explicit rerank UI control and audit rendering for
   reranked answers/runs.
 
@@ -260,35 +264,53 @@ needed for the current task:
 
 - **Prerequisite features:** F-02 Chunking and Embeddings; F-03 Global RAG;
   F-04 Query Controls and Explore; F-05 Answer Traceability.
-- **External packages added:** N/A - the concrete reranker SDK/package remains
-  intentionally open in this documentation pass.
+- **External packages added:** None. The concrete Cohere adapter is implemented
+  on top of the existing AI SDK core `rerank()` contract, so this closeout
+  adds no new npm dependency.
 - **External services:** Postgres/pgvector; the existing embedding/generation
-  providers; one concrete reranking provider behind the new adapter boundary.
+  providers; Cohere Rerank behind the new adapter boundary.
 - **Environment variables:** `RAG_RERANKER_PROVIDER` - configured reranker
-  adapter id; `RAG_RERANKER_MODEL` - configured reranker model name. Any
-  provider-specific credential variables remain intentionally undefined until a
-  concrete implementation is selected.
+  adapter id (`cohere` when enabled); `RAG_RERANKER_MODEL` - configured
+  reranker model name, defaulting to `rerank-v3.5`; `COHERE_API_KEY` - Cohere
+  credential required when `RAG_RERANKER_PROVIDER=cohere` outside test.
 
 ## Acceptance Criteria
 
 1. Request validation accepts `strategy: "rerank"` without regressing the
-   existing `standard` and `explore` request shapes.
+   existing `standard` and `explore` request shapes. **(Done —
+   `src/application/rag/schemas.test.ts` and
+   `src/app/api/rag/ask/handler.test.ts`.)**
 2. `rerank` retrieves `candidateTopK = min(24, topK * 3)` first-pass
    candidates and calls the reranking provider exactly once before context
-   assembly.
+   assembly. **(Done — `src/application/rag/retrieve-chunks.test.ts` plus
+   `src/app/api/rag/reranked-retrieval.integration.test.ts`.)**
 3. If first-pass retrieval returns at least `topK` candidates, the final
    reranked selection contains exactly `topK` chunks in reranked order.
+   **(Done — `src/application/rag/retrieve-chunks.test.ts` and
+   `src/app/api/rag/reranked-retrieval.integration.test.ts`.)**
 4. `explore` continues to use deterministic diversification and is not silently
-   replaced by reranking.
+   replaced by reranking. **(Done — `src/application/rag/retrieve-chunks.test.ts`,
+   `src/app/api/rag/reranked-retrieval.integration.test.ts`, and
+   `src/app/query/page.test.tsx`.)**
 5. Successful reranked answers and persisted traces expose `candidateTopK`,
    `rerankerProvider`, `rerankerModel`, reranking audit data,
-   `retrievalScore`, and nullable `rerankScore`.
+   `retrievalScore`, and nullable `rerankScore`. **(Done —
+   `src/repositories/rag-query-runs-repository.test.ts`,
+   `src/app/api/rag/query-runs/[id]/handler.test.ts`, and
+   `src/app/api/rag/reranked-retrieval.integration.test.ts`.)**
 6. Reranking failures persist `reranking_failed` or
    `reranking_unavailable`, skip generation, and return sanitized API errors.
+   **(Done — `src/application/rag/answer-question.test.ts`,
+   `src/app/api/rag/ask/handler.test.ts`, and
+   `src/app/api/rag/reranked-retrieval.integration.test.ts`.)**
 7. `/query` exposes an explicit rerank control for global single-turn
    questions and can inspect reranked current answers and persisted runs.
+   **(Done — `src/app/query/page.test.tsx` and
+   `src/app/api/rag/query-runs/[id]/handler.test.ts`.)**
 8. API responses, persisted traces, and `/query` audit views remain free of
    secrets, raw prompts, stack traces, and raw reranker/provider payloads.
+   **(Done — `src/application/rag/schemas.test.ts`,
+   `src/app/api/rag/ask/handler.test.ts`, and `src/app/query/page.test.tsx`.)**
 
 ## Decisions
 
@@ -296,7 +318,8 @@ needed for the current task:
 |----------|-------------------------|-----------|
 | Keep `standard`, `explore`, and `rerank` as three explicit strategies | Replace `explore`; hide reranking behind `explore`; auto-pick strategies | Each strategy serves a distinct operator intent and stays explainable/auditable. |
 | Reuse `candidateTopK = min(24, topK * 3)` for reranking | Fixed candidate count; operator-controlled `candidateTopK`; unbounded candidate fetch | The existing policy already balances retrieval breadth with bounded cost and fits the new strategy without adding another operator control. |
-| Add a dedicated `RerankingProvider` boundary | Hard-code one reranker into the application layer; piggyback on the generation provider interface | The concrete vendor/model is intentionally still open, so the contract must isolate that decision behind an adapter. |
+| Add a dedicated `RerankingProvider` boundary | Hard-code one reranker into the application layer; piggyback on the generation provider interface | The runtime now uses Cohere, but the contract still isolates that choice behind an adapter so later providers remain swappable. |
+| Implement Cohere through a local AI SDK-core-compatible reranking adapter | Block F-08 on an extra provider package; call Cohere directly from the application layer | The existing AI SDK `rerank()` contract already supports a provider-local model boundary, so the project can land a governed runtime path without widening the application layer or introducing another package install dependency. |
 | Expose `retrievalScore` plus nullable `rerankScore` | Keep one ambiguous `score`; expose only rerank score | The audit layer needs to preserve both retrieval stages explicitly. |
 | Add dedicated reranking failure vocabulary | Reuse `generation_failed`/`generation_unavailable`; collapse rerank failures into generic technical errors | The reranking stage is now a first-class governed step and needs its own safe operational signals. |
 

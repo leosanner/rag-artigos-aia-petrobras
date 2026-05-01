@@ -27,8 +27,9 @@ provider-agnostic.
 
 - Drizzle schema and repository SQL; Block 02 owns those.
 - Ask/query-run handlers, Zod DTOs, and `/query`; Block 04 owns those.
-- Concrete reranker adapters or SDKs; that work plugs into the port defined
-  here.
+- Choosing the concrete reranker vendor/model in the abstract; the Cohere
+  adapter that eventually lands in `src/infrastructure/ai/` still plugs into
+  the port defined here instead of changing the application contract.
 - Conversation-route SSE behavior, focused-mode verification, or streaming
   event payloads; Block 05 records those follow-up sync points only.
 
@@ -132,7 +133,7 @@ export interface GenerationProvider {
 - `src/application/rag/ports.ts`
 - `src/application/rag/schemas.ts`
 - `src/infrastructure/ai/openai-generation-provider.ts`
-- `src/infrastructure/ai/*rerank*.ts` (future concrete adapter)
+- `src/infrastructure/ai/cohere-reranking-provider.ts`
 
 ## Tests First
 
