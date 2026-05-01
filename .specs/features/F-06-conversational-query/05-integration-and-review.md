@@ -98,6 +98,13 @@ and the required independent-review handoff.
 
 ## Review Handoff
 
+- Follow-up note after F-08: the shared runtime now knows how to instantiate a
+  reranker, but the public conversation request contract still rejects
+  `retrievalSettings.strategy = "rerank"` in
+  `src/application/rag/schemas.ts`. Conversation rerank adoption therefore
+  remains a separate spec-sync and verification task; F-06 closeout must not
+  claim that rerank is available on `POST /api/rag/conversations/:id/messages`
+  yet.
 - Reviewer: Codex via `codex:rescue` on a brand-new thread (CLAUDE.md
   "Extremely important: every review must use a brand-new reviewer
   agent/thread").

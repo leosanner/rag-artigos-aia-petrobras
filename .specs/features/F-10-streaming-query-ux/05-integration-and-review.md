@@ -119,6 +119,13 @@ pnpm test
 
 ## Reviewer Handoff Packet
 
+- Follow-up note after F-08: the streaming conversation transport still
+  inherits the public conversation retrieval contract from F-06, so
+  `POST /api/rag/conversations/:id/messages` does not yet expose
+  `retrievalSettings.strategy = "rerank"`. Enabling rerank on the SSE path
+  remains a dedicated follow-up that must widen the request DTOs, preserve the
+  current event guarantees, and rerun the F-10 closeout verification.
+
 Provide the reviewer with:
 
 - The committed F-10 implementation diff against the branch base.
