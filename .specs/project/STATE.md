@@ -1,11 +1,43 @@
 # State
 
-**Last Updated:** 2026-04-28
-**Current Work:** `F-10 / Streaming Query UX` implementation has landed on the conversation transport and `/query`, including SSE event negotiation, live source reveal, and token-by-token answer rendering. `F-08 / Reranked Retrieval` still remains the oldest open shared `/query` retrieval contract, while independent reviews of both `F-07` and `F-10` are still pending — each must use a fresh reviewer thread per `CLAUDE.md`.
+**Last Updated:** 2026-04-30
+**Current Work:** `F-08 / Reranked Retrieval` has now landed as a real global single-turn vertical with a concrete Cohere-backed reranking runtime behind the shared provider boundary. Fresh independent reviews of `F-07`, `F-08`, and `F-10` are still pending — each must use a fresh reviewer thread per `CLAUDE.md` — and conversation/focused/streaming rerank adoption remains follow-up work rather than implicit scope creep.
 
 ---
 
 ## Recent Decisions
+
+### AD-018: F-08 lands with a concrete Cohere reranker on the global single-turn path (2026-04-30)
+
+**Decision:** Close `F-08 / Reranked Retrieval` as an implemented vertical on
+the global single-turn path only. The runtime now wires an optional
+`RerankingProvider` through shared RAG composition in
+`src/app/api/rag/runtime.ts`, using `RAG_RERANKER_PROVIDER=cohere`,
+`RAG_RERANKER_MODEL` (default `rerank-v3.5`), and `COHERE_API_KEY`. The
+concrete infrastructure adapter lives in
+`src/infrastructure/ai/cohere-reranking-provider.ts` and uses the existing AI
+SDK core `rerank()` contract with a local Cohere model implementation instead
+of waiting on an extra provider package. The closeout is proved by targeted
+unit coverage plus a new real-Postgres integration test in
+`src/app/api/rag/reranked-retrieval.integration.test.ts`.
+**Reason:** F-08 needed a governed runtime path, not just an abstract port. The
+existing AI SDK core rerank contract was already sufficient to keep the
+provider-specific HTTP logic isolated inside infrastructure while preserving
+the application boundary defined by Blocks 01-04.
+**Trade-off:** Focused, conversation, and streaming public request contracts are
+still intentionally narrower than the shared runtime. `ragAskRequestSchema`
+accepts `rerank` only for global single-turn asks, while focused and
+conversation message schemas continue to reject it until dedicated follow-up
+contracts widen those surfaces. Cohere rerank audit cost remains normalized to
+`0` because billing is search-unit based and the project still has no governed
+USD conversion policy for those units.
+**Impact:** Added the concrete Cohere reranking adapter and shared RAG runtime
+composition, extended env validation with `COHERE_API_KEY`,
+`RAG_RERANKER_PROVIDER`, and defaulted `RAG_RERANKER_MODEL`, added
+`src/app/api/rag/reranked-retrieval.integration.test.ts`, synced the F-08
+overview and closeout docs, reopened the deferred focused-rerank note in
+F-07, and recorded explicit follow-up notes in F-06 and F-10 that their
+conversation/streaming surfaces still need dedicated rerank adoption.
 
 ### AD-017: Streaming is introduced first on the conversation transport, not on the ask endpoint (2026-04-28)
 
@@ -192,10 +224,11 @@ _None for now._
 - [x] ~~Define M2 feature contracts and close base RAG planning decisions~~ — resolved by AD-011
 - [x] ~~Implement `F-04 / Query Controls and Explore` with TDD against its spec~~ — completed by the F-04 Block 05 closeout and local verification on 2026-04-23
 - [x] ~~Implement `F-05 / Answer Traceability` with TDD against its spec~~ — completed by the F-05 Block 05 closeout and local verification on 2026-04-23
-- [ ] Implement `F-08 / Reranked Retrieval` with TDD against its spec — when this lands, also re-open Block 05 RF-B05-02 #6 in F-07 to add focused `rerank` integration coverage
+- [x] ~~Implement `F-08 / Reranked Retrieval` with TDD against its spec~~ — global single-turn closeout completed on 2026-04-30 (AD-018); the deferred focused-rerank note in F-07 is reopened as follow-up scope rather than silently covered
 - [x] ~~Implement `F-06 / Conversational Query`~~ — completed before F-07 closeout (see git history)
 - [x] ~~Implement `F-07 / Focused RAG`~~ — Block 05 implementation closeout completed on 2026-04-28 (AD-016); independent review still pending
 - [x] ~~Implement `F-10 / Streaming Query UX` on the conversation path~~ — completed on 2026-04-28 (AD-017); independent review still pending
+- [ ] Independent review of `F-08 / Reranked Retrieval` by a fresh reviewer agent (per CLAUDE.md) — required before F-08 is marked reviewed
 - [ ] Independent review of `F-07 / Focused RAG` by a fresh reviewer agent (per CLAUDE.md) — required before F-07 is marked reviewed
 - [ ] Independent review of `F-10 / Streaming Query UX` by a fresh reviewer agent (per CLAUDE.md) — required before F-10 is marked reviewed
 - [ ] Choose a definitive project name (current placeholder: "AIA Insight")
