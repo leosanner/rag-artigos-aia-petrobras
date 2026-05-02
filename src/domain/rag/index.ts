@@ -12,4 +12,5 @@ export * from "./query-run-status";
 export * from "./related-terms";
 export * from "./reranking";
 export * from "./retrieval-settings";
+export * from "./run-projection";
 export * from "./selectable-document";
