@@ -14,6 +14,7 @@ export const RAG_RETRIEVAL_MAX_TOP_K = 12;
 export const RAG_RETRIEVAL_DEFAULT_TOP_K = 6;
 export const RAG_RETRIEVAL_DEFAULT_STRATEGY = "standard";
 export const EXPLORE_RETRIEVAL_MAX_CANDIDATES = 24;
+export const RAG_RERANK_DEFAULT_CANDIDATE_TOP_K = EXPLORE_RETRIEVAL_MAX_CANDIDATES;
 
 export const RagRetrievalStrategySchema = z.enum([
   "standard",
