@@ -2,6 +2,36 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - docs(specs): introduce F-12 unified conversational query
+
+Date: 2026-05-02
+
+Changed:
+
+- Added `.specs/features/F-12-unified-conversational-query/spec.md` as the
+  authoritative contract for collapsing `/query` onto the conversational
+  surface, lifting rerank to per-turn granularity, retiring
+  `POST /api/rag/ask`, defaulting `topK`/`candidateTopK` behind an
+  "Avançado" disclosure, extending the streaming event vocabulary with a
+  rerank phase, and relocating audit access to a per-message right-side
+  drawer.
+- Added "Superseded by F-12" banners at the top of
+  `.specs/features/F-04-query-controls-and-explore/spec.md`,
+  `.specs/features/F-06-conversational-query/spec.md`, and
+  `.specs/features/F-08-reranked-retrieval/spec.md` so reviewers and
+  implementers land on the active contract first while preserving decision
+  lineage in the predecessor specs.
+- Recorded `AD-019` (retire `POST /api/rag/ask`), `AD-020` (per-turn
+  strategy selection in the chat), `AD-021` (deterministic non-generative
+  `explore` turns excluded from prompt history), and `AD-022` (per-message
+  inline audit drawer; remove the global runs index and per-run drawer
+  from `/query`) in `.specs/project/STATE.md`. Updated `Last Updated` and
+  `Current Work` to reflect the F-12 queue.
+
+No application code changed in this entry; F-12 implementation breakdown
+documents (`01-domain*.md` … `05-integration*.md`) and the actual code
+landings are queued as follow-ups.
+
 ## (unreleased) - feat(rag): close F-08 reranked retrieval with a governed Cohere runtime
 
 Date: 2026-04-30
