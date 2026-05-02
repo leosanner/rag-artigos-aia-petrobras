@@ -48,10 +48,37 @@ they violate the F-12 invariants.
 | INV-07 | Schema explicitly forbids cascade-delete of runs. | Encoded in FK definition + integration test. |
 | INV-08 | Audit drawer never fetches a per-run endpoint. | Read projection completeness is the contract. |
 
+## State at start of block
+
+FK audit on `src/db/schema.ts` (commit `d9a3f22`):
+
+- `rag_conversation_messages.conversation_id → rag_conversations.id`
+  uses `ON DELETE CASCADE`. Deleting a conversation removes its
+  messages — expected.
+- `rag_conversation_messages.trace_id → rag_query_runs.id` has **no**
+  `ON DELETE` clause (Postgres default `NO ACTION`). The reference is
+  one-way *message → run*; `rag_query_runs` has no FK back into
+  conversations or messages.
+- Conclusion: deleting a conversation cascades only to messages —
+  `rag_query_runs` rows are preserved by construction. **INV-07 is
+  already satisfied; no migration is required for this block.**
+- Other FKs touching runs were also audited and are consistent with
+  the spec: `rag_query_run_sources.run_id` and
+  `rag_query_run_related_terms.run_id` cascade with the parent run
+  (intentional — child rows belong to the run); `rag_query_runs.document_id`
+  uses `ON DELETE SET NULL` (orphans the run from a deleted document
+  without losing audit data).
+- Read projection: `ConversationRepository.getDetail` already calls
+  `RagQueryRunsRepository.getById` per assistant message and returns
+  `sources`, `relatedTerms`, `metadata`, and `audit` (including
+  `reranking`) inline — RN-10 / INV-08 already satisfied at the
+  application layer. Block 02 adds the integration test that pins the
+  contract.
+
 ## Tasks (TDD-first)
 
-1. Inspect current `query_runs` FK definitions; document findings in this
-   doc under "State at start of block" before writing tests.
+1. ~~Inspect current `query_runs` FK definitions~~ — done above. No
+   migration needed; tasks 3 collapses to "no-op" for this block.
 2. Write integration test
    `src/app/api/rag/conversation-delete-preserves-runs.integration.test.ts`
    asserting: insert conversation + message + run; delete conversation;
