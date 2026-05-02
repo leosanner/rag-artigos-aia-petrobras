@@ -4,6 +4,7 @@ export * from "./context-assembler";
 export * from "./conversation-context";
 export * from "./conversation-rules";
 export * from "./conversation-title";
+export * from "./prompt-history";
 export * from "./diversified-selection";
 export * from "./focused-rejection";
 export * from "./focused-request";
