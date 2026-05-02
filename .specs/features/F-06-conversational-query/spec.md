@@ -1,5 +1,12 @@
 # F-06 - Conversational Query
 
+> **Superseded by [F-12 — Unified Conversational Query](../F-12-unified-conversational-query/spec.md).**
+> The conversation entity, transport, and persistence model defined here
+> remain the canonical RAG execution surface. F-12 collapses `/query` onto
+> this surface, removes the parallel single-turn ask flow, lifts rerank to
+> per-turn granularity, and relocates audit access to a per-message drawer.
+> This document is preserved for historical context and decision lineage.
+
 ## Scope
 
 **In scope:**

@@ -1,5 +1,12 @@
 # F-04 - Query Controls and Explore
 
+> **Superseded by [F-12 — Unified Conversational Query](../F-12-unified-conversational-query/spec.md).**
+> The retrieval-control vocabulary defined here (`topK`, `strategy`, `explore`)
+> remains valid, but the `POST /api/rag/ask` surface and the single-turn
+> `/query` panel that consume it are retired in F-12. Strategy selection is
+> now per-turn inside the conversational chat. This document is preserved for
+> historical context and decision lineage.
+
 ## Scope
 
 **In scope:**

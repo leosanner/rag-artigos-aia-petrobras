@@ -1,5 +1,13 @@
 # F-08 - Reranked Retrieval
 
+> **Superseded by [F-12 — Unified Conversational Query](../F-12-unified-conversational-query/spec.md).**
+> The rerank contract, provider boundary, audit schema, and failure codes
+> defined here remain authoritative. F-12 retires the global single-turn
+> ask surface this document is anchored to and lifts rerank into per-turn
+> selection inside the conversational chat. Focused-mode rerank stays out of
+> scope (still global only). This document is preserved for historical
+> context and decision lineage.
+
 ## Scope
 
 **In scope:**
