@@ -1,11 +1,104 @@
 # State
 
-**Last Updated:** 2026-04-30
-**Current Work:** `F-08 / Reranked Retrieval` has now landed as a real global single-turn vertical with a concrete Cohere-backed reranking runtime behind the shared provider boundary. Fresh independent reviews of `F-07`, `F-08`, and `F-10` are still pending — each must use a fresh reviewer thread per `CLAUDE.md` — and conversation/focused/streaming rerank adoption remains follow-up work rather than implicit scope creep.
+**Last Updated:** 2026-05-02
+**Current Work:** `F-12 / Unified Conversational Query` has been specified and supersedes the contracts of `F-04`, `F-06`, and `F-08`. Implementation is queued: collapse `/query` onto the conversational surface, lift rerank to per-turn granularity, retire `POST /api/rag/ask`, and relocate audit access to a per-message drawer. F-10 streaming transport stays active. Fresh independent reviews of `F-07`, `F-08`, and `F-10` remain pending per `CLAUDE.md`.
 
 ---
 
 ## Recent Decisions
+
+### AD-022: Audit access becomes per-message and inline; the global runs index and per-run drawer are removed from `/query` (2026-05-02)
+
+**Decision:** As part of `F-12 / Unified Conversational Query`, remove the
+global runs list and the cross-conversation run-detail drawer from the
+`/query` page. Each assistant message in the chat exposes a "Ver auditoria"
+action that opens a right-side drawer rendering the trace data already
+embedded in the conversation payload returned by
+`GET /api/rag/conversations/:id`. The audit drawer never fetches a per-run
+endpoint.
+**Reason:** Two parallel UI surfaces (inline trace on the message + global
+list + per-run drawer) describe the same `query_run` rows and have already
+drifted in shape. Inlining trace data on the conversation read avoids a
+second round-trip and keeps the audit shape canonical to the conversation
+contract. A future admin/governance view can rehydrate a global perspective
+without reintroducing the duplicated UI.
+**Trade-off:** Operators temporarily lose a cross-conversation runs view.
+Until a dedicated governance surface lands, runs are only reachable through
+the conversation that produced them. Runs whose conversation has been
+deleted remain queryable via SQL/scripting (see AD-019 for run preservation
+on delete).
+**Impact:** Drives changes in `src/app/query/page.tsx`,
+`src/app/query/page.module.css`, the conversation API payload shape, and
+the test suite. `GET /api/rag/query-runs/:id` may remain as an internal
+endpoint but is no longer consumed by `/query`.
+
+### AD-021: `explore` turns are deterministic, non-generative, and excluded from prompt history (2026-05-02)
+
+**Decision:** Inside the unified chat from F-12, a turn submitted with
+strategy `explore` produces a deterministic related-terms artifact (the
+existing F-04 explore output) as the assistant message content. The LLM is
+not invoked. Subsequent `standard`/`rerank` turns in the same conversation
+skip explore turns when assembling the prompt history.
+**Reason:** F-04 designed `explore` as the explicit non-generative
+discovery path. Synthesizing a narrative paragraph from the related terms
+would reintroduce the hallucination risk the strategy was created to
+avoid. Including explore turns in the prompt history would also pull
+non-narrative context into the LLM's view of the conversation.
+**Trade-off:** Conversational follow-ups that reference an explore turn
+("expand the second term") cannot rely on natural-language coreference
+through the LLM; the user must restate the term explicitly or switch back
+to `standard`/`rerank` for synthesis.
+**Impact:** Application-layer prompt assembly must filter assistant
+messages by `query_run.strategy`. The chat renderer must support
+related-terms as a first-class assistant message body.
+
+### AD-020: Retrieval strategy is selected per turn inside the conversational chat (2026-05-02)
+
+**Decision:** With F-12, the chat composer exposes a single strategy
+selector with three options (`standard`, `explore`, `rerank`) when the
+conversation is in `global` mode and one option (`standard`) when in
+`focused` mode. Selection is per-user-turn; a single conversation may
+freely mix strategies across turns. An "Avançado" disclosure exposes
+`topK` (always) and `candidateTopK` (only when strategy = `rerank`),
+defaulting to F-08's documented values. Override values are sticky for
+the UI session and do not persist server-side.
+**Reason:** `query_run.strategy` is already a per-run column. Forcing one
+strategy per conversation would invent an entity-level coupling the
+schema does not have, and prevent natural mixing
+(explore-then-rerank-then-standard). Always-on rerank charges Cohere on
+trivial follow-ups; classifier-driven selection introduces hidden
+behavior incompatible with the project's traceability bar.
+**Trade-off:** Slightly more composer real estate compared to a fixed
+strategy. The "Avançado" disclosure mitigates clutter for the common
+case.
+**Impact:** Drives changes in the conversation message request schema
+(strategy/mode validation per RN-03), the `/query` composer, and
+acceptance tests covering each strategy/mode combination.
+
+### AD-019: Retire `POST /api/rag/ask` in favor of the conversation transport (2026-05-02)
+
+**Decision:** With F-12, `POST /api/rag/ask` is removed entirely. The route
+handler, `ragAskSuccessResponseSchema` and its siblings, and the
+single-turn `/query` panel are deleted. All RAG execution flows through
+`POST /api/rag/conversations` and
+`POST /api/rag/conversations/:id/messages`. A "quick query" use case is
+served by a one-turn conversation. Conversation deletion does not cascade
+to `query_runs`; affected runs surface a derived `conversation_archived`
+flag in any future governance-facing payload.
+**Reason:** This DEMO has no external API consumers, and two parallel
+transports duplicate audit shapes (run-only vs conversation+message+run)
+and force F-11 (agentic conversational RAG) to either ignore one path or
+double-implement every tool route. A one-turn conversation covers the
+quick-query use case at zero new cost. Soft-preserving runs on conversation
+delete protects governance evidence without blocking UX cleanup.
+**Trade-off:** Existing scripts or external integrations hitting `/ask`
+break — none are known. Conversations created before F-12 still load and
+render, but their next-turn strategy selector defaults to `standard`
+regardless of historical mix.
+**Impact:** Drives the deletion of `src/app/api/rag/ask`, removal of
+`ragAskSuccessResponseSchema` and friends from `src/application/rag/schemas.ts`,
+and rewrites of `src/app/query/page.tsx` and its tests. F-04, F-06, and
+F-08 spec.md files carry "Superseded by F-12" banners.
 
 ### AD-018: F-08 lands with a concrete Cohere reranker on the global single-turn path (2026-04-30)
 
