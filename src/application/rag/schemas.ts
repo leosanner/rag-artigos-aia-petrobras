@@ -26,10 +26,13 @@ const publicAskRetrievalStrategySchema = z.enum([
   "rerank",
 ]);
 
-const publicConversationRetrievalStrategySchema = z.enum([
+const publicGlobalConversationRetrievalStrategySchema = z.enum([
   "standard",
   "explore",
+  "rerank",
 ]);
+
+const publicFocusedConversationRetrievalStrategySchema = z.enum(["standard"]);
 
 export const ragRetrievalInputSchema = z
   .object({
@@ -51,7 +54,19 @@ export const conversationRagRetrievalInputSchema = z
       .min(RAG_RETRIEVAL_MIN_TOP_K)
       .max(RAG_RETRIEVAL_MAX_TOP_K)
       .optional(),
-    strategy: publicConversationRetrievalStrategySchema.optional(),
+    strategy: publicGlobalConversationRetrievalStrategySchema.optional(),
+  })
+  .strict();
+
+export const focusedConversationRagRetrievalInputSchema = z
+  .object({
+    topK: z
+      .number()
+      .int()
+      .min(RAG_RETRIEVAL_MIN_TOP_K)
+      .max(RAG_RETRIEVAL_MAX_TOP_K)
+      .optional(),
+    strategy: publicFocusedConversationRetrievalStrategySchema.optional(),
   })
   .strict();
 
@@ -72,7 +87,7 @@ const focusedRagAskInputSchema = z
     question: z.string().trim().min(1),
     mode: z.literal("focused"),
     documentId: z.string().uuid(),
-    retrieval: conversationRagRetrievalInputSchema.optional(),
+    retrieval: focusedConversationRagRetrievalInputSchema.optional(),
   })
   .strict();
 
@@ -395,7 +410,7 @@ export const appendConversationMessageGlobalRequestSchema = z
 export const appendConversationMessageFocusedRequestSchema = z
   .object({
     content: z.string().trim().min(1),
-    retrievalSettings: conversationRagRetrievalInputSchema.optional(),
+    retrievalSettings: focusedConversationRagRetrievalInputSchema.optional(),
     mode: z.literal("focused"),
     documentId: z.string().uuid(),
   })
@@ -437,6 +452,12 @@ export const appendConversationMessageResponseSchema = z.union([
       status: z.literal("document_not_focusable"),
       userMessage: conversationMessageResponseSchema,
       errorCode: z.literal("document_not_focusable"),
+    })
+    .strip(),
+  z
+    .object({
+      status: z.literal("invalid_request"),
+      errorCode: z.literal("strategy_not_allowed_for_focused_conversation"),
     })
     .strip(),
 ]);

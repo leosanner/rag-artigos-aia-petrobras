@@ -364,4 +364,41 @@ describe("StreamConversationMessage", () => {
     ]);
     expect(messages.append).toHaveBeenCalledTimes(1);
   });
+
+  it.each(["explore", "rerank"] as const)(
+    "rejects strategy=%s on a focused-mode stream request without persisting any message or invoking the engine",
+    async (strategy) => {
+      const events: Array<{ type: string; status?: string }> = [];
+      const { service, messages, answerQuestion } = createService();
+
+      const result = await service.execute(
+        {
+          conversationId: CONVERSATION_ID,
+          userMessageContent: "Pergunta focada com explore",
+          mode: "focused",
+          documentId: "55555555-5555-4555-8555-555555555555",
+          retrievalSettings: { strategy },
+        },
+        {
+          onEvent: async (event) => {
+            events.push(
+              event.type === "error"
+                ? { type: event.type, status: event.status }
+                : { type: event.type },
+            );
+          },
+        },
+      );
+
+      expect(result).toBe("completed");
+      expect(events).toEqual([
+        {
+          type: "error",
+          status: "strategy_not_allowed_for_focused_conversation",
+        },
+      ]);
+      expect(messages.append).not.toHaveBeenCalled();
+      expect(answerQuestion.executeStream).not.toHaveBeenCalled();
+    },
+  );
 });

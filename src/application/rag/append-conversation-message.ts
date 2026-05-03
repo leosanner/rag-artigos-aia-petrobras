@@ -36,9 +36,16 @@ export type AppendConversationMessageFocusedErrorCode =
   | "document_not_found"
   | "document_not_focusable";
 
+export type AppendConversationMessageInvalidRequestCode =
+  "strategy_not_allowed_for_focused_conversation";
+
 export type AppendConversationMessageOutput =
   | {
       status: "not_found";
+    }
+  | {
+      status: "invalid_request";
+      errorCode: AppendConversationMessageInvalidRequestCode;
     }
   | {
       status: "answered" | "answered_no_evidence";
@@ -90,6 +97,17 @@ export class AppendConversationMessage {
     if (!conversation) {
       return {
         status: "not_found",
+      };
+    }
+
+    if (
+      input.mode === "focused" &&
+      input.retrievalSettings?.strategy !== undefined &&
+      input.retrievalSettings.strategy !== "standard"
+    ) {
+      return {
+        status: "invalid_request",
+        errorCode: "strategy_not_allowed_for_focused_conversation",
       };
     }
 

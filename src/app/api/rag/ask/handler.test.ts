@@ -350,7 +350,7 @@ describe("POST /api/rag/ask handler", () => {
           documentId: DOCUMENT_ID,
           retrieval: {
             topK: 9,
-            strategy: "explore",
+            strategy: "standard",
           },
         },
         { Authorization: `Bearer ${VALID_SECRET}` },
@@ -374,7 +374,7 @@ describe("POST /api/rag/ask handler", () => {
       documentId: DOCUMENT_ID,
       retrieval: {
         topK: 9,
-        strategy: "explore",
+        strategy: "standard",
       },
     });
   });

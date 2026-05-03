@@ -621,8 +621,8 @@ describe("AppendConversationMessage", () => {
         conversationId: conversation.id,
         userMessageContent: "mensagem que falha",
       });
-      if (result.status === "not_found") {
-        throw new Error("Expected the conversation to exist");
+      if (result.status === "not_found" || result.status === "invalid_request") {
+        throw new Error("Expected a generation failure result");
       }
 
       expect(result).toEqual({
@@ -691,7 +691,7 @@ describe("AppendConversationMessage", () => {
         documentId: "77777777-7777-4777-8777-777777777777",
         retrievalSettings: {
           topK: 8,
-          strategy: "explore",
+          strategy: "standard",
         },
       });
       if (result.status === "not_found") {
@@ -716,7 +716,7 @@ describe("AppendConversationMessage", () => {
         documentId: "77777777-7777-4777-8777-777777777777",
         retrieval: {
           topK: 8,
-          strategy: "explore",
+          strategy: "standard",
         },
         conversationContext: {
           transcript: "User: mensagem focada",
@@ -736,6 +736,49 @@ describe("AppendConversationMessage", () => {
 
       const persistedRuns = await db.select().from(ragQueryRuns);
       expect(persistedRuns).toHaveLength(0);
+    },
+  );
+
+  it.each(["explore", "rerank"] as const)(
+    "rejects a focused-mode request with strategy=%s as invalid_request, before persisting any message or run",
+    async (strategy) => {
+      const focusedDocumentId = "55555555-5555-4555-8555-555555555555";
+      const conversation = await createConversation.execute();
+
+      const { answerQuestion, invocations } = createFakeAnswerQuestion(
+        db,
+        runsRepository,
+        conversation.id,
+        { status: "answered", answer: "ignored" },
+      );
+      const service = new AppendConversationMessage({
+        conversations,
+        messages,
+        answerQuestion,
+      });
+
+      const result = await service.execute({
+        conversationId: conversation.id,
+        userMessageContent: "qualquer coisa",
+        mode: "focused",
+        documentId: focusedDocumentId,
+        retrievalSettings: { strategy },
+      });
+
+      expect(result).toEqual({
+        status: "invalid_request",
+        errorCode: "strategy_not_allowed_for_focused_conversation",
+      });
+      expect(invocations).toHaveLength(0);
+
+      const messageRows = await db
+        .select()
+        .from(ragConversationMessages)
+        .where(eq(ragConversationMessages.conversationId, conversation.id));
+      expect(messageRows).toHaveLength(0);
+
+      const runRows = await db.select().from(ragQueryRuns);
+      expect(runRows).toHaveLength(0);
     },
   );
 

@@ -67,6 +67,19 @@ export class StreamConversationMessage {
       onEvent: StreamConversationMessageListener;
     },
   ): Promise<"completed" | "not_found"> {
+    if (
+      input.mode === "focused" &&
+      input.retrievalSettings?.strategy !== undefined &&
+      input.retrievalSettings.strategy !== "standard"
+    ) {
+      await options.onEvent({
+        type: "error",
+        status: "strategy_not_allowed_for_focused_conversation",
+        errorCode: "strategy_not_allowed_for_focused_conversation",
+      });
+      return "completed";
+    }
+
     const conversation = await this.conversations.getDetail(input.conversationId);
 
     if (!conversation) {

@@ -35,7 +35,7 @@ describe("ragAskRequestSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("keeps rerank unavailable on the public conversation request surface", () => {
+  it("accepts rerank on the public global conversation request surface", () => {
     const result = appendConversationMessageRequestSchema.safeParse({
       content: "Quais tecnicas aparecem com mais frequencia?",
       retrievalSettings: {
@@ -44,7 +44,38 @@ describe("ragAskRequestSchema", () => {
       },
     });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+  });
+
+  it.each(["explore", "rerank"] as const)(
+    "rejects strategy=%s on the public focused conversation request surface",
+    (strategy) => {
+      const result = appendConversationMessageRequestSchema.safeParse({
+        content: "Pergunta no documento focado",
+        mode: "focused",
+        documentId: "11111111-1111-4111-8111-111111111111",
+        retrievalSettings: {
+          topK: 6,
+          strategy,
+        },
+      });
+
+      expect(result.success).toBe(false);
+    },
+  );
+
+  it("accepts strategy=standard on the public focused conversation request surface", () => {
+    const result = appendConversationMessageRequestSchema.safeParse({
+      content: "Pergunta no documento focado",
+      mode: "focused",
+      documentId: "11111111-1111-4111-8111-111111111111",
+      retrievalSettings: {
+        topK: 6,
+        strategy: "standard",
+      },
+    });
+
+    expect(result.success).toBe(true);
   });
 
   it("keeps split scores and rerank audit visible on the public ask payload", () => {

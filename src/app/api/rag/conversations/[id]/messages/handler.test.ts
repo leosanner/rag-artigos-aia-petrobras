@@ -348,7 +348,7 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
           documentId: DOCUMENT_ID,
           retrievalSettings: {
             topK: 8,
-            strategy: "explore",
+            strategy: "standard",
           },
         },
         { Authorization: `Bearer ${VALID_SECRET}` },
@@ -375,7 +375,7 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
       documentId: DOCUMENT_ID,
       retrievalSettings: {
         topK: 8,
-        strategy: "explore",
+        strategy: "standard",
       },
       requestTraceId: expect.any(String),
     });

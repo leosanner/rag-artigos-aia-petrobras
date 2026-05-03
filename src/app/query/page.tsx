@@ -1024,7 +1024,11 @@ export default function QueryPage() {
     if (response.status === 502 || response.status === 503) {
       const parsed = appendConversationMessageResponseSchema.safeParse(body);
 
-      if (parsed.success && "errorCode" in parsed.data) {
+      if (
+        parsed.success &&
+        "errorCode" in parsed.data &&
+        "userMessage" in parsed.data
+      ) {
         appendTranscriptMessages([parsed.data.userMessage]);
       }
 

@@ -68,6 +68,13 @@ export function toAppendConversationMessageHttpResponse(
     });
   }
 
+  if (result.status === "invalid_request") {
+    return appendConversationMessageResponseSchema.parse({
+      status: result.status,
+      errorCode: result.errorCode,
+    });
+  }
+
   if ("errorCode" in result) {
     return appendConversationMessageResponseSchema.parse({
       status: result.status,

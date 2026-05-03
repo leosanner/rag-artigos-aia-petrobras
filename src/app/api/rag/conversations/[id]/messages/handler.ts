@@ -135,7 +135,9 @@ export function createRagConversationMessagesHandler(
               ? 404
               : result.status === "document_not_focusable"
                 ? 422
-            : 200;
+                : result.status === "invalid_request"
+                  ? 422
+                  : 200;
 
       return NextResponse.json(body, {
         status,

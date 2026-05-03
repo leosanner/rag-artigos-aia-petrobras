@@ -15,6 +15,7 @@ export const STREAM_CONVERSATION_ERROR_STATUSES = Object.freeze([
   "generation_unavailable",
   "document_not_found",
   "document_not_focusable",
+  "strategy_not_allowed_for_focused_conversation",
 ] as const);
 
 export type StreamConversationErrorStatus =
