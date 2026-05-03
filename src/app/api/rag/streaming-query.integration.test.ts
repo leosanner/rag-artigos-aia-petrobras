@@ -17,6 +17,7 @@ import { StreamConversationMessage } from "@/application/rag/stream-conversation
 import type {
   GenerationProvider,
   QuestionEmbeddingProvider,
+  RerankingProvider,
 } from "@/application/rag/ports";
 import {
   ragConversationStreamEventSchema,
@@ -160,6 +161,32 @@ function conversationContext(id: string) {
   };
 }
 
+function buildRerankingProvider(): RerankingProvider {
+  return {
+    rerank: vi.fn().mockImplementation(async ({ matches }) => ({
+      matches: matches.map(
+        (
+          match: { chunkId: string },
+          index: number,
+        ) => ({
+          chunkId: match.chunkId,
+          rerankScore: 0.95 - index * 0.05,
+        }),
+      ),
+      metadata: {
+        rerankerProvider: "cohere",
+        rerankerModel: "rerank-v3.5",
+      },
+      audit: {
+        latencyMs: 12,
+        candidatesEvaluated: matches.length,
+        inputTokens: 32,
+        estimatedCostUsd: 0.0000041,
+      },
+    })),
+  };
+}
+
 function wire(db: TestDatabase, options?: { failStreaming?: boolean }) {
   const documentsRepository = new DocumentsRepository(db);
   const chunksRepository = new DocumentChunksRepository(db);
@@ -170,6 +197,7 @@ function wire(db: TestDatabase, options?: { failStreaming?: boolean }) {
   const retrieveChunks = new RetrieveChunks({
     questionEmbeddingProvider: buildEmbeddingProvider(),
     chunksRepository,
+    rerankingProvider: buildRerankingProvider(),
     embeddingModel: EMBEDDING_MODEL,
   });
   const answerQuestion = new AnswerQuestion({
@@ -350,5 +378,81 @@ describe("F-10 streaming query integration (real Postgres + real handlers)", () 
       .from(ragQueryRuns)
       .where(eq(ragQueryRuns.id, persistedRuns[0]!.id));
     expect(failedRun[0]?.answer).toBeNull();
+  });
+
+  it("streams a rerank conversation turn with retrieving_sources → reranking → generating_answer phase order", async () => {
+    const { conversationsRepository, messagesHandler } = wire(db);
+    const conversation = await conversationsRepository.create();
+
+    const response = await messagesHandler(
+      postStream(
+        `http://localhost/api/rag/conversations/${conversation.id}/messages`,
+        {
+          content: "Pergunta com rerank",
+          retrievalSettings: { topK: 3, strategy: "rerank" },
+        },
+      ),
+      conversationContext(conversation.id),
+    );
+
+    expect(response.status).toBe(200);
+    const events = await readSseEvents(response);
+    const phases = events
+      .filter((event) => event.type === "phase")
+      .map((event) =>
+        event.type === "phase" ? event.phase : null,
+      );
+
+    expect(phases).toEqual([
+      "retrieving_sources",
+      "reranking",
+      "generating_answer",
+    ]);
+    expect(events.at(-1)?.type).toBe("done");
+    expect(events.some((event) => event.type === "answer_delta")).toBe(true);
+
+    const persistedRuns = await db.select().from(ragQueryRuns);
+    expect(persistedRuns).toHaveLength(1);
+    expect(persistedRuns[0]?.retrievalStrategy).toBe("rerank");
+    expect(persistedRuns[0]?.rerankerProvider).toBe("cohere");
+  });
+
+  it("streams an explore conversation turn as user_message_created → related_terms → done with no token deltas or phase events", async () => {
+    const { conversationsRepository, messagesHandler } = wire(db);
+    const conversation = await conversationsRepository.create();
+
+    const response = await messagesHandler(
+      postStream(
+        `http://localhost/api/rag/conversations/${conversation.id}/messages`,
+        {
+          content: "Tema exploratório com perspectivas variadas",
+          retrievalSettings: { topK: 3, strategy: "explore" },
+        },
+      ),
+      conversationContext(conversation.id),
+    );
+
+    expect(response.status).toBe(200);
+    const events = await readSseEvents(response);
+
+    expect(events.map((event) => event.type)).toEqual([
+      "user_message_created",
+      "related_terms",
+      "done",
+    ]);
+    const relatedTermsEvent = events.find(
+      (event) => event.type === "related_terms",
+    );
+    if (!relatedTermsEvent || relatedTermsEvent.type !== "related_terms") {
+      throw new Error("expected related_terms event");
+    }
+    expect(Array.isArray(relatedTermsEvent.terms)).toBe(true);
+
+    const persistedRuns = await db.select().from(ragQueryRuns);
+    expect(persistedRuns).toHaveLength(1);
+    expect(persistedRuns[0]?.retrievalStrategy).toBe("explore");
+    expect(persistedRuns[0]?.generationInputTokens).toBeNull();
+    expect(persistedRuns[0]?.generationOutputTokens).toBeNull();
+    expect(persistedRuns[0]?.generationCostUsd).toBeNull();
   });
 });
