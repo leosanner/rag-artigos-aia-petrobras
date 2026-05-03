@@ -1,6 +1,7 @@
 import {
   buildConversationRetrievalContext,
   deriveConversationTitle,
+  filterPromptHistory,
   type FocusedDocumentRejectionReason,
   type RagQueryRunErrorCode,
 } from "@/domain/rag";
@@ -92,9 +93,8 @@ export class AppendConversationMessage {
       };
     }
 
-    const previousStoredMessages = await this.messages.listPreviousVisible(
-      input.conversationId,
-      4,
+    const previousStoredMessages = filterPromptHistory(
+      await this.messages.listPreviousVisible(input.conversationId, 4),
     );
 
     const createdUserMessage = await this.messages.append({

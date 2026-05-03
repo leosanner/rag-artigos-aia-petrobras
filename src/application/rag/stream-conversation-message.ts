@@ -1,6 +1,7 @@
 import {
   buildConversationRetrievalContext,
   deriveConversationTitle,
+  filterPromptHistory,
   type FocusedDocumentRejectionReason,
 } from "@/domain/rag";
 import type { ConversationMessageRepository } from "@/repositories/conversation-message-repository";
@@ -72,9 +73,8 @@ export class StreamConversationMessage {
       return "not_found";
     }
 
-    const previousStoredMessages = await this.messages.listPreviousVisible(
-      input.conversationId,
-      4,
+    const previousStoredMessages = filterPromptHistory(
+      await this.messages.listPreviousVisible(input.conversationId, 4),
     );
 
     const createdUserMessage = await this.messages.append({

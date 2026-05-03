@@ -738,4 +738,79 @@ describe("AppendConversationMessage", () => {
       expect(persistedRuns).toHaveLength(0);
     },
   );
+
+  it("filters out the user/assistant pair of an explore turn before assembling the next prompt transcript", async () => {
+    const conversation = await createConversation.execute();
+    await conversations.updateTitleIfUnset(conversation.id, "Titulo");
+
+    const standardRun = await insertRun(runsRepository, {
+      question: "pergunta 1",
+      answer: "resposta 1 standard.",
+      retrievalStrategy: "standard",
+    });
+    const exploreRun = await insertRun(runsRepository, {
+      question: "pergunta 2 explore",
+      answer: "termos relacionados serializados",
+      retrievalStrategy: "explore",
+    });
+
+    await insertStoredMessage(db, {
+      conversationId: conversation.id,
+      role: "user",
+      content: "pergunta 1",
+      createdAt: new Date("2026-04-25T12:00:00.000Z"),
+    });
+    await insertStoredMessage(db, {
+      conversationId: conversation.id,
+      role: "assistant",
+      content: "resposta standard 1",
+      traceId: standardRun.id,
+      createdAt: new Date("2026-04-25T12:00:01.000Z"),
+    });
+    await insertStoredMessage(db, {
+      conversationId: conversation.id,
+      role: "user",
+      content: "pergunta explore",
+      createdAt: new Date("2026-04-25T12:00:02.000Z"),
+    });
+    await insertStoredMessage(db, {
+      conversationId: conversation.id,
+      role: "assistant",
+      content: "termos relacionados serializados",
+      traceId: exploreRun.id,
+      createdAt: new Date("2026-04-25T12:00:03.000Z"),
+    });
+
+    const { answerQuestion, invocations } = createFakeAnswerQuestion(
+      db,
+      runsRepository,
+      conversation.id,
+      {
+        status: "answered",
+        answer: "Resposta nova [1].",
+      },
+    );
+    const service = new AppendConversationMessage({
+      conversations,
+      messages,
+      answerQuestion,
+    });
+
+    const result = await service.execute({
+      conversationId: conversation.id,
+      userMessageContent: "pergunta seguinte",
+    });
+    if (result.status !== "answered") {
+      throw new Error("Expected an answered result");
+    }
+
+    expect(invocations).toHaveLength(1);
+    expect(invocations[0]?.input.conversationContext?.transcript).toBe(
+      [
+        "User: pergunta 1",
+        "Assistant: resposta standard 1",
+        "User: pergunta seguinte",
+      ].join("\n\n"),
+    );
+  });
 });

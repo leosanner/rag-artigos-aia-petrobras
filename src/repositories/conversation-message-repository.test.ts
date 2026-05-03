@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { ragConversations } from "@/db/schema";
+import { ragConversations, ragQueryRuns } from "@/db/schema";
 import { createTestDatabase, resetTestDatabase } from "@/test/db";
 
 import { ConversationMessageRepository } from "./conversation-message-repository";
@@ -106,10 +106,61 @@ describe("ConversationMessageRepository", () => {
     const previous = await repository.listPreviousVisible(conversationId, 4);
 
     expect(previous).toEqual([
-      { role: "user", content: "mensagem 2" },
-      { role: "user", content: "mensagem 3" },
-      { role: "user", content: "mensagem 4" },
-      { role: "user", content: "mensagem 5" },
+      { role: "user", content: "mensagem 2", trace: null },
+      { role: "user", content: "mensagem 3", trace: null },
+      { role: "user", content: "mensagem 4", trace: null },
+      { role: "user", content: "mensagem 5", trace: null },
+    ]);
+  });
+
+  it("hydrates assistant messages with the retrieval strategy of their query run", async () => {
+    const conversationId = await insertConversation(db);
+
+    await repository.append({
+      conversationId,
+      role: "user",
+      content: "Pergunta exploratória",
+      traceId: null,
+    });
+
+    const exploreRunId = await insertRun(db, "explore");
+    await repository.append({
+      conversationId,
+      role: "assistant",
+      content: "Resposta explore",
+      traceId: exploreRunId,
+    });
+
+    await repository.append({
+      conversationId,
+      role: "user",
+      content: "Outra pergunta",
+      traceId: null,
+    });
+
+    const standardRunId = await insertRun(db, "standard");
+    await repository.append({
+      conversationId,
+      role: "assistant",
+      content: "Resposta standard",
+      traceId: standardRunId,
+    });
+
+    const previous = await repository.listPreviousVisible(conversationId, 4);
+
+    expect(previous).toEqual([
+      { role: "user", content: "Pergunta exploratória", trace: null },
+      {
+        role: "assistant",
+        content: "Resposta explore",
+        trace: { strategy: "explore" },
+      },
+      { role: "user", content: "Outra pergunta", trace: null },
+      {
+        role: "assistant",
+        content: "Resposta standard",
+        trace: { strategy: "standard" },
+      },
     ]);
   });
 
@@ -136,7 +187,41 @@ describe("ConversationMessageRepository", () => {
     const previous = await repository.listPreviousVisible(conversationId);
 
     expect(previous).toHaveLength(4);
-    expect(previous[0]).toEqual({ role: "user", content: "mensagem 2" });
-    expect(previous[3]).toEqual({ role: "user", content: "mensagem 5" });
+    expect(previous[0]).toEqual({
+      role: "user",
+      content: "mensagem 2",
+      trace: null,
+    });
+    expect(previous[3]).toEqual({
+      role: "user",
+      content: "mensagem 5",
+      trace: null,
+    });
   });
 });
+
+async function insertRun(
+  db: TestDatabase,
+  strategy: "standard" | "explore" | "rerank",
+): Promise<string> {
+  const [run] = await db
+    .insert(ragQueryRuns)
+    .values({
+      question: `pergunta ${strategy}`,
+      answer: `resposta ${strategy}`,
+      mode: "global",
+      status: "answered",
+      retrievalStrategy: strategy,
+      topK: 6,
+      candidateTopK: strategy === "rerank" ? 24 : 6,
+      latencyMs: 10,
+      embeddingInputTokens: 0,
+      embeddingCostUsd: 0,
+      totalCostUsd: 0,
+      promptVersion: "test/v1",
+      generationModel: "test-model",
+      embeddingModel: "test-embed",
+    })
+    .returning({ id: ragQueryRuns.id });
+  return run.id;
+}

@@ -2,10 +2,11 @@ import { desc, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import * as schema from "@/db/schema";
-import { ragConversationMessages } from "@/db/schema";
+import { ragConversationMessages, ragQueryRuns } from "@/db/schema";
 import type {
-  ConversationMessageForContext,
   ConversationMessageRole,
+  PromptHistoryMessage,
+  RagRetrievalStrategy,
 } from "@/domain/rag";
 
 type DatabaseClient = NodePgDatabase<typeof schema>;
@@ -44,13 +45,18 @@ export class ConversationMessageRepository {
   async listPreviousVisible(
     conversationId: string,
     limit: number = CONVERSATION_PREVIOUS_VISIBLE_DEFAULT_LIMIT,
-  ): Promise<ConversationMessageForContext[]> {
+  ): Promise<PromptHistoryMessage[]> {
     const rows = await this.db
       .select({
         role: ragConversationMessages.role,
         content: ragConversationMessages.content,
+        retrievalStrategy: ragQueryRuns.retrievalStrategy,
       })
       .from(ragConversationMessages)
+      .leftJoin(
+        ragQueryRuns,
+        eq(ragConversationMessages.traceId, ragQueryRuns.id),
+      )
       .where(eq(ragConversationMessages.conversationId, conversationId))
       .orderBy(
         desc(ragConversationMessages.createdAt),
@@ -61,6 +67,10 @@ export class ConversationMessageRepository {
     return rows.reverse().map((row) => ({
       role: row.role,
       content: row.content,
+      trace:
+        row.retrievalStrategy === null
+          ? null
+          : { strategy: row.retrievalStrategy as RagRetrievalStrategy },
     }));
   }
 }
