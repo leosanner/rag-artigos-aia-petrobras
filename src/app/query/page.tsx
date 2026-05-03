@@ -268,7 +268,7 @@ type StreamingAssistantState =
   | { status: "idle" }
   | {
       status: "streaming";
-      phase: "retrieving_sources" | "generating_answer";
+      phase: "retrieving_sources" | "reranking" | "generating_answer";
       content: string;
       sources: RagStreamSource[];
     };
@@ -1108,6 +1108,10 @@ export default function QueryPage() {
                 ? [...current.sources, event.source]
                 : [event.source],
           }));
+          continue;
+        }
+
+        if (event.type === "related_terms") {
           continue;
         }
 
@@ -2575,7 +2579,7 @@ function StreamingConversationMessageItem({
   content,
   sources,
 }: {
-  phase: "retrieving_sources" | "generating_answer";
+  phase: "retrieving_sources" | "reranking" | "generating_answer";
   content: string;
   sources: RagStreamSource[];
 }) {
@@ -2592,7 +2596,9 @@ function StreamingConversationMessageItem({
         <p className={styles.streamingPhase}>
           {phase === "retrieving_sources"
             ? "Consultando fontes..."
-            : "Gerando resposta..."}
+            : phase === "reranking"
+              ? "Reordenando fontes..."
+              : "Gerando resposta..."}
         </p>
 
         {sources.length > 0 ? (
@@ -3106,7 +3112,8 @@ function formatStreamErrorMessage(
     | "generation_failed"
     | "generation_unavailable"
     | "document_not_found"
-    | "document_not_focusable",
+    | "document_not_focusable"
+    | "strategy_not_allowed_for_focused_conversation",
 ): string {
   if (status === "generation_failed") {
     return RAG_GENERATION_FAILED_MESSAGE;
@@ -3120,7 +3127,11 @@ function formatStreamErrorMessage(
     return RAG_FOCUSED_DOCUMENT_NOT_FOUND_MESSAGE;
   }
 
-  return RAG_FOCUSED_DOCUMENT_NOT_FOCUSABLE_MESSAGE;
+  if (status === "document_not_focusable") {
+    return RAG_FOCUSED_DOCUMENT_NOT_FOCUSABLE_MESSAGE;
+  }
+
+  return RAG_TECHNICAL_ERROR_MESSAGE;
 }
 
 function formatAskFailureMessage(body: unknown, httpStatus: number): string {

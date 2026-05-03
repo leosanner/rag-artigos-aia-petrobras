@@ -58,6 +58,7 @@ export type AnswerQuestionDeps = {
 
 export type AnswerQuestionStreamCallbacks = {
   onSources?: (sources: RagSource[]) => Promise<void> | void;
+  onRerankingStart?: () => Promise<void> | void;
   onGenerationStart?: () => Promise<void> | void;
   onAnswerDelta?: (textDelta: string) => Promise<void> | void;
 };
@@ -144,6 +145,9 @@ export class AnswerQuestion {
         question: retrievalQuestion,
         retrieval,
         ...(documentId !== null ? { documentId } : {}),
+        ...(callbacks?.onRerankingStart !== undefined
+          ? { onRerankingStart: callbacks.onRerankingStart }
+          : {}),
       });
     } catch (error) {
       const failureCode = toApplicationFailureCode(error);

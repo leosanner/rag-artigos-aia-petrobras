@@ -468,6 +468,7 @@ export type AppendConversationMessageResponse = z.infer<
 
 export const ragConversationStreamPhaseSchema = z.enum([
   "retrieving_sources",
+  "reranking",
   "generating_answer",
 ]);
 
@@ -480,6 +481,7 @@ export const ragConversationStreamErrorStatusSchema = z.enum([
   "generation_unavailable",
   "document_not_found",
   "document_not_focusable",
+  "strategy_not_allowed_for_focused_conversation",
 ]);
 
 export type RagConversationStreamErrorStatus = z.infer<
@@ -514,6 +516,13 @@ export const ragConversationStreamAnswerDeltaEventSchema = z
   })
   .strip();
 
+export const ragConversationStreamRelatedTermsEventSchema = z
+  .object({
+    type: z.literal("related_terms"),
+    terms: z.array(relatedTermSchema),
+  })
+  .strip();
+
 export const ragConversationStreamDoneEventSchema = z
   .object({
     type: z.literal("done"),
@@ -535,6 +544,7 @@ export const ragConversationStreamEventSchema = z.discriminatedUnion("type", [
   ragConversationStreamPhaseEventSchema,
   ragConversationStreamSourceEventSchema,
   ragConversationStreamAnswerDeltaEventSchema,
+  ragConversationStreamRelatedTermsEventSchema,
   ragConversationStreamDoneEventSchema,
   ragConversationStreamErrorEventSchema,
 ]);

@@ -101,6 +101,8 @@ export function toConversationStreamEventHttpResponse(
       return ragConversationStreamEventSchema.parse(event);
     case "answer_delta":
       return ragConversationStreamEventSchema.parse(event);
+    case "related_terms":
+      return ragConversationStreamEventSchema.parse(event);
     case "done":
       return ragConversationStreamEventSchema.parse({
         type: event.type,

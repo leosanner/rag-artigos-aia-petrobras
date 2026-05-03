@@ -365,6 +365,113 @@ describe("StreamConversationMessage", () => {
     expect(messages.append).toHaveBeenCalledTimes(1);
   });
 
+  it("for explore strategy, emits user_message_created → related_terms → done with no phase, source, or answer_delta events", async () => {
+    const events: Array<{ type: string; terms?: unknown }> = [];
+    const exploreTerms = [
+      {
+        rank: 1,
+        term: "termo composto",
+        ngramSize: 2,
+        frequency: 4,
+        sourceCoverageCount: 3,
+      },
+    ];
+    const exploreAnswer = JSON.stringify({
+      kind: "related_terms",
+      terms: exploreTerms,
+    });
+    const { service, messages, answerQuestion } = createService({
+      executeStream: async () =>
+        buildAnsweredResult({
+          answer: exploreAnswer,
+          sources: [],
+          relatedTerms: exploreTerms,
+          metadata: {
+            ...buildAnsweredResult().metadata,
+            retrievalStrategy: "explore",
+            candidateTopK: 18,
+          },
+          audit: {
+            ...buildAnsweredResult().audit,
+            generation: null,
+          },
+        }),
+      hydratedAssistantTraceId: TRACE_ID,
+    });
+
+    await service.execute(
+      {
+        conversationId: CONVERSATION_ID,
+        userMessageContent: "Pergunta exploratória",
+        retrievalSettings: { strategy: "explore" },
+      },
+      {
+        onEvent: async (event) => {
+          if (event.type === "related_terms") {
+            events.push({ type: event.type, terms: event.terms });
+          } else {
+            events.push({ type: event.type });
+          }
+        },
+      },
+    );
+
+    expect(events).toEqual([
+      { type: "user_message_created" },
+      { type: "related_terms", terms: exploreTerms },
+      { type: "done" },
+    ]);
+    expect(answerQuestion.executeStream).toHaveBeenCalledTimes(1);
+    expect(messages.append).toHaveBeenCalledTimes(2);
+  });
+
+  it("for rerank strategy, emits a phase=reranking event between retrieval and generation phases", async () => {
+    const events: Array<{ type: string; phase?: string }> = [];
+    const { service } = createService({
+      executeStream: async (callbacks) => {
+        await callbacks.onSources?.([buildSource()]);
+        await callbacks.onRerankingStart?.();
+        await callbacks.onGenerationStart?.();
+        await callbacks.onAnswerDelta?.("Resposta");
+        return buildAnsweredResult({
+          metadata: {
+            ...buildAnsweredResult().metadata,
+            retrievalStrategy: "rerank",
+            rerankerProvider: "cohere",
+            rerankerModel: "rerank-v3",
+          },
+        });
+      },
+    });
+
+    await service.execute(
+      {
+        conversationId: CONVERSATION_ID,
+        userMessageContent: "Pergunta com rerank",
+        retrievalSettings: { strategy: "rerank" },
+      },
+      {
+        onEvent: async (event) => {
+          events.push(
+            event.type === "phase"
+              ? { type: event.type, phase: event.phase }
+              : { type: event.type },
+          );
+        },
+      },
+    );
+
+    expect(events).toEqual([
+      { type: "user_message_created" },
+      { type: "phase", phase: "retrieving_sources" },
+      { type: "source" },
+      { type: "phase", phase: "reranking" },
+      { type: "phase", phase: "generating_answer" },
+      { type: "answer_delta" },
+      { type: "done" },
+    ]);
+  });
+
   it.each(["explore", "rerank"] as const)(
     "rejects strategy=%s on a focused-mode stream request without persisting any message or invoking the engine",
     async (strategy) => {

@@ -29,6 +29,7 @@ export type RetrieveChunksInput = {
   question: string;
   retrieval: RagRetrievalSettings;
   documentId?: string;
+  onRerankingStart?: () => Promise<void> | void;
 };
 
 export type RetrieveChunksResult = {
@@ -141,6 +142,7 @@ export class RetrieveChunks {
       }
 
       const firstPassMatches = rawMatches.map(toFirstPassMatch);
+      await input.onRerankingStart?.();
       const rerankedResult = await this.rerankMatches({
         question: input.question,
         matches: firstPassMatches,

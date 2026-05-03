@@ -1,9 +1,10 @@
-import type { RagSource } from "@/domain/rag";
+import type { RagSource, RelatedTerm } from "@/domain/rag";
 
 import type { ConversationMessageResponse } from "./conversation-types";
 
 export const STREAM_CONVERSATION_PHASES = Object.freeze([
   "retrieving_sources",
+  "reranking",
   "generating_answer",
 ] as const);
 
@@ -37,6 +38,10 @@ export type StreamConversationMessageEvent =
   | {
       type: "answer_delta";
       textDelta: string;
+    }
+  | {
+      type: "related_terms";
+      terms: RelatedTerm[];
     }
   | {
       type: "done";

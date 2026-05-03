@@ -122,10 +122,15 @@ export class StreamConversationMessage {
       type: "user_message_created",
       userMessage,
     });
-    await options.onEvent({
-      type: "phase",
-      phase: "retrieving_sources",
-    });
+
+    const isExploreTurn = input.retrievalSettings?.strategy === "explore";
+
+    if (!isExploreTurn) {
+      await options.onEvent({
+        type: "phase",
+        phase: "retrieving_sources",
+      });
+    }
 
     const turnInput =
       input.mode === "focused"
@@ -155,28 +160,36 @@ export class StreamConversationMessage {
             requestTraceId: input.requestTraceId,
           };
 
-    const callbacks: AnswerQuestionStreamCallbacks = {
-      onSources: async (sources) => {
-        for (const source of sources) {
-          await options.onEvent({
-            type: "source",
-            source,
-          });
-        }
-      },
-      onGenerationStart: async () => {
-        await options.onEvent({
-          type: "phase",
-          phase: "generating_answer",
-        });
-      },
-      onAnswerDelta: async (textDelta) => {
-        await options.onEvent({
-          type: "answer_delta",
-          textDelta,
-        });
-      },
-    };
+    const callbacks: AnswerQuestionStreamCallbacks = isExploreTurn
+      ? {}
+      : {
+          onSources: async (sources) => {
+            for (const source of sources) {
+              await options.onEvent({
+                type: "source",
+                source,
+              });
+            }
+          },
+          onRerankingStart: async () => {
+            await options.onEvent({
+              type: "phase",
+              phase: "reranking",
+            });
+          },
+          onGenerationStart: async () => {
+            await options.onEvent({
+              type: "phase",
+              phase: "generating_answer",
+            });
+          },
+          onAnswerDelta: async (textDelta) => {
+            await options.onEvent({
+              type: "answer_delta",
+              textDelta,
+            });
+          },
+        };
 
     const turnResult = await this.answerQuestion.executeStream(
       turnInput,
@@ -208,6 +221,13 @@ export class StreamConversationMessage {
         errorCode: status,
       });
       return "completed";
+    }
+
+    if (isExploreTurn) {
+      await options.onEvent({
+        type: "related_terms",
+        terms: turnResult.relatedTerms,
+      });
     }
 
     const createdAssistantMessage = await this.messages.append({
