@@ -6,6 +6,7 @@ export * from "./conversation-rules";
 export * from "./conversation-title";
 export * from "./prompt-history";
 export * from "./diversified-selection";
+export * from "./explore-artifact";
 export * from "./focused-rejection";
 export * from "./focused-request";
 export * from "./query-run-status";

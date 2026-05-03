@@ -531,6 +531,6 @@ describe("F-08 reranked retrieval integration (real Postgres + real handlers)", 
     expect(exploreDetail.audit.reranking).toBeNull();
 
     expect(rerankSpy).not.toHaveBeenCalled();
-    expect(generateSpy).toHaveBeenCalledTimes(2);
+    expect(generateSpy).toHaveBeenCalledTimes(1);
   });
 });

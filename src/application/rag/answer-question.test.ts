@@ -604,11 +604,9 @@ describe("AnswerQuestion", () => {
     expect(nowMs).toHaveBeenCalledTimes(2);
   });
 
-  it("normalizes explore retrieval defaults, forwards explore prompting, and persists the applied strategy metadata", async () => {
+  it("for explore strategy, skips LLM generation, persists the deterministic related-terms artifact as the run answer, and records zero generation tokens", async () => {
     const { service, retrieveChunks, generationProvider, runsRepository } =
-      createService({
-        answer: "Perspectiva A [1]. Perspectiva B [2].",
-      });
+      createService();
 
     const result = await service.execute({
       question: "Quais perspectivas diferentes aparecem?",
@@ -618,8 +616,28 @@ describe("AnswerQuestion", () => {
       },
     });
 
+    if (result.kind !== "answered") {
+      throw new Error("Expected an answered explore result");
+    }
+
+    expect(retrieveChunks.search).toHaveBeenCalledWith({
+      question: "Quais perspectivas diferentes aparecem?",
+      retrieval: {
+        topK: 6,
+        strategy: "explore",
+      },
+    });
+    expect(generationProvider.generateAnswer).not.toHaveBeenCalled();
+    expect(generationProvider.streamAnswer).not.toHaveBeenCalled();
+
+    const parsedArtifact = JSON.parse(result.answer) as {
+      kind: string;
+      terms: unknown[];
+    };
+    expect(parsedArtifact.kind).toBe("related_terms");
+    expect(parsedArtifact.terms).toEqual(result.relatedTerms);
+
     expect(result).toMatchObject({
-      kind: "answered",
       status: "answered",
       metadata: {
         mode: "global",
@@ -628,24 +646,28 @@ describe("AnswerQuestion", () => {
         retrievalStrategy: "explore",
         candidateTopK: 18,
       },
+      sources: [],
     });
-    expect(retrieveChunks.search).toHaveBeenCalledWith({
-      question: "Quais perspectivas diferentes aparecem?",
-      retrieval: {
-        topK: 6,
-        strategy: "explore",
-      },
-    });
-    expect(generationProvider.generateAnswer).toHaveBeenCalledWith(
-      expect.objectContaining({
-        retrievalStrategy: "explore",
-      }),
-    );
+
+    const createCall = runsRepository.create.mock.calls[0]?.[0] as
+      | { sources: Array<{ citedInAnswer: boolean }> }
+      | undefined;
+    expect(createCall).toBeDefined();
     expect(runsRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
+        status: "answered",
         retrievalStrategy: "explore",
         candidateTopK: 18,
+        answer: result.answer,
+        generationInputTokens: null,
+        generationOutputTokens: null,
+        generationTotalTokens: null,
+        generationCostUsd: null,
       }),
+    );
+    expect(createCall!.sources.length).toBeGreaterThan(0);
+    expect(createCall!.sources.every((s) => s.citedInAnswer === false)).toBe(
+      true,
     );
   });
 

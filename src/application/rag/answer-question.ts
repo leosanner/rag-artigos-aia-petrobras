@@ -3,6 +3,7 @@ import {
   GenerationFailure,
   assertValidCitationMarkers,
   assembleRagContext,
+  buildExploreArtifactContent,
   buildNoEvidenceAnswer,
   extractCitationNumbers,
   extractRelatedTerms,
@@ -248,6 +249,42 @@ export class AnswerQuestion {
       question: input.question,
       sourceExcerpts: matches.map((match) => match.excerpt),
     });
+
+    if (retrieval.strategy === "explore") {
+      const exploreAnswer = buildExploreArtifactContent(relatedTerms);
+      const audit = this.buildAudit(
+        startedAtMs,
+        embedding,
+        reranking?.audit ?? null,
+        null,
+      );
+      const persisted = await this.persistRun(
+        this.buildPersistInput({
+          question: input.question,
+          answer: exploreAnswer,
+          status: "answered",
+          errorCode: null,
+          metadata,
+          audit,
+          sources: toPersistedSources(matches, new Set<number>()),
+          relatedTerms,
+          generation: null,
+        }),
+        input.requestTraceId,
+      );
+
+      return answerQuestionResultSchema.parse({
+        kind: "answered",
+        status: "answered",
+        traceId: persisted.id,
+        answer: exploreAnswer,
+        mode,
+        sources: [],
+        relatedTerms,
+        metadata,
+        audit,
+      });
+    }
 
     let generation: GenerationUsage | null = null;
     let answer: string;
