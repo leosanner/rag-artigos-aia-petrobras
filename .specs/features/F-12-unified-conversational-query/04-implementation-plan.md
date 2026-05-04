@@ -36,17 +36,20 @@ Quebra do [04-interface-query-page-and-route-removal.md](./04-interface-query-pa
 
 ### Fatia 2 — Remover histórico de runs
 
-- [ ] Apagar em `page.tsx`:
+- [x] Apagar em `page.tsx`:
   - `recentRunsState`, `selectedRunState`, `createInitialRecentRunsState`, `createInitialSelectedRunState`
-  - `loadRunDetail`, fetch `/api/rag/query-runs`
-  - Sidebar/UI das runs e botão de inspecionar run
-- [ ] Apagar testes:
-  - L1547 "starts a new focused conversation from a cited source card in persisted run detail"
-  - L1646 "loads the recent history manually and inspects one persisted run on demand"
-  - L1694 "clears persisted history…on 401 when refreshing history"
-  - L1731 "clears persisted history…on 401 when loading run detail"
-  - L1758 "renders a persisted failed run safely without leaking internals"
-- [ ] `pnpm vitest run src/app/query/page.test.tsx` verde.
+  - `loadRecentRuns`, `loadRunDetail`, fetch `/api/rag/query-runs`
+  - Painel `<details className={styles.runsPanel}>` (histórico + run-detail inline)
+  - `historyButtonLabel`, `resetPersistedAuditState`
+  - Imports orfãos: `ragQueryRunDetailResponseSchema`, `ragQueryRunSummariesResponseSchema`, `RAG_HISTORY_*`, `RAG_RUN_DETAIL_*`, `RAG_RERANKING_*`, `formatAskFailureMessage`
+- [x] Apagar testes:
+  - "starts a new focused conversation from a cited source card in persisted run detail"
+  - "loads the recent history manually and inspects one persisted run on demand"
+  - "clears persisted history…on 401 when refreshing history"
+  - "clears persisted history…on 401 when loading run detail"
+  - "renders a persisted failed run safely without leaking internals"
+  - Helpers `clickLoadHistory`, `openHistoryRun`; constants `RUN_ID`, `RUN_SUMMARIES`, `RUN_DETAIL`, `FAILED_RUN_DETAIL`
+- [x] `pnpm typecheck` ✓ | `pnpm lint` ✓ | `pnpm vitest run src/app/query/page.test.tsx` ✓ (32 tests).
 
 ### Fatia 3 — Strategy selector no composer
 

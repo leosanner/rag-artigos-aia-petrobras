@@ -9,8 +9,6 @@ import {
   listRagDocumentsResponseSchema,
   ragConversationStreamEventSchema,
   ragInvalidRequestResponseSchema,
-  ragQueryRunDetailResponseSchema,
-  ragQueryRunSummariesResponseSchema,
   ragUnauthorizedResponseSchema,
   type ConversationDetailResponse,
   type ConversationMessageResponse,
@@ -40,16 +38,9 @@ import {
   RAG_FOCUSED_DOCUMENTS_ERROR_MESSAGE,
   RAG_GENERATION_FAILED_MESSAGE,
   RAG_GENERATION_UNAVAILABLE_MESSAGE,
-  RAG_HISTORY_EMPTY_MESSAGE,
-  RAG_HISTORY_ERROR_MESSAGE,
-  RAG_HISTORY_IDLE_MESSAGE,
   RAG_INVALID_REQUEST_MESSAGE,
   RAG_NETWORK_ERROR_MESSAGE,
   RAG_NO_GENERATION_AUDIT_MESSAGE,
-  RAG_RERANKING_FAILED_MESSAGE,
-  RAG_RERANKING_UNAVAILABLE_MESSAGE,
-  RAG_RUN_DETAIL_ERROR_MESSAGE,
-  RAG_RUN_DETAIL_IDLE_MESSAGE,
   RAG_TECHNICAL_ERROR_MESSAGE,
   RAG_UNAUTHORIZED_MESSAGE,
   truncateExcerptPreview,
@@ -221,19 +212,6 @@ type ConversationState = {
   error: ConversationErrorKind | null;
 };
 
-type RecentRunsState = {
-  status: "idle" | "loading" | "loaded" | "error";
-  runs: RagQueryRunSummaryResponse[];
-  error: LoadErrorKind | null;
-};
-
-type SelectedRunState = {
-  status: "idle" | "loading" | "loaded" | "error";
-  run: RagQueryRunDetailResponse | null;
-  runId: string | null;
-  error: LoadErrorKind | null;
-};
-
 type SelectableDocumentsState = {
   status: "idle" | "loading" | "loaded" | "error";
   documents: SelectableRagDocument[];
@@ -253,23 +231,6 @@ type StreamingAssistantState =
       content: string;
       sources: RagStreamSource[];
     };
-
-function createInitialRecentRunsState(): RecentRunsState {
-  return {
-    status: "idle",
-    runs: [],
-    error: null,
-  };
-}
-
-function createInitialSelectedRunState(): SelectedRunState {
-  return {
-    status: "idle",
-    run: null,
-    runId: null,
-    error: null,
-  };
-}
 
 function createInitialConversationState(): ConversationState {
   return {
@@ -303,12 +264,6 @@ export default function QueryPage() {
   const [askState, setAskState] = useState<ConversationAskState>({
     kind: "idle",
   });
-  const [recentRunsState, setRecentRunsState] = useState<RecentRunsState>(
-    createInitialRecentRunsState,
-  );
-  const [selectedRunState, setSelectedRunState] = useState<SelectedRunState>(
-    createInitialSelectedRunState,
-  );
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversationState, setConversationState] = useState<ConversationState>(
     createInitialConversationState,
@@ -347,12 +302,6 @@ export default function QueryPage() {
     isStandardSubmitting ? "Consultando..." : "Consultar base";
   const exploreButtonLabel =
     isExploreSubmitting ? "Explorando..." : "Explorar perspectivas";
-  const historyButtonLabel =
-    recentRunsState.status === "loading"
-      ? "Carregando historico..."
-      : recentRunsState.status === "idle"
-        ? "Carregar historico recente"
-        : "Atualizar historico";
   const conversationTitle =
     conversationState.conversation?.title ??
     (conversationId ? "Conversa sem titulo" : "Nenhuma conversa ativa");
@@ -474,7 +423,6 @@ export default function QueryPage() {
 
     if (value.length === 0) {
       sessionStorage.removeItem(SECRET_STORAGE_KEY);
-      resetPersistedAuditState();
       resetSelectableDocumentsState();
       setConversationState((current) => ({
         ...current,
@@ -487,11 +435,6 @@ export default function QueryPage() {
     sessionStorage.setItem(SECRET_STORAGE_KEY, value);
   }
 
-  function resetPersistedAuditState() {
-    setRecentRunsState(createInitialRecentRunsState());
-    setSelectedRunState(createInitialSelectedRunState());
-  }
-
   function resetSelectableDocumentsState() {
     setSelectableDocumentsState(createInitialSelectableDocumentsState());
     setSelectedDocumentId("");
@@ -500,7 +443,6 @@ export default function QueryPage() {
   function clearSecret() {
     sessionStorage.removeItem(SECRET_STORAGE_KEY);
     setSecret("");
-    resetPersistedAuditState();
     resetSelectableDocumentsState();
     setConversationState((current) => ({
       ...current,
@@ -1318,191 +1260,6 @@ export default function QueryPage() {
     });
   }
 
-  async function loadRecentRuns() {
-    if (trimmedSecret.length === 0) {
-      return;
-    }
-
-    setRecentRunsState((current) => ({
-      ...current,
-      status: "loading",
-      error: null,
-    }));
-
-    const response = await fetchJson("/api/rag/query-runs", {
-      method: "GET",
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${trimmedSecret}`,
-      },
-    });
-
-    if (response.kind === "network_error") {
-      console.error("[rag/query]", {
-        phase: "loadRecentRuns",
-        kind: "network_error",
-      });
-      setRecentRunsState((current) => ({
-        ...current,
-        status: "error",
-        error: "technical",
-      }));
-      return;
-    }
-
-    if (response.status === 200) {
-      const parsed = ragQueryRunSummariesResponseSchema.safeParse(response.body);
-
-      if (!parsed.success) {
-        console.error("[rag/query]", {
-          phase: "loadRecentRuns",
-          status: response.status,
-          body: response.body,
-          parseError: true,
-        });
-        setRecentRunsState((current) => ({
-          ...current,
-          status: "error",
-          error: "technical",
-        }));
-        return;
-      }
-
-      setRecentRunsState({
-        status: "loaded",
-        runs: parsed.data,
-        error: null,
-      });
-      return;
-    }
-
-    if (response.status === 401) {
-      const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
-      console.error("[rag/query]", {
-        phase: "loadRecentRuns",
-        status: response.status,
-        body: response.body,
-      });
-      const error = parsed.success ? "unauthorized" : "technical";
-      clearSecret();
-      setRecentRunsState({
-        status: "error",
-        runs: [],
-        error,
-      });
-      return;
-    }
-
-    console.error("[rag/query]", {
-      phase: "loadRecentRuns",
-      status: response.status,
-      body: response.body,
-    });
-    setRecentRunsState((current) => ({
-      ...current,
-      status: "error",
-      error: "technical",
-    }));
-  }
-
-  async function loadRunDetail(runId: string) {
-    if (trimmedSecret.length === 0) {
-      return;
-    }
-
-    setSelectedRunState({
-      status: "loading",
-      run: null,
-      runId,
-      error: null,
-    });
-
-    const response = await fetchJson(`/api/rag/query-runs/${runId}`, {
-      method: "GET",
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${trimmedSecret}`,
-      },
-    });
-
-    if (response.kind === "network_error") {
-      console.error("[rag/query]", {
-        phase: "loadRunDetail",
-        kind: "network_error",
-      });
-      setSelectedRunState({
-        status: "error",
-        run: null,
-        runId,
-        error: "technical",
-      });
-      return;
-    }
-
-    if (response.status === 200) {
-      const parsed = ragQueryRunDetailResponseSchema.safeParse(response.body);
-
-      if (!parsed.success) {
-        console.error("[rag/query]", {
-          phase: "loadRunDetail",
-          status: response.status,
-          body: response.body,
-          parseError: true,
-        });
-        setSelectedRunState({
-          status: "error",
-          run: null,
-          runId,
-          error: "technical",
-        });
-        return;
-      }
-
-      setSelectedRunState({
-        status: "loaded",
-        run: parsed.data,
-        runId,
-        error: null,
-      });
-      return;
-    }
-
-    if (response.status === 401) {
-      const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
-      console.error("[rag/query]", {
-        phase: "loadRunDetail",
-        status: response.status,
-        body: response.body,
-      });
-      const error = parsed.success ? "unauthorized" : "technical";
-      clearSecret();
-      setRecentRunsState({
-        status: "error",
-        runs: [],
-        error,
-      });
-      setSelectedRunState({
-        status: "error",
-        run: null,
-        runId,
-        error,
-      });
-      return;
-    }
-
-    console.error("[rag/query]", {
-      phase: "loadRunDetail",
-      status: response.status,
-      body: response.body,
-    });
-    setSelectedRunState({
-      status: "error",
-      run: null,
-      runId,
-      error: "technical",
-    });
-  }
-
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await submitQuestion("standard");
@@ -1880,207 +1637,6 @@ export default function QueryPage() {
         </section>
         </div>
 
-        <details className={styles.runsPanel}>
-          <summary className={styles.runsPanelSummary}>
-            <span className={styles.runsPanelTitleGroup}>
-              <span className={styles.runsPanelEyebrow}>Auditoria</span>
-              <span className={styles.runsPanelTitle}>
-                Historico de execucoes
-              </span>
-            </span>
-            <span aria-hidden className={styles.runsPanelChevron}>
-              ▾
-            </span>
-          </summary>
-
-          <div className={styles.runsPanelBody}>
-            <header className={styles.runsPanelToolbar}>
-              <p className={styles.panelCopy}>
-                O carregamento e manual. Nenhuma consulta adicional e feita
-                automaticamente apos o ask atual.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  void loadRecentRuns();
-                }}
-                disabled={
-                  trimmedSecret.length === 0 ||
-                  recentRunsState.status === "loading"
-                }
-                className={`${styles.btn} ${styles.btnSecondary}`}
-              >
-                {historyButtonLabel}
-              </button>
-            </header>
-
-          {recentRunsState.error === "unauthorized" ? (
-            <StatusAlert kind="unauthorized" message={RAG_UNAUTHORIZED_MESSAGE} />
-          ) : null}
-
-          {recentRunsState.error === "technical" ? (
-            <StatusAlert kind="technical" message={RAG_HISTORY_ERROR_MESSAGE} />
-          ) : null}
-
-          {recentRunsState.status === "idle" ? (
-            <p className={styles.emptyPanel}>{RAG_HISTORY_IDLE_MESSAGE}</p>
-          ) : null}
-
-          {recentRunsState.status === "loading" && recentRunsState.runs.length === 0 ? (
-            <p className={styles.emptyPanel}>Carregando historico auditado...</p>
-          ) : null}
-
-          {recentRunsState.status !== "idle" &&
-          recentRunsState.runs.length === 0 &&
-          recentRunsState.status !== "loading" ? (
-            <p className={styles.emptyPanel}>{RAG_HISTORY_EMPTY_MESSAGE}</p>
-          ) : null}
-
-          {recentRunsState.runs.length > 0 ? (
-            <ol className={styles.historyList}>
-              {recentRunsState.runs.map((run) => {
-                const isSelected = selectedRunState.runId === run.id;
-                const isLoading =
-                  selectedRunState.status === "loading" &&
-                  selectedRunState.runId === run.id;
-
-                return (
-                  <li key={run.id}>
-                    <details
-                      className={`${styles.historyItem} ${
-                        isSelected ? styles.historyItemActive : ""
-                      }`}
-                    >
-                      <summary className={styles.historyItemSummary}>
-                        <span className={styles.historyItemHead}>
-                          <span className={styles.historyQuestion}>
-                            {run.question}
-                          </span>
-                          <span className={styles.historyItemInlineMeta}>
-                            {formatTimestamp(run.createdAt)} ·{" "}
-                            {formatRunStatus(run.status)}
-                          </span>
-                        </span>
-                        <span
-                          aria-hidden
-                          className={styles.historyItemChevron}
-                        >
-                          ▾
-                        </span>
-                      </summary>
-
-                      <div className={styles.historyItemBody}>
-                        <span className={styles.historyMeta}>
-                          strategy :: {formatStrategy(run.retrievalStrategy)}
-                        </span>
-                        <span className={styles.historyMeta}>
-                          top-k :: {run.topK}
-                        </span>
-                        <span className={styles.historyMeta}>
-                          latency :: {run.latencyMs} ms
-                        </span>
-                        <span className={styles.historyMeta}>
-                          total :: {formatUsd(run.totalCostUsd)}
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void loadRunDetail(run.id);
-                          }}
-                          disabled={isLoading}
-                          className={`${styles.btn} ${styles.btnSecondary} ${styles.historyItemAction}`}
-                        >
-                          {isLoading
-                            ? "abrindo execucao..."
-                            : isSelected
-                              ? "recarregar execucao"
-                              : "ver execucao auditada"}
-                        </button>
-                      </div>
-                    </details>
-                  </li>
-                );
-              })}
-            </ol>
-          ) : null}
-
-          {selectedRunState.error === "unauthorized" ? (
-            <StatusAlert kind="unauthorized" message={RAG_UNAUTHORIZED_MESSAGE} />
-          ) : null}
-
-          {selectedRunState.error === "technical" ? (
-            <StatusAlert kind="technical" message={RAG_RUN_DETAIL_ERROR_MESSAGE} />
-          ) : null}
-
-          {selectedRunState.status === "idle" ? (
-            <p className={styles.emptyPanel}>{RAG_RUN_DETAIL_IDLE_MESSAGE}</p>
-          ) : null}
-
-          {selectedRunState.status === "loading" ? (
-            <p className={styles.emptyPanel}>Carregando execucao persistida...</p>
-          ) : null}
-
-          {selectedRunState.run ? (
-            <section className={styles.result}>
-              <article className={styles.resultBlock}>
-                <header className={styles.blockHeader}>
-                  <span className={styles.blockIndex}>
-                    [ 01 ] Resposta persistida
-                  </span>
-                  <span className={styles.blockMeta}>
-                    status :: {formatRunStatus(selectedRunState.run.status)}
-                  </span>
-                </header>
-                <div className={styles.blockBody}>
-                  <p className={styles.subHeadline}>Pergunta persistida</p>
-                  <p className={styles.questionSnapshot}>
-                    {selectedRunState.run.question}
-                  </p>
-                  <h2 className={styles.answerHeadline}>
-                    Execucao auditada armazenada em banco.
-                  </h2>
-                  <p className={styles.answerText}>
-                    {selectedRunState.run.answer ??
-                      "Nenhuma resposta textual foi persistida para esta execucao."}
-                  </p>
-                </div>
-              </article>
-
-              <AuditSummaryBlock
-                blockIndex="[ 02 ] Auditoria persistida"
-                metaLabel={`created :: ${formatTimestamp(
-                  selectedRunState.run.createdAt,
-                )}`}
-                traceId={selectedRunState.run.id}
-                question={selectedRunState.run.question}
-                metadata={selectedRunState.run.metadata}
-                audit={selectedRunState.run.audit}
-                status={selectedRunState.run.status}
-                errorCode={selectedRunState.run.errorCode}
-                createdAt={selectedRunState.run.createdAt}
-              />
-
-              <RelatedTermsBlock
-                blockIndex="[ 03 ] Termos persistidos"
-                terms={selectedRunState.run.relatedTerms}
-              />
-
-              <SourcesBlock
-                blockIndex="[ 04 ] Fontes persistidas"
-                sources={selectedRunState.run.sources}
-                showCitationFlags
-                onStartFocusedConversation={
-                  selectedRunState.run.mode === "global"
-                    ? startFocusedConversationFromSource
-                    : undefined
-                }
-                handoffState={handoffState}
-              />
-            </section>
-          ) : null}
-          </div>
-        </details>
       </div>
     </main>
   );
@@ -2707,29 +2263,6 @@ function formatStreamErrorMessage(
   }
 
   return RAG_TECHNICAL_ERROR_MESSAGE;
-}
-
-function formatAskFailureMessage(body: unknown, httpStatus: number): string {
-  const errorCode =
-    typeof body === "object" &&
-    body !== null &&
-    "error" in body &&
-    typeof body.error === "string"
-      ? body.error
-      : null;
-
-  switch (errorCode) {
-    case "generation_failed":
-      return RAG_GENERATION_FAILED_MESSAGE;
-    case "generation_unavailable":
-      return RAG_GENERATION_UNAVAILABLE_MESSAGE;
-    case "reranking_failed":
-      return RAG_RERANKING_FAILED_MESSAGE;
-    case "reranking_unavailable":
-      return RAG_RERANKING_UNAVAILABLE_MESSAGE;
-    default:
-      return formatTechnicalErrorMessage(httpStatus);
-  }
 }
 
 function formatUsd(value: number): string {

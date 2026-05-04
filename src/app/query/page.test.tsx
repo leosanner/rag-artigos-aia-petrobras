@@ -12,7 +12,6 @@ const SECRET = "query-secret-value";
 const CONVERSATION_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const FOCUSED_HANDOFF_CONVERSATION_ID = "fefefefe-fefe-4efe-8efe-fefefefefefe";
 const CURRENT_TRACE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const RUN_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const FOCUSED_DOCUMENT_ID = "12121212-1212-4212-8212-121212121212";
 const SOURCE_HANDOFF_DOCUMENT_ID = "22222222-2222-4222-8222-222222222222";
 const RUN_DETAIL_SOURCE_DOCUMENT_ID = "66666666-6666-4666-8666-666666666666";
@@ -112,104 +111,6 @@ const NO_EVIDENCE_RESPONSE = {
     generation: null,
     totalCostUsd: 0.00000117,
   },
-};
-
-const RUN_SUMMARIES = [
-  {
-    id: RUN_ID,
-    question: "Quais tecnicas aparecem com maior frequencia?",
-    status: "answered" as const,
-    topK: 6,
-    retrievalStrategy: "standard" as const,
-    latencyMs: 432,
-    totalCostUsd: 0.000482,
-    createdAt: "2026-04-23T12:34:56.000Z",
-  },
-];
-
-const RUN_DETAIL = {
-  id: RUN_ID,
-  question: "Quais tecnicas aparecem com maior frequencia?",
-  answer: "Classificacao supervisionada [1].",
-  mode: "global" as const,
-  documentId: null,
-  status: "answered" as const,
-  errorCode: null,
-  sources: [
-    {
-      sourceNumber: 1,
-      chunkId: "55555555-5555-4555-8555-555555555555",
-      documentId: RUN_DETAIL_SOURCE_DOCUMENT_ID,
-      documentTitle: "artigo-persistido.pdf",
-      chunkIndex: 0,
-      excerpt: "Trecho persistido do banco.",
-      retrievalScore: 0.92,
-      rerankScore: null,
-      documentPipelineVersion: "documents-v1",
-      chunkingVersion: "hybrid-v1-900-150",
-      embeddingModel: "text-embedding-3-large",
-      citedInAnswer: true,
-    },
-  ],
-  relatedTerms: [
-    {
-      rank: 1,
-      term: "classificacao supervisionada",
-      ngramSize: 2,
-      frequency: 3,
-      sourceCoverageCount: 1,
-    },
-  ],
-  metadata: {
-    mode: "global" as const,
-    documentId: null,
-    topK: 6,
-    retrievalStrategy: "standard" as const,
-    candidateTopK: 6,
-    promptVersion: "f05-audit-v1",
-    generationModel: "gpt-4.1-mini",
-    embeddingModel: "text-embedding-3-large",
-    rerankerProvider: null,
-    rerankerModel: null,
-  },
-  audit: {
-    latencyMs: 432,
-    embedding: {
-      inputTokens: 17,
-      estimatedCostUsd: 0.000002,
-    },
-    reranking: null,
-    generation: {
-      inputTokens: 120,
-      outputTokens: 42,
-      totalTokens: 162,
-      estimatedCostUsd: 0.00048,
-    },
-    totalCostUsd: 0.000482,
-  },
-  createdAt: "2026-04-23T12:34:56.000Z",
-};
-
-const FAILED_RUN_DETAIL = {
-  ...RUN_DETAIL,
-  id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-  question: "Existe evidencia suficiente para uma resposta?",
-  answer: null,
-  status: "generation_failed" as const,
-  errorCode: "generation_failed" as const,
-  sources: [],
-  relatedTerms: [],
-  audit: {
-    latencyMs: 91,
-    embedding: {
-      inputTokens: 8,
-      estimatedCostUsd: 0.00000104,
-    },
-    reranking: null,
-    generation: null,
-    totalCostUsd: 0.00000104,
-  },
-  createdAt: "2026-04-24T08:00:00.000Z",
 };
 
 const CREATE_CONVERSATION_RESPONSE = {
@@ -559,35 +460,6 @@ function getConversationSection(): HTMLElement {
   return section;
 }
 
-function clickLoadHistory(): void {
-  fireEvent.click(
-    screen.getByRole("button", { name: /carregar historico recente/i }),
-  );
-}
-
-function openHistoryRun(question: RegExp): void {
-  const summary = screen.getByText(question).closest("summary");
-
-  if (!summary) {
-    throw new Error("history summary not found for question");
-  }
-
-  const details = summary.closest("details") as HTMLDetailsElement | null;
-
-  if (!details) {
-    throw new Error("history details element not found");
-  }
-
-  if (!details.open) {
-    fireEvent.click(summary);
-  }
-
-  const action = within(details).getByRole("button", {
-    name: /(ver|recarregar) execucao/i,
-  });
-  fireEvent.click(action);
-}
-
 function clickNewConversation(): void {
   fireEvent.click(screen.getByRole("button", { name: /nova conversa/i }));
 }
@@ -670,8 +542,8 @@ describe("/query page", () => {
       }),
     ).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: /carregar historico recente/i }),
-    ).toBeDisabled();
+      screen.queryByRole("button", { name: /carregar historico recente/i }),
+    ).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -1398,73 +1270,6 @@ describe("/query page", () => {
     expect(screen.queryByText(LONG_EXCERPT)).not.toBeInTheDocument();
   });
 
-  it("starts a new focused conversation from a cited source card in persisted run detail", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(RUN_SUMMARIES));
-    fetchMock.mockResolvedValueOnce(jsonResponse(RUN_DETAIL));
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse(HANDOFF_SELECTABLE_DOCUMENTS_RESPONSE),
-    );
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse(FOCUSED_HANDOFF_CONVERSATION_RESPONSE, { status: 201 }),
-    );
-
-    render(<QueryPage />);
-    typeSecret(SECRET);
-    typeQuestion("Quero revisar essa fonte no detalhe.");
-
-    await act(async () => {
-      clickLoadHistory();
-    });
-
-    await act(async () => {
-      openHistoryRun(/quais tecnicas aparecem com maior frequencia\?/i);
-    });
-
-    await act(async () => {
-      clickStartFocusedConversation();
-    });
-
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
-      "/api/rag/documents",
-      expect.objectContaining({
-        method: "GET",
-        cache: "no-store",
-        headers: expect.objectContaining({
-          Authorization: `Bearer ${SECRET}`,
-        }),
-      }),
-    );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
-      "/api/rag/conversations",
-      expect.objectContaining({
-        method: "POST",
-        cache: "no-store",
-        headers: expect.objectContaining({
-          Authorization: `Bearer ${SECRET}`,
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({}),
-      }),
-    );
-    expect(screen.getByLabelText(/documento especifico/i)).toBeChecked();
-    expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
-      RUN_DETAIL_SOURCE_DOCUMENT_ID,
-    );
-    expect(
-      within(getConversationSection()).getByLabelText(/pergunta/i),
-    ).toHaveValue(
-      "Quero revisar essa fonte no detalhe.",
-    );
-    expect(window.location.search).toContain(
-      `conversation=${FOCUSED_HANDOFF_CONVERSATION_ID}`,
-    );
-    expect(window.location.search).toContain(
-      `documentId=${RUN_DETAIL_SOURCE_DOCUMENT_ID}`,
-    );
-  });
-
   it("shows the no-evidence state, empty sources, and skipped generation audit", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }));
     fetchMock.mockResolvedValueOnce(
@@ -1495,151 +1300,6 @@ describe("/query page", () => {
     expect(
       screen.getAllByText(/esta execucao nao consumiu geracao de resposta/i)[0],
     ).toBeInTheDocument();
-  });
-
-  it("loads the recent history manually and inspects one persisted run on demand", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(RUN_SUMMARIES));
-    fetchMock.mockResolvedValueOnce(jsonResponse(RUN_DETAIL));
-
-    render(<QueryPage />);
-    typeSecret(SECRET);
-
-    await act(async () => {
-      clickLoadHistory();
-    });
-
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      "/api/rag/query-runs",
-      expect.objectContaining({
-        method: "GET",
-        cache: "no-store",
-        headers: expect.objectContaining({
-          Authorization: `Bearer ${SECRET}`,
-        }),
-      }),
-    );
-    expect(
-      screen.getByText(/quais tecnicas aparecem com maior frequencia\?/i),
-    ).toBeInTheDocument();
-
-    await act(async () => {
-      openHistoryRun(/quais tecnicas aparecem com maior frequencia\?/i);
-    });
-
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      `/api/rag/query-runs/${RUN_ID}`,
-      expect.objectContaining({
-        method: "GET",
-        cache: "no-store",
-        headers: expect.objectContaining({
-          Authorization: `Bearer ${SECRET}`,
-        }),
-      }),
-    );
-    expect(screen.getByText(/classificacao supervisionada \[1\]\./i)).toBeInTheDocument();
-    expect(screen.getByText(/citado :: sim/i)).toBeInTheDocument();
-    expect(
-      screen.getAllByText(/2026-04-23 12:34:56Z/i).length,
-    ).toBeGreaterThan(0);
-  });
-
-  it("clears persisted history, clears the stored secret, and shows a safe message on 401 when refreshing history", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(RUN_SUMMARIES));
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ error: "unauthorized" }, { status: 401 }),
-    );
-    sessionStorage.setItem("query:secret", SECRET);
-
-    render(<QueryPage />);
-
-    expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe(
-      SECRET,
-    );
-
-    await act(async () => {
-      clickLoadHistory();
-    });
-
-    expect(
-      screen.getByText(/quais tecnicas aparecem com maior frequencia\?/i),
-    ).toBeInTheDocument();
-
-    await act(async () => {
-      fireEvent.click(
-        screen.getByRole("button", { name: /atualizar historico/i }),
-      );
-    });
-
-    expect(
-      screen.getAllByText(/secret de consulta foi rejeitado/i).length,
-    ).toBeGreaterThan(0);
-    expect(
-      screen.queryByText(/quais tecnicas aparecem com maior frequencia\?/i),
-    ).not.toBeInTheDocument();
-    expect(sessionStorage.getItem("query:secret")).toBeNull();
-    expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe("");
-  });
-
-  it("clears persisted history, clears the stored secret, and shows a safe message on 401 when loading run detail", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(RUN_SUMMARIES));
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ error: "unauthorized" }, { status: 401 }),
-    );
-    sessionStorage.setItem("query:secret", SECRET);
-
-    render(<QueryPage />);
-
-    await act(async () => {
-      clickLoadHistory();
-    });
-
-    await act(async () => {
-      openHistoryRun(/quais tecnicas aparecem com maior frequencia\?/i);
-    });
-
-    expect(
-      screen.getAllByText(/secret de consulta foi rejeitado/i).length,
-    ).toBeGreaterThan(0);
-    expect(
-      screen.queryByText(/quais tecnicas aparecem com maior frequencia\?/i),
-    ).not.toBeInTheDocument();
-    expect(sessionStorage.getItem("query:secret")).toBeNull();
-    expect((screen.getByLabelText(/secret de consulta/i) as HTMLInputElement).value).toBe("");
-  });
-
-  it("renders a persisted failed run safely without leaking internals", async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse([
-        {
-          ...RUN_SUMMARIES[0],
-          id: FAILED_RUN_DETAIL.id,
-          question: FAILED_RUN_DETAIL.question,
-          status: FAILED_RUN_DETAIL.status,
-          createdAt: FAILED_RUN_DETAIL.createdAt,
-        },
-      ]),
-    );
-    fetchMock.mockResolvedValueOnce(jsonResponse(FAILED_RUN_DETAIL));
-
-    render(<QueryPage />);
-    typeSecret(SECRET);
-
-    await act(async () => {
-      clickLoadHistory();
-    });
-
-    await act(async () => {
-      openHistoryRun(/existe evidencia suficiente para uma resposta\?/i);
-    });
-
-    expect(screen.getAllByText(/falha segura/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/generation_failed/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/nenhuma resposta textual foi persistida para esta execucao/i),
-    ).toBeInTheDocument();
-    expect(document.body.textContent ?? "").not.toContain("providerPayload");
   });
 
   it("shows safe ask errors for invalid request, unauthorized, and technical failures", async () => {
