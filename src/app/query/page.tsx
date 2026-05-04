@@ -43,6 +43,13 @@ import {
   RAG_NO_GENERATION_AUDIT_MESSAGE,
   RAG_TECHNICAL_ERROR_MESSAGE,
   RAG_UNAUTHORIZED_MESSAGE,
+  STRATEGY_FOCUSED_NOTE,
+  STRATEGY_LABEL_EXPLORE,
+  STRATEGY_LABEL_RERANK,
+  STRATEGY_LABEL_STANDARD,
+  STRATEGY_TOOLTIP_EXPLORE,
+  STRATEGY_TOOLTIP_RERANK,
+  STRATEGY_TOOLTIP_STANDARD,
   truncateExcerptPreview,
 } from "./constants";
 import styles from "./page.module.css";
@@ -189,11 +196,30 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
   };
 })();
 
-type ConversationSubmissionStrategy = Extract<
-  RagRetrievalStrategy,
-  "standard" | "explore"
->;
+type ConversationSubmissionStrategy = RagRetrievalStrategy;
 type QueryMode = "global" | "focused";
+
+const GLOBAL_STRATEGY_OPTIONS: ReadonlyArray<{
+  value: RagRetrievalStrategy;
+  label: string;
+  tooltip: string;
+}> = [
+  {
+    value: "standard",
+    label: STRATEGY_LABEL_STANDARD,
+    tooltip: STRATEGY_TOOLTIP_STANDARD,
+  },
+  {
+    value: "explore",
+    label: STRATEGY_LABEL_EXPLORE,
+    tooltip: STRATEGY_TOOLTIP_EXPLORE,
+  },
+  {
+    value: "rerank",
+    label: STRATEGY_LABEL_RERANK,
+    tooltip: STRATEGY_TOOLTIP_RERANK,
+  },
+];
 
 type ConversationAskState =
   | { kind: "idle" }
@@ -261,6 +287,10 @@ export default function QueryPage() {
   const [queryMode, setQueryMode] = useState<QueryMode>("global");
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const [topK, setTopK] = useState(RAG_RETRIEVAL_DEFAULT_TOP_K);
+  const [selectedStrategy, setSelectedStrategy] =
+    useState<RagRetrievalStrategy>("standard");
+  const [openStrategyTooltip, setOpenStrategyTooltip] =
+    useState<RagRetrievalStrategy | null>(null);
   const [askState, setAskState] = useState<ConversationAskState>({
     kind: "idle",
   });
@@ -294,14 +324,11 @@ export default function QueryPage() {
     trimmedSecret.length > 0 &&
     !isSubmitting &&
     (queryMode === "global" || selectedDocument !== null);
-  const isStandardSubmitting =
-    askState.kind === "submitting" && askState.strategy === "standard";
-  const isExploreSubmitting =
-    askState.kind === "submitting" && askState.strategy === "explore";
-  const standardButtonLabel =
-    isStandardSubmitting ? "Consultando..." : "Consultar base";
-  const exploreButtonLabel =
-    isExploreSubmitting ? "Explorando..." : "Explorar perspectivas";
+  const effectiveStrategy: RagRetrievalStrategy =
+    queryMode === "focused" ? "standard" : selectedStrategy;
+  const submitButtonLabel = isSubmitting
+    ? "Consultando..."
+    : "Consultar base";
   const conversationTitle =
     conversationState.conversation?.title ??
     (conversationId ? "Conversa sem titulo" : "Nenhuma conversa ativa");
@@ -1262,7 +1289,7 @@ export default function QueryPage() {
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await submitQuestion("standard");
+    await submitQuestion(effectiveStrategy);
   }
 
   return (
@@ -1565,7 +1592,7 @@ export default function QueryPage() {
                     ) {
                       event.preventDefault();
                       if (canSubmit) {
-                        void submitQuestion("standard");
+                        void submitQuestion(effectiveStrategy);
                       }
                     }
                   }}
@@ -1574,6 +1601,68 @@ export default function QueryPage() {
                   className={styles.textarea}
                 />
               </div>
+
+              {queryMode === "global" ? (
+                <div
+                  role="radiogroup"
+                  aria-label="Estratégia"
+                  className={styles.composerStrategy}
+                >
+                  <ul className={styles.composerStrategyList}>
+                    {GLOBAL_STRATEGY_OPTIONS.map((option) => {
+                      const tooltipId = `query-strategy-${option.value}-tooltip`;
+                      const isOpen = openStrategyTooltip === option.value;
+                      return (
+                        <li
+                          key={option.value}
+                          className={styles.composerStrategyItem}
+                        >
+                          <label className={styles.composerStrategyOption}>
+                            <input
+                              type="radio"
+                              name="query-strategy"
+                              value={option.value}
+                              checked={selectedStrategy === option.value}
+                              onChange={() => {
+                                setSelectedStrategy(option.value);
+                                setAskState({ kind: "idle" });
+                              }}
+                            />
+                            <span>{option.label}</span>
+                          </label>
+                          <button
+                            type="button"
+                            aria-label={`Sobre estratégia ${option.label}`}
+                            aria-expanded={isOpen}
+                            aria-controls={tooltipId}
+                            onClick={() =>
+                              setOpenStrategyTooltip((current) =>
+                                current === option.value ? null : option.value,
+                              )
+                            }
+                            className={styles.composerStrategyInfo}
+                          >
+                            i
+                          </button>
+                          {isOpen ? (
+                            <p
+                              id={tooltipId}
+                              role="note"
+                              className={styles.composerStrategyTooltip}
+                            >
+                              {option.tooltip}
+                            </p>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : (
+                <p className={styles.composerStrategyNote}>
+                  {STRATEGY_FOCUSED_NOTE}
+                </p>
+              )}
 
               <div className={styles.composerFooter}>
                 <label htmlFor="query-top-k" className={styles.composerTopK}>
@@ -1613,22 +1702,10 @@ export default function QueryPage() {
                   type="submit"
                   disabled={!canSubmit}
                   className={`${styles.btn} ${
-                    isStandardSubmitting ? styles.btnLoading : styles.btnPrimary
+                    isSubmitting ? styles.btnLoading : styles.btnPrimary
                   }`}
                 >
-                  {standardButtonLabel}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void submitQuestion("explore");
-                  }}
-                  disabled={!canSubmit}
-                  className={`${styles.btn} ${
-                    isExploreSubmitting ? styles.btnLoading : styles.btnExplore
-                  }`}
-                >
-                  {exploreButtonLabel}
+                  {submitButtonLabel}
                 </button>
                 </div>
               </div>

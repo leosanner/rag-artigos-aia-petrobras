@@ -62,6 +62,20 @@ export const RAG_RUN_DETAIL_ERROR_MESSAGE =
 export const RAG_NO_GENERATION_AUDIT_MESSAGE =
   "Esta execucao nao consumiu geracao de resposta.";
 
+export const STRATEGY_LABEL_STANDARD = "Padrão";
+export const STRATEGY_LABEL_EXPLORE = "Explorar";
+export const STRATEGY_LABEL_RERANK = "Rerank";
+
+export const STRATEGY_TOOLTIP_STANDARD =
+  "Recupera as fontes mais relevantes pela busca híbrida e responde direto. Indicado para perguntas objetivas.";
+export const STRATEGY_TOOLTIP_EXPLORE =
+  "Amplia a busca para descobrir abordagens e termos relacionados. Útil quando a pergunta ainda está aberta.";
+export const STRATEGY_TOOLTIP_RERANK =
+  "Recupera mais candidatos e os reordena com um modelo dedicado antes da resposta. Mais lento, porém com fontes melhor priorizadas.";
+
+export const STRATEGY_FOCUSED_NOTE =
+  "No modo focado apenas a estratégia padrão está disponível.";
+
 export function truncateExcerptPreview(excerpt: string): string {
   if (excerpt.length <= RAG_SOURCE_EXCERPT_PREVIEW_LENGTH) {
     return excerpt;

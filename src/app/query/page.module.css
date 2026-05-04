@@ -226,6 +226,114 @@
   gap: 16px;
 }
 
+.composerStrategy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.composerStrategyList {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.composerStrategyItem {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.composerStrategyOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: var(--border);
+  background: var(--paper);
+  cursor: pointer;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.composerStrategyOption:hover {
+  background: var(--paper-deep);
+}
+
+.composerStrategyOption input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.composerStrategyOption:has(input:checked) {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.composerStrategyOption:has(input:focus-visible) {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.composerStrategyInfo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 6px;
+  border: var(--border);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.composerStrategyInfo:hover {
+  background: var(--paper-deep);
+}
+
+.composerStrategyInfo[aria-expanded="true"] {
+  background: var(--blue);
+  color: var(--paper);
+  border-color: var(--blue);
+}
+
+.composerStrategyTooltip {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  background: var(--paper-deep);
+  border: var(--border);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.composerStrategyNote {
+  margin: 0;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  opacity: 0.7;
+}
+
 .composerTopK {
   display: inline-flex;
   align-items: center;

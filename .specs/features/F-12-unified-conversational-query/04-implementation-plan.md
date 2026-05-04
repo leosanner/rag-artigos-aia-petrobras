@@ -53,16 +53,19 @@ Quebra do [04-interface-query-page-and-route-removal.md](./04-interface-query-pa
 
 ### Fatia 3 — Strategy selector no composer
 
-- [ ] Adicionar `selectedStrategy` state (default `"standard"`) na page.
-- [ ] Renderizar segmented buttons (`role="radiogroup"`, `aria-label="Estratégia"`) na composer:
+- [x] Adicionar `selectedStrategy` state (default `"standard"`) na page.
+- [x] Renderizar segmented buttons (`role="radiogroup"`, `aria-label="Estratégia"`) na composer:
   - `global`: 3 botões
-  - `focused`: oculto (label estático informativo opcional)
-- [ ] Adicionar copy PT-BR em `constants.ts`:
+  - `focused`: oculto + nota estática `STRATEGY_FOCUSED_NOTE`
+- [x] Adicionar copy PT-BR em `constants.ts`:
   - `STRATEGY_TOOLTIP_STANDARD`, `STRATEGY_TOOLTIP_EXPLORE`, `STRATEGY_TOOLTIP_RERANK`
-- [ ] Botão "i" abre tooltip acessível (`aria-describedby` ou popover) com a copy.
-- [ ] Wirar `selectedStrategy` no payload do submit (via conversation route, não ask).
-- [ ] **Novo teste (a)**: visibilidade do selector por modo.
-- [ ] CSS para segmented + tooltip em `page.module.css`.
+  - Labels `STRATEGY_LABEL_STANDARD/EXPLORE/RERANK` e `STRATEGY_FOCUSED_NOTE`
+- [x] Botão "i" por opção (aria-expanded/aria-controls) abre tooltip `role="note"` com a copy.
+- [x] Wirar `effectiveStrategy` (=`selectedStrategy` em global, forçado `"standard"` em focused) no payload do submit. Botão "Explorar perspectivas" removido; submit único via Enter ou "Consultar base".
+- [x] **Novo teste (a)**: visibilidade do selector por modo.
+- [x] **Novo teste extra**: tooltip toggle abre/fecha via botão "i".
+- [x] CSS para segmented + tooltip + nota em `page.module.css`.
+- [x] `pnpm vitest run src/app/query/page.test.tsx` ✓ (34 tests) | `pnpm lint` ✓ | `pnpm typecheck` ✓.
 
 ### Fatia 4 — "Avançado" disclosure
 

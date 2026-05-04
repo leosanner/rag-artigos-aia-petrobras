@@ -440,11 +440,9 @@ function clickSubmit(): void {
   );
 }
 
-function clickExplore(): void {
+function selectStrategy(label: RegExp): void {
   fireEvent.click(
-    within(getConversationSection()).getByRole("button", {
-      name: /explorar perspectivas/i,
-    }),
+    within(getConversationSection()).getByRole("radio", { name: label }),
   );
 }
 
@@ -537,10 +535,14 @@ describe("/query page", () => {
       }),
     ).toBeDisabled();
     expect(
-      within(getConversationSection()).getByRole("button", {
-        name: /explorar perspectivas/i,
-      }),
-    ).toBeDisabled();
+      within(getConversationSection()).getByRole("radio", { name: /^padrão$/i }),
+    ).toBeChecked();
+    expect(
+      within(getConversationSection()).getByRole("radio", { name: /^explorar$/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(getConversationSection()).getByRole("radio", { name: /^rerank$/i }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /carregar historico recente/i }),
     ).not.toBeInTheDocument();
@@ -574,6 +576,64 @@ describe("/query page", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the strategy selector only in global mode and a focused-only note in focused mode", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(SELECTABLE_DOCUMENTS_RESPONSE));
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+
+    expect(
+      within(getConversationSection()).getByRole("radiogroup", {
+        name: /estratégia/i,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(getConversationSection()).getByRole("radio", { name: /^padrão$/i }),
+    ).toBeChecked();
+
+    await act(async () => {
+      clickFocusedMode();
+    });
+
+    expect(
+      within(getConversationSection()).queryByRole("radiogroup", {
+        name: /estratégia/i,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(getConversationSection()).getByText(
+        /apenas a estratégia padrão está disponível/i,
+      ),
+    ).toBeInTheDocument();
+
+    clickGlobalMode();
+
+    expect(
+      within(getConversationSection()).getByRole("radio", { name: /^padrão$/i }),
+    ).toBeChecked();
+  });
+
+  it("opens the per-strategy tooltip when the info button is clicked", () => {
+    render(<QueryPage />);
+    typeSecret(SECRET);
+
+    const exploreInfo = within(getConversationSection()).getByRole("button", {
+      name: /sobre estratégia explorar/i,
+    });
+
+    fireEvent.click(exploreInfo);
+
+    expect(
+      within(getConversationSection()).getByRole("note"),
+    ).toHaveTextContent(/amplia a busca/i);
+
+    fireEvent.click(exploreInfo);
+
+    expect(
+      within(getConversationSection()).queryByRole("note"),
+    ).not.toBeInTheDocument();
+  });
+
   it("requires a selected document in focused mode and preserves the selection across mode switches", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(SELECTABLE_DOCUMENTS_RESPONSE));
 
@@ -594,21 +654,16 @@ describe("/query page", () => {
       }),
     ).toBeDisabled();
     expect(
-      within(getConversationSection()).getByRole("button", {
-        name: /explorar perspectivas/i,
+      within(getConversationSection()).queryByRole("radiogroup", {
+        name: /estratégia/i,
       }),
-    ).toBeDisabled();
+    ).not.toBeInTheDocument();
 
     selectFocusedDocument(FOCUSED_DOCUMENT_ID);
 
     expect(
       within(getConversationSection()).getByRole("button", {
         name: /consultar base/i,
-      }),
-    ).toBeEnabled();
-    expect(
-      within(getConversationSection()).getByRole("button", {
-        name: /explorar perspectivas/i,
       }),
     ).toBeEnabled();
 
@@ -705,9 +760,10 @@ describe("/query page", () => {
     );
 
     typeQuestion("Compare as abordagens metodologicas.");
+    selectStrategy(/^explorar$/i);
 
     await act(async () => {
-      clickExplore();
+      clickSubmit();
     });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
