@@ -955,7 +955,7 @@ describe("/query page", () => {
     });
 
     expect(
-      await screen.findByText(/consultando fontes/i),
+      await screen.findByText(/recuperando candidatos/i),
     ).toBeInTheDocument();
     expect(
       screen.getAllByText(/quais tecnicas aparecem com mais frequencia\?/i)
@@ -1016,7 +1016,93 @@ describe("/query page", () => {
     });
 
     expect(await screen.findByText(CURRENT_TRACE_ID)).toBeInTheDocument();
-    expect(screen.queryByText(/consultando fontes/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/recuperando candidatos/i)).not.toBeInTheDocument();
+  });
+
+  it("renders related terms inline during the explore stream", async () => {
+    const stream = createControlledEventStreamResponse();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(stream.response);
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Quais tecnicas aparecem com mais frequencia?");
+    selectStrategy(/^explorar$/i);
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    await act(async () => {
+      stream.push({ type: "phase", phase: "retrieving_sources" });
+      stream.push({
+        type: "related_terms",
+        terms: [
+          {
+            rank: 1,
+            term: "classificacao supervisionada",
+            ngramSize: 2,
+            frequency: 3,
+            sourceCoverageCount: 2,
+          },
+          {
+            rank: 2,
+            term: "segmentacao",
+            ngramSize: 1,
+            frequency: 2,
+            sourceCoverageCount: 1,
+          },
+        ],
+      });
+    });
+
+    const relatedTermsRegion = await screen.findByRole("region", {
+      name: /termos relacionados/i,
+    });
+    expect(
+      within(relatedTermsRegion).getByText(/classificacao supervisionada/i),
+    ).toBeInTheDocument();
+    expect(
+      within(relatedTermsRegion).getByText(/^segmentacao$/i),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the rerank phase copy while the rerank stream is live", async () => {
+    const stream = createControlledEventStreamResponse();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+    );
+    fetchMock.mockResolvedValueOnce(stream.response);
+
+    render(<QueryPage />);
+    typeSecret(SECRET);
+    typeQuestion("Quais tecnicas aparecem com mais frequencia?");
+    selectStrategy(/^rerank$/i);
+
+    await act(async () => {
+      clickSubmit();
+    });
+
+    await act(async () => {
+      stream.push({ type: "phase", phase: "retrieving_sources" });
+    });
+
+    expect(
+      await screen.findByText(/recuperando candidatos/i),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      stream.push({ type: "phase", phase: "reranking" });
+    });
+
+    expect(
+      await screen.findByText(/reordenando candidatos/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/recuperando candidatos/i),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps the streamed user message and shows a safe error when the SSE turn fails", async () => {

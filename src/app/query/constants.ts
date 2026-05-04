@@ -80,6 +80,12 @@ export const RAG_AUDIT_DRAWER_TITLE = "Auditoria da mensagem";
 export const RAG_AUDIT_DRAWER_CLOSE_LABEL = "Fechar auditoria";
 export const RAG_AUDIT_DRAWER_EMPTY = "Nenhuma mensagem selecionada para auditoria.";
 
+export const RAG_PHASE_COPY_RETRIEVING = "Recuperando candidatos…";
+export const RAG_PHASE_COPY_RERANKING = "Reordenando candidatos…";
+export const RAG_PHASE_COPY_GENERATING = "Gerando resposta…";
+
+export const RAG_STREAM_RELATED_TERMS_TITLE = "Termos relacionados";
+
 export function truncateExcerptPreview(excerpt: string): string {
   if (excerpt.length <= RAG_SOURCE_EXCERPT_PREVIEW_LENGTH) {
     return excerpt;

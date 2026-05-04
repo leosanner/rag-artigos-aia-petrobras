@@ -98,12 +98,18 @@ Quebra do [04-interface-query-page-and-route-removal.md](./04-interface-query-pa
 
 ### Fatia 6 — Phase status PT-BR
 
-- [ ] Mapear phase events para copy em `StreamingConversationMessageItem`:
+- [x] Mapear phase events para copy em `StreamingConversationMessageItem`:
   - `retrieving_sources` → "Recuperando candidatos…"
   - `reranking` → "Reordenando candidatos…"
   - `generating_answer` → "Gerando resposta…"
-- [ ] Adicionar constantes `RAG_PHASE_COPY_*` em `constants.ts`.
-- [ ] **Novos testes (e)** related-terms rendering em explore turn **(f)** rerank phase copy durante stream mockado.
+- [x] Constantes `RAG_PHASE_COPY_RETRIEVING/RERANKING/GENERATING` + `RAG_STREAM_RELATED_TERMS_TITLE` em `constants.ts`.
+- [x] `StreamingAssistantState` ganha `relatedTerms: RelatedTerm[]`; handler do evento `related_terms` agora popula o estado (antes era `continue` silencioso) usando `event.terms`.
+- [x] Bloco `<section role="region" aria-label="Termos relacionados">` na bolha de streaming exibe os termos quando presentes.
+- [x] Teste existente "streams sources first..." atualizado para nova copy ("recuperando candidatos").
+- [x] **Novo teste (e)** related-terms renderizam em turn explore.
+- [x] **Novo teste (f)** copy de rerank aparece durante stream mockado (e some quando phase muda).
+- [x] CSS `streamingRelatedTerms*` em `page.module.css`.
+- [x] `pnpm vitest run src/app/query/page.test.tsx` ✓ (39 tests) | `pnpm lint` ✓ | `pnpm typecheck` ✓.
 
 ### Fatia 7 — Backwards-compat fixture
 

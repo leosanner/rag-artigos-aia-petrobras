@@ -44,6 +44,10 @@ import {
   RAG_INVALID_REQUEST_MESSAGE,
   RAG_NETWORK_ERROR_MESSAGE,
   RAG_NO_GENERATION_AUDIT_MESSAGE,
+  RAG_PHASE_COPY_GENERATING,
+  RAG_PHASE_COPY_RERANKING,
+  RAG_PHASE_COPY_RETRIEVING,
+  RAG_STREAM_RELATED_TERMS_TITLE,
   RAG_TECHNICAL_ERROR_MESSAGE,
   RAG_UNAUTHORIZED_MESSAGE,
   STRATEGY_FOCUSED_NOTE,
@@ -252,13 +256,16 @@ type HandoffState =
   | { status: "idle" }
   | { status: "starting"; sourceChunkId: string };
 
+type StreamingPhase = "retrieving_sources" | "reranking" | "generating_answer";
+
 type StreamingAssistantState =
   | { status: "idle" }
   | {
       status: "streaming";
-      phase: "retrieving_sources" | "reranking" | "generating_answer";
+      phase: StreamingPhase;
       content: string;
       sources: RagStreamSource[];
+      relatedTerms: RelatedTerm[];
     };
 
 function createInitialConversationState(): ConversationState {
@@ -867,6 +874,8 @@ export default function QueryPage() {
               current.status === "streaming" ? current.content : "",
             sources:
               current.status === "streaming" ? current.sources : [],
+            relatedTerms:
+              current.status === "streaming" ? current.relatedTerms : [],
           }));
           continue;
         }
@@ -884,11 +893,25 @@ export default function QueryPage() {
               current.status === "streaming"
                 ? [...current.sources, event.source]
                 : [event.source],
+            relatedTerms:
+              current.status === "streaming" ? current.relatedTerms : [],
           }));
           continue;
         }
 
         if (event.type === "related_terms") {
+          setStreamingAssistantState((current) => ({
+            status: "streaming",
+            phase:
+              current.status === "streaming"
+                ? current.phase
+                : "retrieving_sources",
+            content:
+              current.status === "streaming" ? current.content : "",
+            sources:
+              current.status === "streaming" ? current.sources : [],
+            relatedTerms: event.terms,
+          }));
           continue;
         }
 
@@ -902,6 +925,8 @@ export default function QueryPage() {
                 : event.textDelta,
             sources:
               current.status === "streaming" ? current.sources : [],
+            relatedTerms:
+              current.status === "streaming" ? current.relatedTerms : [],
           }));
           continue;
         }
@@ -1589,6 +1614,7 @@ export default function QueryPage() {
                   phase={streamingAssistantState.phase}
                   content={streamingAssistantState.content}
                   sources={streamingAssistantState.sources}
+                  relatedTerms={streamingAssistantState.relatedTerms}
                 />
               ) : null}
             </ol>
@@ -1837,11 +1863,20 @@ function StreamingConversationMessageItem({
   phase,
   content,
   sources,
+  relatedTerms,
 }: {
-  phase: "retrieving_sources" | "reranking" | "generating_answer";
+  phase: StreamingPhase;
   content: string;
   sources: RagStreamSource[];
+  relatedTerms: RelatedTerm[];
 }) {
+  const phaseCopy =
+    phase === "retrieving_sources"
+      ? RAG_PHASE_COPY_RETRIEVING
+      : phase === "reranking"
+        ? RAG_PHASE_COPY_RERANKING
+        : RAG_PHASE_COPY_GENERATING;
+
   return (
     <li className={`${styles.transcriptItem} ${styles.transcriptAssistant}`}>
       <article
@@ -1852,13 +1887,7 @@ function StreamingConversationMessageItem({
           <span>Ao vivo</span>
         </header>
 
-        <p className={styles.streamingPhase}>
-          {phase === "retrieving_sources"
-            ? "Consultando fontes..."
-            : phase === "reranking"
-              ? "Reordenando fontes..."
-              : "Gerando resposta..."}
-        </p>
+        <p className={styles.streamingPhase}>{phaseCopy}</p>
 
         {sources.length > 0 ? (
           <ol className={styles.streamingSources}>
@@ -1873,6 +1902,27 @@ function StreamingConversationMessageItem({
               </li>
             ))}
           </ol>
+        ) : null}
+
+        {relatedTerms.length > 0 ? (
+          <section
+            aria-label={RAG_STREAM_RELATED_TERMS_TITLE}
+            className={styles.streamingRelatedTerms}
+          >
+            <p className={styles.streamingRelatedTermsTitle}>
+              {RAG_STREAM_RELATED_TERMS_TITLE}
+            </p>
+            <ul className={styles.streamingRelatedTermsList}>
+              {relatedTerms.map((term) => (
+                <li
+                  key={`${term.rank}-${term.term}`}
+                  className={styles.streamingRelatedTermsChip}
+                >
+                  {term.term}
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
 
         {content.length > 0 ? (
