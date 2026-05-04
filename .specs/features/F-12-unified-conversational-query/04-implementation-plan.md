@@ -113,8 +113,9 @@ Quebra do [04-interface-query-page-and-route-removal.md](./04-interface-query-pa
 
 ### Fatia 7 — Backwards-compat fixture
 
-- [ ] **Novo teste (g)**: carregar fixture pré-F-12 (sem `retrievalStrategy` em metadata?) e verificar que `selectedStrategy` no composer defaulta para `"standard"`.
-- [ ] Se necessário: ajuste mínimo no parser do conversation payload para tolerar metadata legado.
+- [x] **Novo teste (g)**: carrega conversation cuja última turn usou `retrievalStrategy: "rerank"` e verifica que o composer mantém `selectedStrategy === "standard"` (radio "Padrão" checked) e `topK = 6`. Confirma a decisão "strategy state não observa metadata da conversa carregada".
+- [x] Parser intacto — schema `.strip()` já aceita metadata legado/extra; nenhum ajuste necessário.
+- [x] `pnpm vitest run src/app/query/page.test.tsx` ✓ (40 tests) | `pnpm lint` ✓ | `pnpm typecheck` ✓.
 
 ### Fatia 8 — Cleanup `/api/rag/ask` e schemas
 

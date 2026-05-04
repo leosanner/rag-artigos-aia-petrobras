@@ -1297,6 +1297,44 @@ describe("/query page", () => {
     expect(screen.getByText(/Conversa sem titulo/i)).toBeInTheDocument();
   });
 
+  it("keeps the composer strategy at the default when loading a conversation whose last turn used a non-standard strategy", async () => {
+    const legacyAssistant = appendResponseFromAsk({
+      ...SUCCESS_RESPONSE,
+      metadata: {
+        ...SUCCESS_RESPONSE.metadata,
+        retrievalStrategy: "rerank" as const,
+        candidateTopK: 24,
+      },
+    }).assistantMessage;
+
+    const legacyConversation = {
+      ...CONVERSATION_DETAIL_RESPONSE,
+      messages: [CONVERSATION_DETAIL_RESPONSE.messages[0]!, legacyAssistant],
+    };
+
+    sessionStorage.setItem("query:secret", SECRET);
+    window.history.pushState({}, "", `/query?conversation=${CONVERSATION_ID}`);
+    fetchMock.mockResolvedValueOnce(jsonResponse(legacyConversation));
+
+    render(<QueryPage />);
+
+    await screen.findByText(SUCCESS_RESPONSE.answer);
+
+    expect(
+      within(getConversationSection()).getByRole("radio", {
+        name: /^padrão$/i,
+      }),
+    ).toBeChecked();
+    expect(
+      within(getConversationSection()).getByRole("radio", {
+        name: /^rerank$/i,
+      }),
+    ).not.toBeChecked();
+    expect(
+      within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
+    ).toHaveValue(6);
+  });
+
   it("opens the assistant-message audit inside a side drawer", async () => {
     sessionStorage.setItem("query:secret", SECRET);
     window.history.pushState({}, "", `/query?conversation=${CONVERSATION_ID}`);
