@@ -130,17 +130,42 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
           audit,
           createdAt: "2026-04-26T12:00:32.000Z",
           relatedTerms: [
-            { rank: 1, term: "random forest", ngramSize: 2, frequency: 18, sourceCoverageCount: 9 },
-            { rank: 2, term: "sensoriamento remoto", ngramSize: 2, frequency: 14, sourceCoverageCount: 8 },
-            { rank: 3, term: "classificacao supervisionada", ngramSize: 2, frequency: 11, sourceCoverageCount: 6 },
-            { rank: 4, term: "support vector machine", ngramSize: 3, frequency: 9, sourceCoverageCount: 5 },
+            {
+              rank: 1,
+              term: "random forest",
+              ngramSize: 2,
+              frequency: 18,
+              sourceCoverageCount: 9,
+            },
+            {
+              rank: 2,
+              term: "sensoriamento remoto",
+              ngramSize: 2,
+              frequency: 14,
+              sourceCoverageCount: 8,
+            },
+            {
+              rank: 3,
+              term: "classificacao supervisionada",
+              ngramSize: 2,
+              frequency: 11,
+              sourceCoverageCount: 6,
+            },
+            {
+              rank: 4,
+              term: "support vector machine",
+              ngramSize: 3,
+              frequency: 9,
+              sourceCoverageCount: 5,
+            },
           ],
           sources: [
             {
               sourceNumber: 1,
               chunkId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
               documentId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
-              documentTitle: "Machine learning para AIA - revisao sistematica (2022).pdf",
+              documentTitle:
+                "Machine learning para AIA - revisao sistematica (2022).pdf",
               chunkIndex: 4,
               excerpt:
                 "Entre os 31 estudos revisados, Random Forest aparece em 19 trabalhos como classificador principal, frequentemente comparado a SVM em cenarios de cobertura do solo.",
@@ -155,7 +180,8 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
               sourceNumber: 2,
               chunkId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
               documentId: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
-              documentTitle: "CNNs aplicadas a imagens Sentinel-2 em estudos de impacto.pdf",
+              documentTitle:
+                "CNNs aplicadas a imagens Sentinel-2 em estudos de impacto.pdf",
               chunkIndex: 7,
               excerpt:
                 "A arquitetura U-Net foi usada para segmentar areas degradadas com IoU medio de 0.78, superando metodos baseados em indices espectrais isolados.",
@@ -170,7 +196,8 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
               sourceNumber: 3,
               chunkId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
               documentId: "ffffffff-ffff-ffff-ffff-ffffffffffff",
-              documentTitle: "Ensembles e indices espectrais em monitoramento ambiental.pdf",
+              documentTitle:
+                "Ensembles e indices espectrais em monitoramento ambiental.pdf",
               chunkIndex: 2,
               excerpt:
                 "Modelos do tipo gradient boosting alimentados por NDVI, NDWI e EVI superaram baselines tradicionais em 4 das 6 bacias estudadas.",
@@ -187,7 +214,8 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
       {
         id: "44444444-4444-4444-4444-444444444444",
         role: "user",
-        content: "E quanto a metricas de avaliacao? Quais sao reportadas com mais frequencia?",
+        content:
+          "E quanto a metricas de avaliacao? Quais sao reportadas com mais frequencia?",
         createdAt: "2026-04-26T12:04:10.000Z",
         trace: null,
       },
@@ -341,9 +369,7 @@ export default function QueryPage() {
     (queryMode === "global" || selectedDocument !== null);
   const effectiveStrategy: RagRetrievalStrategy =
     queryMode === "focused" ? "standard" : selectedStrategy;
-  const submitButtonLabel = isSubmitting
-    ? "Consultando..."
-    : "Consultar base";
+  const submitButtonLabel = isSubmitting ? "Consultando..." : "Consultar base";
   const conversationTitle =
     conversationState.conversation?.title ??
     (conversationId ? "Conversa sem titulo" : "Nenhuma conversa ativa");
@@ -352,7 +378,7 @@ export default function QueryPage() {
   const auditDrawerMessage =
     auditDrawerMessageId === null
       ? null
-      : (conversationState.conversation?.messages ?? []).find(
+      : ((conversationState.conversation?.messages ?? []).find(
           (
             message,
           ): message is ConversationMessageResponse & {
@@ -361,7 +387,7 @@ export default function QueryPage() {
             message.role === "assistant" &&
             message.trace !== null &&
             message.id === auditDrawerMessageId,
-        ) ?? null;
+        ) ?? null);
 
   const clearStrategyTooltipTimer = () => {
     if (strategyTooltipTimerRef.current !== null) {
@@ -698,8 +724,14 @@ export default function QueryPage() {
         },
       );
     } catch {
-      console.error("[rag/query]", { phase: "submitQuestion", kind: "network_error" });
-      setAskState({ kind: "technical_error", message: RAG_NETWORK_ERROR_MESSAGE });
+      console.error("[rag/query]", {
+        phase: "submitQuestion",
+        kind: "network_error",
+      });
+      setAskState({
+        kind: "technical_error",
+        message: RAG_NETWORK_ERROR_MESSAGE,
+      });
       return;
     }
 
@@ -867,7 +899,9 @@ export default function QueryPage() {
       });
 
       const errorCode =
-        parsed.success && "errorCode" in parsed.data ? parsed.data.errorCode : null;
+        parsed.success && "errorCode" in parsed.data
+          ? parsed.data.errorCode
+          : null;
       const message =
         errorCode === "generation_failed"
           ? RAG_GENERATION_FAILED_MESSAGE
@@ -914,10 +948,8 @@ export default function QueryPage() {
           setStreamingAssistantState((current) => ({
             status: "streaming",
             phase: event.phase,
-            content:
-              current.status === "streaming" ? current.content : "",
-            sources:
-              current.status === "streaming" ? current.sources : [],
+            content: current.status === "streaming" ? current.content : "",
+            sources: current.status === "streaming" ? current.sources : [],
             relatedTerms:
               current.status === "streaming" ? current.relatedTerms : [],
           }));
@@ -931,8 +963,7 @@ export default function QueryPage() {
               current.status === "streaming"
                 ? current.phase
                 : "retrieving_sources",
-            content:
-              current.status === "streaming" ? current.content : "",
+            content: current.status === "streaming" ? current.content : "",
             sources:
               current.status === "streaming"
                 ? [...current.sources, event.source]
@@ -950,10 +981,8 @@ export default function QueryPage() {
               current.status === "streaming"
                 ? current.phase
                 : "retrieving_sources",
-            content:
-              current.status === "streaming" ? current.content : "",
-            sources:
-              current.status === "streaming" ? current.sources : [],
+            content: current.status === "streaming" ? current.content : "",
+            sources: current.status === "streaming" ? current.sources : [],
             relatedTerms: event.terms,
           }));
           continue;
@@ -967,8 +996,7 @@ export default function QueryPage() {
               current.status === "streaming"
                 ? `${current.content}${event.textDelta}`
                 : event.textDelta,
-            sources:
-              current.status === "streaming" ? current.sources : [],
+            sources: current.status === "streaming" ? current.sources : [],
             relatedTerms:
               current.status === "streaming" ? current.relatedTerms : [],
           }));
@@ -1499,7 +1527,9 @@ export default function QueryPage() {
                   <select
                     id="query-document"
                     value={selectedDocumentId}
-                    onChange={(event) => setSelectedDocumentId(event.target.value)}
+                    onChange={(event) =>
+                      setSelectedDocumentId(event.target.value)
+                    }
                     className={styles.select}
                   >
                     <option value="">Selecione um documento focavel</option>
@@ -1534,7 +1564,8 @@ export default function QueryPage() {
                         chunks indexados :: {selectedDocument.chunkCount}
                       </p>
                       <p className={styles.documentSummaryMeta}>
-                        atualizado :: {formatTimestamp(selectedDocument.updatedAt)}
+                        atualizado ::{" "}
+                        {formatTimestamp(selectedDocument.updatedAt)}
                       </p>
                     </div>
                   ) : (
@@ -1574,263 +1605,279 @@ export default function QueryPage() {
         </section>
 
         <div className={styles.chatLayout}>
-        <AuditDrawer
-          open={auditDrawerMessage !== null}
-          onClose={closeAuditDrawer}
-          traceLabel={
-            auditDrawerMessage
-              ? `trace :: ${auditDrawerMessage.trace.id.slice(0, 8)}`
-              : null
-          }
-        >
-          {auditDrawerMessage ? (
-            <>
-              <AuditSummaryBlock
-                blockIndex="[ 01 ] Auditoria da mensagem"
-                metaLabel={`trace :: ${auditDrawerMessage.trace.id.slice(0, 8)}`}
-                traceId={auditDrawerMessage.trace.id}
-                question={auditDrawerMessage.trace.question}
-                metadata={auditDrawerMessage.trace.metadata}
-                audit={auditDrawerMessage.trace.audit}
-                status={auditDrawerMessage.trace.status}
-                errorCode={auditDrawerMessage.trace.errorCode}
-                createdAt={auditDrawerMessage.trace.createdAt}
-              />
-              <RelatedTermsBlock
-                blockIndex="[ 02 ] Termos da mensagem"
-                terms={auditDrawerMessage.trace.relatedTerms}
-              />
-              <SourcesBlock
-                blockIndex="[ 03 ] Fontes da mensagem"
-                sources={auditDrawerMessage.trace.sources}
-                showCitationFlags
-                onStartFocusedConversation={
-                  auditDrawerMessage.trace.mode === "global"
-                    ? startFocusedConversationFromSource
-                    : undefined
-                }
-                handoffState={handoffState}
-              />
-            </>
-          ) : null}
-        </AuditDrawer>
-
-        <section className={`${styles.panel} ${styles.chatPanel}`}>
-          <header className={styles.panelHeader}>
-            <div>
-              <h2 className={styles.panelTitle}>Conversa</h2>
-              <p className={styles.panelCopy}>
-                {conversationTitle}
-                {conversationId ? ` :: ${conversationId.slice(0, 8)}` : ""}
-              </p>
-            </div>
-          </header>
-
-          {conversationState.error === "unauthorized" ? (
-            <StatusAlert kind="unauthorized" message={RAG_UNAUTHORIZED_MESSAGE} />
-          ) : null}
-
-          {conversationState.error === "technical" ? (
-            <StatusAlert kind="technical" message={RAG_TECHNICAL_ERROR_MESSAGE} />
-          ) : null}
-
-          {conversationState.error === "not_found" ? (
-            <StatusAlert
-              kind="technical"
-              message="Conversa nao encontrada ou indisponivel para recarga."
-            />
-          ) : null}
-
-          {conversationState.status === "loading" ? (
-            <p className={styles.emptyPanel}>Carregando conversa...</p>
-          ) : null}
-
-          {conversationState.conversation?.messages.length ||
-          streamingAssistantState.status === "streaming" ? (
-            <ol className={styles.transcript}>
-              {(conversationState.conversation?.messages ?? []).map((message) => (
-                <ConversationMessageItem
-                  key={message.id}
-                  message={message}
-                  onViewAudit={() => openAuditDrawer(message.id)}
+          <AuditDrawer
+            open={auditDrawerMessage !== null}
+            onClose={closeAuditDrawer}
+            traceLabel={
+              auditDrawerMessage
+                ? `trace :: ${auditDrawerMessage.trace.id.slice(0, 8)}`
+                : null
+            }
+          >
+            {auditDrawerMessage ? (
+              <>
+                <AuditSummaryBlock
+                  blockIndex="[ 01 ] Auditoria da mensagem"
+                  metaLabel={`trace :: ${auditDrawerMessage.trace.id.slice(0, 8)}`}
+                  traceId={auditDrawerMessage.trace.id}
+                  question={auditDrawerMessage.trace.question}
+                  metadata={auditDrawerMessage.trace.metadata}
+                  audit={auditDrawerMessage.trace.audit}
+                  status={auditDrawerMessage.trace.status}
+                  errorCode={auditDrawerMessage.trace.errorCode}
+                  createdAt={auditDrawerMessage.trace.createdAt}
                 />
-              ))}
-              {streamingAssistantState.status === "streaming" ? (
-                <StreamingConversationMessageItem
-                  phase={streamingAssistantState.phase}
-                  content={streamingAssistantState.content}
-                  sources={streamingAssistantState.sources}
-                  relatedTerms={streamingAssistantState.relatedTerms}
+                <RelatedTermsBlock
+                  blockIndex="[ 02 ] Termos da mensagem"
+                  terms={auditDrawerMessage.trace.relatedTerms}
+                />
+                <SourcesBlock
+                  blockIndex="[ 03 ] Fontes da mensagem"
+                  sources={auditDrawerMessage.trace.sources}
+                  showCitationFlags
+                  onStartFocusedConversation={
+                    auditDrawerMessage.trace.mode === "global"
+                      ? startFocusedConversationFromSource
+                      : undefined
+                  }
+                  handoffState={handoffState}
+                />
+              </>
+            ) : null}
+          </AuditDrawer>
+
+          <section className={`${styles.panel} ${styles.chatPanel}`}>
+            <header className={styles.panelHeader}>
+              <div>
+                <h2 className={styles.panelTitle}>Conversa</h2>
+                <p className={styles.panelCopy}>
+                  {conversationTitle}
+                  {conversationId ? ` :: ${conversationId.slice(0, 8)}` : ""}
+                </p>
+              </div>
+            </header>
+
+            {conversationState.error === "unauthorized" ? (
+              <StatusAlert
+                kind="unauthorized"
+                message={RAG_UNAUTHORIZED_MESSAGE}
+              />
+            ) : null}
+
+            {conversationState.error === "technical" ? (
+              <StatusAlert
+                kind="technical"
+                message={RAG_TECHNICAL_ERROR_MESSAGE}
+              />
+            ) : null}
+
+            {conversationState.error === "not_found" ? (
+              <StatusAlert
+                kind="technical"
+                message="Conversa nao encontrada ou indisponivel para recarga."
+              />
+            ) : null}
+
+            {conversationState.status === "loading" ? (
+              <p className={styles.emptyPanel}>Carregando conversa...</p>
+            ) : null}
+
+            {conversationState.conversation?.messages.length ||
+            streamingAssistantState.status === "streaming" ? (
+              <ol className={styles.transcript}>
+                {(conversationState.conversation?.messages ?? []).map(
+                  (message) => (
+                    <ConversationMessageItem
+                      key={message.id}
+                      message={message}
+                      onViewAudit={() => openAuditDrawer(message.id)}
+                    />
+                  ),
+                )}
+                {streamingAssistantState.status === "streaming" ? (
+                  <StreamingConversationMessageItem
+                    phase={streamingAssistantState.phase}
+                    content={streamingAssistantState.content}
+                    sources={streamingAssistantState.sources}
+                    relatedTerms={streamingAssistantState.relatedTerms}
+                  />
+                ) : null}
+              </ol>
+            ) : null}
+
+            <div className={styles.composerWrap}>
+              {askState.kind === "invalid_request" ? (
+                <StatusAlert
+                  kind="invalid"
+                  message={RAG_INVALID_REQUEST_MESSAGE}
                 />
               ) : null}
-            </ol>
-          ) : null}
 
-
-          <div className={styles.composerWrap}>
-            {askState.kind === "invalid_request" ? (
-              <StatusAlert kind="invalid" message={RAG_INVALID_REQUEST_MESSAGE} />
-            ) : null}
-
-            {askState.kind === "unauthorized" ? (
-              <StatusAlert kind="unauthorized" message={RAG_UNAUTHORIZED_MESSAGE} />
-            ) : null}
-
-            {askState.kind === "technical_error" ? (
-              <StatusAlert kind="technical" message={askState.message} />
-            ) : null}
-
-            <form onSubmit={onSubmit} className={styles.composer}>
-              <div className={`${styles.field} ${styles.fieldQuestion}`}>
-                <label htmlFor="query-question" className={styles.label}>
-                  <span>Pergunta</span>
-                  <span className={styles.labelIndex}>[ 05 ]</span>
-                </label>
-                <textarea
-                  id="query-question"
-                  value={question}
-                  onChange={(event) => setQuestion(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (
-                      event.key === "Enter" &&
-                      !event.shiftKey &&
-                      !event.nativeEvent.isComposing
-                    ) {
-                      event.preventDefault();
-                      if (canSubmit) {
-                        void submitQuestion(effectiveStrategy);
-                      }
-                    }
-                  }}
-                  rows={3}
-                  placeholder="Ex.: Quais tecnicas aparecem com mais frequencia nos estudos ou neste documento?"
-                  className={styles.textarea}
+              {askState.kind === "unauthorized" ? (
+                <StatusAlert
+                  kind="unauthorized"
+                  message={RAG_UNAUTHORIZED_MESSAGE}
                 />
-              </div>
+              ) : null}
 
-              {queryMode === "global" ? (
-                <div
-                  role="radiogroup"
-                  aria-label="Estratégia"
-                  className={styles.composerStrategy}
-                >
-                  <ul className={styles.composerStrategyList}>
-                    {GLOBAL_STRATEGY_OPTIONS.map((option) => {
-                      const tooltipId = `query-strategy-${option.value}-tooltip`;
-                      const isOpen = visibleStrategyTooltip === option.value;
-                      return (
-                        <li
-                          key={option.value}
-                          className={styles.composerStrategyItem}
-                          onMouseEnter={() =>
-                            scheduleStrategyTooltip(option.value)
-                          }
-                          onMouseLeave={hideStrategyTooltip}
-                        >
-                          <label className={styles.composerStrategyOption}>
-                            <input
-                              type="radio"
-                              name="query-strategy"
-                              value={option.value}
-                              aria-describedby={isOpen ? tooltipId : undefined}
-                              checked={selectedStrategy === option.value}
-                              onChange={() => {
-                                hideStrategyTooltip();
-                                setSelectedStrategy(option.value);
-                                setAskState({ kind: "idle" });
-                              }}
-                            />
-                            <span>{option.label}</span>
-                          </label>
-                          {isOpen ? (
-                            <p
-                              id={tooltipId}
-                              role="note"
-                              className={styles.composerStrategyTooltip}
-                            >
-                              {option.tooltip}
-                            </p>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ) : (
-                <p className={styles.composerStrategyNote}>
-                  {STRATEGY_FOCUSED_NOTE}
-                </p>
-              )}
+              {askState.kind === "technical_error" ? (
+                <StatusAlert kind="technical" message={askState.message} />
+              ) : null}
 
-              <div className={styles.composerFooter}>
-                <details className={styles.composerAdvanced}>
-                  <summary className={styles.composerAdvancedSummary}>
-                    Avançado
-                  </summary>
-                  <div className={styles.composerAdvancedFields}>
-                    <label
-                      htmlFor="query-top-k"
-                      className={styles.composerAdvancedField}
-                    >
-                      <span className={styles.composerAdvancedLabel}>
-                        Fontes recuperadas
-                      </span>
-                      <input
-                        id="query-top-k"
-                        type="number"
-                        min={RAG_RETRIEVAL_MIN_TOP_K}
-                        max={RAG_RETRIEVAL_MAX_TOP_K}
-                        step={1}
-                        value={topK}
-                        onChange={(event) =>
-                          setTopK(readTopKInput(event.target.value))
+              <form onSubmit={onSubmit} className={styles.composer}>
+                <div className={`${styles.field} ${styles.fieldQuestion}`}>
+                  <label htmlFor="query-question" className={styles.label}>
+                    <span>Pergunta</span>
+                    <span className={styles.labelIndex}>[ 05 ]</span>
+                  </label>
+                  <textarea
+                    id="query-question"
+                    value={question}
+                    onChange={(event) => setQuestion(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" &&
+                        !event.shiftKey &&
+                        !event.nativeEvent.isComposing
+                      ) {
+                        event.preventDefault();
+                        if (canSubmit) {
+                          void submitQuestion(effectiveStrategy);
                         }
-                        className={styles.composerAdvancedInput}
-                      />
-                    </label>
-                    {effectiveStrategy === "rerank" ? (
+                      }
+                    }}
+                    rows={3}
+                    placeholder="Ex.: Quais tecnicas aparecem com mais frequencia nos estudos ou neste documento?"
+                    className={styles.textarea}
+                  />
+                </div>
+
+                {queryMode === "global" ? (
+                  <div
+                    role="radiogroup"
+                    aria-label="Estratégia"
+                    className={styles.composerStrategy}
+                  >
+                    <ul className={styles.composerStrategyList}>
+                      {GLOBAL_STRATEGY_OPTIONS.map((option) => {
+                        const tooltipId = `query-strategy-${option.value}-tooltip`;
+                        const isOpen =
+                          visibleStrategyTooltip === option.value;
+                        return (
+                          <li
+                            key={option.value}
+                            className={styles.composerStrategyItem}
+                            onMouseEnter={() =>
+                              scheduleStrategyTooltip(option.value)
+                            }
+                            onMouseLeave={hideStrategyTooltip}
+                          >
+                            <label className={styles.composerStrategyOption}>
+                              <input
+                                type="radio"
+                                name="query-strategy"
+                                value={option.value}
+                                aria-describedby={isOpen ? tooltipId : undefined}
+                                checked={selectedStrategy === option.value}
+                                onChange={() => {
+                                  hideStrategyTooltip();
+                                  setSelectedStrategy(option.value);
+                                  setAskState({ kind: "idle" });
+                                }}
+                              />
+                              <span>{option.label}</span>
+                            </label>
+                            {isOpen ? (
+                              <p
+                                id={tooltipId}
+                                role="note"
+                                className={styles.composerStrategyTooltip}
+                              >
+                                {option.tooltip}
+                              </p>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className={styles.composerStrategyNote}>
+                    {STRATEGY_FOCUSED_NOTE}
+                  </p>
+                )}
+
+                <div className={styles.composerFooter}>
+                  <details className={styles.composerAdvanced}>
+                    <summary className={styles.composerAdvancedSummary}>
+                      Avançado
+                    </summary>
+                    <div className={styles.composerAdvancedFields}>
                       <label
-                        htmlFor="query-candidate-top-k"
+                        htmlFor="query-top-k"
                         className={styles.composerAdvancedField}
                       >
                         <span className={styles.composerAdvancedLabel}>
-                          Candidatos para rerank
+                          Fontes recuperadas
                         </span>
                         <input
-                          id="query-candidate-top-k"
+                          id="query-top-k"
                           type="number"
-                          min={topK}
-                          max={EXPLORE_RETRIEVAL_MAX_CANDIDATES}
+                          min={RAG_RETRIEVAL_MIN_TOP_K}
+                          max={RAG_RETRIEVAL_MAX_TOP_K}
                           step={1}
-                          value={candidateTopK}
+                          value={topK}
                           onChange={(event) =>
-                            setCandidateTopK(
-                              readCandidateTopKInput(event.target.value, topK),
-                            )
+                            setTopK(readTopKInput(event.target.value))
                           }
                           className={styles.composerAdvancedInput}
                         />
                       </label>
-                    ) : null}
+                      {effectiveStrategy === "rerank" ? (
+                        <label
+                          htmlFor="query-candidate-top-k"
+                          className={styles.composerAdvancedField}
+                        >
+                          <span className={styles.composerAdvancedLabel}>
+                            Candidatos para rerank
+                          </span>
+                          <input
+                            id="query-candidate-top-k"
+                            type="number"
+                            min={topK}
+                            max={EXPLORE_RETRIEVAL_MAX_CANDIDATES}
+                            step={1}
+                            value={candidateTopK}
+                            onChange={(event) =>
+                              setCandidateTopK(
+                                readCandidateTopKInput(
+                                  event.target.value,
+                                  topK,
+                                ),
+                              )
+                            }
+                            className={styles.composerAdvancedInput}
+                          />
+                        </label>
+                      ) : null}
+                    </div>
+                  </details>
+                  <div className={styles.composerActions}>
+                    <button
+                      type="submit"
+                      disabled={!canSubmit}
+                      className={`${styles.btn} ${
+                        isSubmitting ? styles.btnLoading : styles.btnPrimary
+                      }`}
+                    >
+                      {submitButtonLabel}
+                    </button>
                   </div>
-                </details>
-                <div className={styles.composerActions}>
-                <button
-                  type="submit"
-                  disabled={!canSubmit}
-                  className={`${styles.btn} ${
-                    isSubmitting ? styles.btnLoading : styles.btnPrimary
-                  }`}
-                >
-                  {submitButtonLabel}
-                </button>
                 </div>
-              </div>
-            </form>
-          </div>
-        </section>
+              </form>
+            </div>
+          </section>
         </div>
-
       </div>
     </main>
   );
@@ -1848,7 +1895,8 @@ function StatusAlert({ kind, message }: StatusAlertProps) {
       : kind === "unauthorized"
         ? styles.alertUnauthorized
         : styles.alertTechnical;
-  const badge = kind === "invalid" ? "400" : kind === "unauthorized" ? "401" : "ERR";
+  const badge =
+    kind === "invalid" ? "400" : kind === "unauthorized" ? "401" : "ERR";
 
   return (
     <div role="alert" className={`${styles.alert} ${className}`}>
@@ -1892,7 +1940,6 @@ function ConversationMessageItem({
           </button>
         ) : null}
       </article>
-
     </li>
   );
 }
@@ -2009,9 +2056,15 @@ function AuditSummaryBlock({
       <div className={styles.metaGrid}>
         <MetaItem label="// trace id" value={traceId} />
         <MetaItem label="// question chars" value={String(question.length)} />
-        <MetaItem label="// strategy" value={formatStrategy(metadata.retrievalStrategy)} />
+        <MetaItem
+          label="// strategy"
+          value={formatStrategy(metadata.retrievalStrategy)}
+        />
         <MetaItem label="// top-k" value={String(metadata.topK)} />
-        <MetaItem label="// candidates" value={String(metadata.candidateTopK)} />
+        <MetaItem
+          label="// candidates"
+          value={String(metadata.candidateTopK)}
+        />
         <MetaItem label="// generation" value={metadata.generationModel} />
         <MetaItem label="// embedding" value={metadata.embeddingModel} />
         <MetaItem
@@ -2050,9 +2103,7 @@ function AuditSummaryBlock({
         <MetaItem
           label="// rerank latency"
           value={
-            audit.reranking
-              ? `${audit.reranking.latencyMs} ms`
-              : "nao aplicado"
+            audit.reranking ? `${audit.reranking.latencyMs} ms` : "nao aplicado"
           }
         />
         <MetaItem
@@ -2072,8 +2123,12 @@ function AuditSummaryBlock({
           }
         />
         <MetaItem label="// total cost" value={formatUsd(audit.totalCostUsd)} />
-        {status ? <MetaItem label="// status" value={formatRunStatus(status)} /> : null}
-        {errorCode ? <MetaItem label="// error code" value={errorCode} /> : null}
+        {status ? (
+          <MetaItem label="// status" value={formatRunStatus(status)} />
+        ) : null}
+        {errorCode ? (
+          <MetaItem label="// error code" value={errorCode} />
+        ) : null}
         {createdAt ? (
           <MetaItem label="// created at" value={formatTimestamp(createdAt)} />
         ) : null}
@@ -2272,9 +2327,9 @@ function writeQueryUrl(
     mode,
     documentId,
   }: {
-  conversationId: string | null;
-  mode: QueryMode;
-  documentId: string | null;
+    conversationId: string | null;
+    mode: QueryMode;
+    documentId: string | null;
   },
   historyMode: "push" | "replace",
 ): void {
@@ -2310,8 +2365,7 @@ async function fetchJson(
   input: RequestInfo | URL,
   init?: RequestInit,
 ): Promise<
-  | { kind: "network_error" }
-  | { kind: "http"; status: number; body: unknown }
+  { kind: "network_error" } | { kind: "http"; status: number; body: unknown }
 > {
   try {
     const response = await fetch(input, init);
