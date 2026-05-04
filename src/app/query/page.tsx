@@ -227,6 +227,7 @@ const GLOBAL_STRATEGY_OPTIONS: ReadonlyArray<{
     tooltip: STRATEGY_TOOLTIP_RERANK,
   },
 ];
+const STRATEGY_TOOLTIP_HOVER_DELAY_MS = 1000;
 
 type ConversationAskState =
   | { kind: "idle" }
@@ -302,7 +303,7 @@ export default function QueryPage() {
   );
   const [selectedStrategy, setSelectedStrategy] =
     useState<RagRetrievalStrategy>("standard");
-  const [openStrategyTooltip, setOpenStrategyTooltip] =
+  const [visibleStrategyTooltip, setVisibleStrategyTooltip] =
     useState<RagRetrievalStrategy | null>(null);
   const [askState, setAskState] = useState<ConversationAskState>({
     kind: "idle",
@@ -324,6 +325,7 @@ export default function QueryPage() {
   });
   const handoffInFlightRef = useRef(false);
   const suppressUrlSyncRef = useRef(false);
+  const strategyTooltipTimerRef = useRef<number | null>(null);
 
   const trimmedQuestion = question.trim();
   const trimmedSecret = secret.trim();
@@ -360,6 +362,27 @@ export default function QueryPage() {
             message.trace !== null &&
             message.id === auditDrawerMessageId,
         ) ?? null;
+
+  const clearStrategyTooltipTimer = () => {
+    if (strategyTooltipTimerRef.current !== null) {
+      window.clearTimeout(strategyTooltipTimerRef.current);
+      strategyTooltipTimerRef.current = null;
+    }
+  };
+
+  const hideStrategyTooltip = () => {
+    clearStrategyTooltipTimer();
+    setVisibleStrategyTooltip(null);
+  };
+
+  const scheduleStrategyTooltip = (strategy: RagRetrievalStrategy) => {
+    clearStrategyTooltipTimer();
+    setVisibleStrategyTooltip(null);
+    strategyTooltipTimerRef.current = window.setTimeout(() => {
+      setVisibleStrategyTooltip(strategy);
+      strategyTooltipTimerRef.current = null;
+    }, STRATEGY_TOOLTIP_HOVER_DELAY_MS);
+  };
 
   useEffect(() => {
     const stored = sessionStorage.getItem(SECRET_STORAGE_KEY);
@@ -404,6 +427,27 @@ export default function QueryPage() {
 
     setIsUrlStateReady(true);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (strategyTooltipTimerRef.current !== null) {
+        window.clearTimeout(strategyTooltipTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (queryMode === "global") {
+      return;
+    }
+
+    if (strategyTooltipTimerRef.current !== null) {
+      window.clearTimeout(strategyTooltipTimerRef.current);
+      strategyTooltipTimerRef.current = null;
+    }
+
+    setVisibleStrategyTooltip(null);
+  }, [queryMode]);
 
   useEffect(() => {
     if (!isUrlStateReady || suppressUrlSyncRef.current) {
@@ -1377,6 +1421,7 @@ export default function QueryPage() {
                     value="global"
                     checked={queryMode === "global"}
                     onChange={() => {
+                      hideStrategyTooltip();
                       setQueryMode("global");
                       setAskState({ kind: "idle" });
                     }}
@@ -1391,6 +1436,7 @@ export default function QueryPage() {
                     value="focused"
                     checked={queryMode === "focused"}
                     onChange={() => {
+                      hideStrategyTooltip();
                       setQueryMode("focused");
                       setAskState({ kind: "idle" });
                     }}
@@ -1671,39 +1717,31 @@ export default function QueryPage() {
                   <ul className={styles.composerStrategyList}>
                     {GLOBAL_STRATEGY_OPTIONS.map((option) => {
                       const tooltipId = `query-strategy-${option.value}-tooltip`;
-                      const isOpen = openStrategyTooltip === option.value;
+                      const isOpen = visibleStrategyTooltip === option.value;
                       return (
                         <li
                           key={option.value}
                           className={styles.composerStrategyItem}
+                          onMouseEnter={() =>
+                            scheduleStrategyTooltip(option.value)
+                          }
+                          onMouseLeave={hideStrategyTooltip}
                         >
                           <label className={styles.composerStrategyOption}>
                             <input
                               type="radio"
                               name="query-strategy"
                               value={option.value}
+                              aria-describedby={isOpen ? tooltipId : undefined}
                               checked={selectedStrategy === option.value}
                               onChange={() => {
+                                hideStrategyTooltip();
                                 setSelectedStrategy(option.value);
                                 setAskState({ kind: "idle" });
                               }}
                             />
                             <span>{option.label}</span>
                           </label>
-                          <button
-                            type="button"
-                            aria-label={`Sobre estratégia ${option.label}`}
-                            aria-expanded={isOpen}
-                            aria-controls={tooltipId}
-                            onClick={() =>
-                              setOpenStrategyTooltip((current) =>
-                                current === option.value ? null : option.value,
-                              )
-                            }
-                            className={styles.composerStrategyInfo}
-                          >
-                            i
-                          </button>
                           {isOpen ? (
                             <p
                               id={tooltipId}

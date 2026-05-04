@@ -235,7 +235,7 @@
 .composerStrategyList {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 10px 12px;
   list-style: none;
   padding: 0;
   margin: 0;
@@ -245,14 +245,16 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
 }
 
 .composerStrategyOption {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
+  min-height: 40px;
+  padding: 8px 16px;
   border: var(--border);
   background: var(--paper);
   cursor: pointer;
@@ -262,11 +264,30 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink);
-  transition: background 160ms ease, border-color 160ms ease;
+  box-shadow: 4px 4px 0 rgba(10, 10, 10, 0.12);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.composerStrategyItem:nth-child(1) .composerStrategyOption {
+  background: linear-gradient(180deg, #ffffff 0%, var(--paper-deep) 100%);
+}
+
+.composerStrategyItem:nth-child(2) .composerStrategyOption {
+  background: linear-gradient(180deg, #efffb9 0%, var(--lime) 100%);
+}
+
+.composerStrategyItem:nth-child(3) .composerStrategyOption {
+  background: linear-gradient(180deg, #dfe6ff 0%, #9fb3ff 100%);
 }
 
 .composerStrategyOption:hover {
-  background: var(--paper-deep);
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0 rgba(10, 10, 10, 0.16);
 }
 
 .composerStrategyOption input {
@@ -279,6 +300,13 @@
   background: var(--ink);
   color: var(--paper);
   border-color: var(--ink);
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0 rgba(10, 10, 10, 0.16);
+}
+
+.composerStrategyItem:nth-child(1) .composerStrategyOption:has(input:checked) {
+  background: linear-gradient(180deg, #fff8d6 0%, var(--yellow) 100%);
+  color: var(--ink);
 }
 
 .composerStrategyOption:has(input:focus-visible) {
@@ -286,42 +314,66 @@
   outline-offset: 2px;
 }
 
-.composerStrategyInfo {
+.composerStrategyTooltip {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 14px);
+  z-index: 24;
+  width: min(340px, calc(100vw - 48px));
+  margin: 0;
+  padding: 14px 16px 14px 18px;
+  background: linear-gradient(180deg, #fffef7 0%, var(--paper) 100%);
+  border: var(--border);
+  box-shadow: 8px 8px 0 rgba(10, 10, 10, 0.14);
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.composerStrategyTooltip::before {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin-right: 6px;
-  border: var(--border);
-  background: var(--paper);
-  color: var(--ink);
+  margin-bottom: 10px;
+  padding: 3px 8px;
+  border: 1px solid currentColor;
+  background: rgba(255, 255, 255, 0.7);
   font-family: var(--font-mono), monospace;
-  font-size: 0.7rem;
+  font-size: 0.62rem;
   font-weight: 700;
-  cursor: pointer;
-  transition: background 160ms ease;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
-.composerStrategyInfo:hover {
-  background: var(--paper-deep);
+.composerStrategyItem:nth-child(1) .composerStrategyTooltip {
+  box-shadow:
+    inset 8px 0 0 var(--ink),
+    6px 6px 0 rgba(10, 10, 10, 0.08);
 }
 
-.composerStrategyInfo[aria-expanded="true"] {
-  background: var(--blue);
-  color: var(--paper);
-  border-color: var(--blue);
+.composerStrategyItem:nth-child(1) .composerStrategyTooltip::before {
+  content: "Busca direta";
 }
 
-.composerStrategyTooltip {
-  flex-basis: 100%;
-  margin: 4px 0 0;
-  padding: 10px 12px;
-  background: var(--paper-deep);
-  border: var(--border);
-  font-size: 0.82rem;
-  line-height: 1.4;
-  color: var(--ink);
+.composerStrategyItem:nth-child(2) .composerStrategyTooltip {
+  background: linear-gradient(180deg, #f7ffd7 0%, var(--paper) 100%);
+  box-shadow:
+    inset 8px 0 0 var(--lime-deep),
+    6px 6px 0 rgba(10, 10, 10, 0.08);
+}
+
+.composerStrategyItem:nth-child(2) .composerStrategyTooltip::before {
+  content: "Explora contexto";
+}
+
+.composerStrategyItem:nth-child(3) .composerStrategyTooltip {
+  background: linear-gradient(180deg, #eef2ff 0%, var(--paper) 100%);
+  box-shadow:
+    inset 8px 0 0 var(--blue),
+    6px 6px 0 rgba(10, 10, 10, 0.08);
+}
+
+.composerStrategyItem:nth-child(3) .composerStrategyTooltip::before {
+  content: "Prioriza fontes";
 }
 
 .composerAdvanced {
@@ -431,6 +483,20 @@
   .composerFooter {
     flex-direction: column;
     align-items: stretch;
+  }
+  .composerStrategyList {
+    display: grid;
+    gap: 12px;
+  }
+  .composerStrategyItem {
+    width: 100%;
+  }
+  .composerStrategyOption {
+    flex: 1;
+  }
+  .composerStrategyTooltip {
+    width: 100%;
+    left: 0;
   }
   .composerActions {
     justify-content: stretch;

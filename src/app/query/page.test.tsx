@@ -508,6 +508,7 @@ describe("/query page", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -666,21 +667,39 @@ describe("/query page", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("opens the per-strategy tooltip when the info button is clicked", () => {
+  it("shows the per-strategy tooltip after hovering the strategy for 1 second", () => {
+    vi.useFakeTimers();
+
     render(<QueryPage />);
     typeSecret(SECRET);
 
-    const exploreInfo = within(getConversationSection()).getByRole("button", {
-      name: /sobre estratégia explorar/i,
+    const exploreStrategy = within(getConversationSection())
+      .getByRole("radio", {
+        name: /explorar/i,
+      })
+      .closest("li");
+
+    expect(exploreStrategy).not.toBeNull();
+
+    fireEvent.mouseEnter(exploreStrategy!);
+
+    act(() => {
+      vi.advanceTimersByTime(999);
     });
 
-    fireEvent.click(exploreInfo);
-
     expect(
-      within(getConversationSection()).getByRole("note"),
-    ).toHaveTextContent(/amplia a busca/i);
+      within(getConversationSection()).queryByRole("note"),
+    ).not.toBeInTheDocument();
 
-    fireEvent.click(exploreInfo);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(within(getConversationSection()).getByRole("note")).toHaveTextContent(
+      /amplia a busca/i,
+    );
+
+    fireEvent.mouseLeave(exploreStrategy!);
 
     expect(
       within(getConversationSection()).queryByRole("note"),
