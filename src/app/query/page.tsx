@@ -23,6 +23,8 @@ import {
   type SelectableRagDocument,
 } from "@/application/rag/schemas";
 import {
+  EXPLORE_RETRIEVAL_MAX_CANDIDATES,
+  RAG_RERANK_DEFAULT_CANDIDATE_TOP_K,
   RAG_RETRIEVAL_DEFAULT_TOP_K,
   RAG_RETRIEVAL_MAX_TOP_K,
   RAG_RETRIEVAL_MIN_TOP_K,
@@ -287,6 +289,9 @@ export default function QueryPage() {
   const [queryMode, setQueryMode] = useState<QueryMode>("global");
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const [topK, setTopK] = useState(RAG_RETRIEVAL_DEFAULT_TOP_K);
+  const [candidateTopK, setCandidateTopK] = useState(
+    RAG_RERANK_DEFAULT_CANDIDATE_TOP_K,
+  );
   const [selectedStrategy, setSelectedStrategy] =
     useState<RagRetrievalStrategy>("standard");
   const [openStrategyTooltip, setOpenStrategyTooltip] =
@@ -1665,38 +1670,57 @@ export default function QueryPage() {
               )}
 
               <div className={styles.composerFooter}>
-                <label htmlFor="query-top-k" className={styles.composerTopK}>
-                  <span className={styles.composerTopKLabel}>
-                    Fontes recuperadas
-                  </span>
-                  <span className={styles.composerTopKSelectWrap}>
-                    <select
-                      id="query-top-k"
-                      value={topK}
-                      onChange={(event) =>
-                        setTopK(readTopKInput(event.target.value))
-                      }
-                      className={styles.composerTopKSelect}
+                <details className={styles.composerAdvanced}>
+                  <summary className={styles.composerAdvancedSummary}>
+                    Avançado
+                  </summary>
+                  <div className={styles.composerAdvancedFields}>
+                    <label
+                      htmlFor="query-top-k"
+                      className={styles.composerAdvancedField}
                     >
-                      {Array.from(
-                        {
-                          length:
-                            RAG_RETRIEVAL_MAX_TOP_K -
-                            RAG_RETRIEVAL_MIN_TOP_K +
-                            1,
-                        },
-                        (_, index) => RAG_RETRIEVAL_MIN_TOP_K + index,
-                      ).map((value) => (
-                        <option key={value} value={value}>
-                          {String(value).padStart(2, "0")}
-                        </option>
-                      ))}
-                    </select>
-                    <span aria-hidden className={styles.composerTopKChevron}>
-                      ▾
-                    </span>
-                  </span>
-                </label>
+                      <span className={styles.composerAdvancedLabel}>
+                        Fontes recuperadas
+                      </span>
+                      <input
+                        id="query-top-k"
+                        type="number"
+                        min={RAG_RETRIEVAL_MIN_TOP_K}
+                        max={RAG_RETRIEVAL_MAX_TOP_K}
+                        step={1}
+                        value={topK}
+                        onChange={(event) =>
+                          setTopK(readTopKInput(event.target.value))
+                        }
+                        className={styles.composerAdvancedInput}
+                      />
+                    </label>
+                    {effectiveStrategy === "rerank" ? (
+                      <label
+                        htmlFor="query-candidate-top-k"
+                        className={styles.composerAdvancedField}
+                      >
+                        <span className={styles.composerAdvancedLabel}>
+                          Candidatos para rerank
+                        </span>
+                        <input
+                          id="query-candidate-top-k"
+                          type="number"
+                          min={topK}
+                          max={EXPLORE_RETRIEVAL_MAX_CANDIDATES}
+                          step={1}
+                          value={candidateTopK}
+                          onChange={(event) =>
+                            setCandidateTopK(
+                              readCandidateTopKInput(event.target.value, topK),
+                            )
+                          }
+                          className={styles.composerAdvancedInput}
+                        />
+                      </label>
+                    ) : null}
+                  </div>
+                </details>
                 <div className={styles.composerActions}>
                 <button
                   type="submit"
@@ -2167,6 +2191,19 @@ function readTopKInput(value: string): number {
   return Math.min(
     RAG_RETRIEVAL_MAX_TOP_K,
     Math.max(RAG_RETRIEVAL_MIN_TOP_K, parsed),
+  );
+}
+
+function readCandidateTopKInput(value: string, topKFloor: number): number {
+  const parsed = Number.parseInt(value, 10);
+
+  if (!Number.isFinite(parsed)) {
+    return RAG_RERANK_DEFAULT_CANDIDATE_TOP_K;
+  }
+
+  return Math.min(
+    EXPLORE_RETRIEVAL_MAX_CANDIDATES,
+    Math.max(topKFloor, parsed),
   );
 }
 

@@ -528,7 +528,7 @@ describe("/query page", () => {
     expect(screen.getByLabelText(/documento especifico/i)).not.toBeChecked();
     expect(
       within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
-    ).toHaveValue("6");
+    ).toHaveValue(6);
     expect(
       within(getConversationSection()).getByRole("button", {
         name: /consultar base/i,
@@ -613,6 +613,59 @@ describe("/query page", () => {
     ).toBeChecked();
   });
 
+  it("hides advanced retrieval controls behind a disclosure that toggles on click", () => {
+    render(<QueryPage />);
+    typeSecret(SECRET);
+
+    const summary = within(getConversationSection()).getByText(/^avançado$/i);
+    const details = summary.closest("details");
+
+    expect(details).not.toBeNull();
+    expect(details).not.toHaveAttribute("open");
+
+    fireEvent.click(summary);
+
+    expect(details).toHaveAttribute("open");
+
+    const topKInput =
+      within(getConversationSection()).getByLabelText(/fontes recuperadas/i);
+    fireEvent.change(topKInput, { target: { value: "10" } });
+
+    expect(topKInput).toHaveValue(10);
+  });
+
+  it("renders candidateTopK only when the rerank strategy is selected", () => {
+    render(<QueryPage />);
+    typeSecret(SECRET);
+
+    const summary = within(getConversationSection()).getByText(/^avançado$/i);
+    fireEvent.click(summary);
+
+    expect(
+      within(getConversationSection()).queryByLabelText(
+        /candidatos para rerank/i,
+      ),
+    ).not.toBeInTheDocument();
+
+    selectStrategy(/^rerank$/i);
+
+    const candidateInput = within(getConversationSection()).getByLabelText(
+      /candidatos para rerank/i,
+    );
+    expect(candidateInput).toHaveValue(24);
+
+    fireEvent.change(candidateInput, { target: { value: "20" } });
+    expect(candidateInput).toHaveValue(20);
+
+    selectStrategy(/^padrão$/i);
+
+    expect(
+      within(getConversationSection()).queryByLabelText(
+        /candidatos para rerank/i,
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   it("opens the per-strategy tooltip when the info button is clicked", () => {
     render(<QueryPage />);
     typeSecret(SECRET);
@@ -670,7 +723,7 @@ describe("/query page", () => {
     clickGlobalMode();
     expect(
       within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
-    ).toHaveValue("9");
+    ).toHaveValue(9);
     expect(
       within(getConversationSection()).getByRole("button", {
         name: /consultar base/i,
@@ -684,7 +737,7 @@ describe("/query page", () => {
     );
     expect(
       within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
-    ).toHaveValue("9");
+    ).toHaveValue(9);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -1247,7 +1300,7 @@ describe("/query page", () => {
     );
     expect(
       within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
-    ).toHaveValue("8");
+    ).toHaveValue(8);
     expect(
       within(getConversationSection()).getByLabelText(/pergunta/i),
     ).toHaveValue(

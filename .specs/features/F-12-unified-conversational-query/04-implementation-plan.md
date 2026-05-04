@@ -69,12 +69,16 @@ Quebra do [04-interface-query-page-and-route-removal.md](./04-interface-query-pa
 
 ### Fatia 4 — "Avançado" disclosure
 
-- [ ] `<details>` nativo com `<summary>Avançado</summary>` na composer.
-- [ ] Dentro: `topK` numeric (sempre visível, range 3..12, default 6).
-- [ ] `candidateTopK` numeric (visível só se `selectedStrategy === "rerank"`, range `topK..24`, default 24).
-- [ ] State: `topKOverride` e `candidateTopKOverride` na page; reset on remount.
-- [ ] **Novos testes (b)** disclosure toggle e override **(c)** candidateTopK só em rerank.
-- [ ] CSS do disclosure.
+- [x] `<details>` nativo com `<summary>Avançado</summary>` na composer (substitui o `<select>` inline antigo do topK).
+- [x] Dentro: `topK` numeric `<input type="number">` (range 3..12, default 6) com label "Fontes recuperadas".
+- [x] `candidateTopK` numeric `<input type="number">` (visível só se `effectiveStrategy === "rerank"`, range `topK..EXPLORE_RETRIEVAL_MAX_CANDIDATES (24)`, default `RAG_RERANK_DEFAULT_CANDIDATE_TOP_K`).
+- [x] State: `topK` (existente) + novo `candidateTopK` na page; ambos resetam on remount.
+- [x] **Novo teste (b)** disclosure toggle (open + edit topK).
+- [x] **Novo teste (c)** candidateTopK aparece somente em rerank e some ao voltar para padrão.
+- [x] CSS do disclosure (`composerAdvanced*`); estilos antigos `composerTopK*` removidos.
+- [x] `pnpm vitest run src/app/query/page.test.tsx` ✓ (36 tests) | `pnpm lint` ✓ | `pnpm typecheck` ✓.
+
+> Wiring backend do `candidateTopK` no payload fica deferido — `conversationRagRetrievalInputSchema` ainda só aceita `{ topK, strategy }`. A UI captura o valor em estado local, mas o submit segue enviando apenas `topK`/`strategy`. A extensão da schema + propagação até `getCandidateTopK` será feita junto da Fatia 6 (phase status PT-BR / wiring de eventos), antes da Fatia 9 (run final).
 
 ### Fatia 5 — AuditDrawer substitui o aside inline
 

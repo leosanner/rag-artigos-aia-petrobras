@@ -324,6 +324,86 @@
   color: var(--ink);
 }
 
+.composerAdvanced {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: var(--font-mono), monospace;
+}
+
+.composerAdvancedSummary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: var(--border);
+  background: var(--paper);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink);
+  cursor: pointer;
+  list-style: none;
+}
+
+.composerAdvancedSummary::-webkit-details-marker {
+  display: none;
+}
+
+.composerAdvancedSummary::before {
+  content: "▸";
+  font-size: 0.75rem;
+}
+
+.composerAdvanced[open] .composerAdvancedSummary::before {
+  content: "▾";
+}
+
+.composerAdvancedFields {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px;
+  background: var(--paper-deep);
+  border: var(--border);
+}
+
+.composerAdvancedField {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.composerAdvancedLabel {
+  opacity: 0.75;
+}
+
+.composerAdvancedInput {
+  width: 96px;
+  padding: 8px 10px;
+  border: var(--border);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  outline: none;
+  transition: border-color 160ms ease;
+}
+
+.composerAdvancedInput:focus-visible {
+  border-color: var(--blue);
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
 .composerStrategyNote {
   margin: 0;
   font-family: var(--font-mono), monospace;
@@ -332,74 +412,6 @@
   text-transform: uppercase;
   color: var(--ink);
   opacity: 0.7;
-}
-
-.composerTopK {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--font-mono), monospace;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink);
-}
-
-.composerTopKLabel {
-  opacity: 0.75;
-}
-
-.composerTopKSelectWrap {
-  position: relative;
-  display: inline-flex;
-  align-items: stretch;
-}
-
-.composerTopKSelect {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  padding: 8px 32px 8px 14px;
-  border: var(--border);
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  line-height: 1;
-  cursor: pointer;
-  outline: none;
-  transition: border-color 160ms ease, background 160ms ease;
-}
-
-.composerTopKSelect:hover {
-  background: var(--paper-deep);
-}
-
-.composerTopKSelect:focus-visible {
-  border-color: var(--blue);
-  outline: 2px solid var(--blue);
-  outline-offset: 2px;
-}
-
-.composerTopKChevron {
-  position: absolute;
-  top: 50%;
-  right: 10px;
-  transform: translateY(-50%);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--ink);
-  pointer-events: none;
-  transition: transform 160ms ease;
-}
-
-.composerTopKSelectWrap:has(.composerTopKSelect:focus-visible) .composerTopKChevron {
-  color: var(--blue);
-  transform: translateY(-50%) rotate(180deg);
 }
 
 @media (max-width: 720px) {
