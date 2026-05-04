@@ -31,6 +31,7 @@ import {
   type RagRetrievalStrategy,
 } from "@/domain/rag";
 
+import { AuditDrawer } from "./components/AuditDrawer";
 import {
   formatTechnicalErrorMessage,
   RAG_EMPTY_SOURCES_MESSAGE,
@@ -307,9 +308,9 @@ export default function QueryPage() {
     useState<StreamingAssistantState>(createInitialStreamingAssistantState);
   const [selectableDocumentsState, setSelectableDocumentsState] =
     useState<SelectableDocumentsState>(createInitialSelectableDocumentsState);
-  const [expandedAuditMessageIds, setExpandedAuditMessageIds] = useState<
-    Set<string>
-  >(() => new Set());
+  const [auditDrawerMessageId, setAuditDrawerMessageId] = useState<
+    string | null
+  >(null);
   const [isUrlStateReady, setIsUrlStateReady] = useState(false);
   const [handoffState, setHandoffState] = useState<HandoffState>({
     status: "idle",
@@ -339,17 +340,19 @@ export default function QueryPage() {
     (conversationId ? "Conversa sem titulo" : "Nenhuma conversa ativa");
   const newConversationLabel =
     conversationState.status === "loading" ? "Carregando..." : "Nova conversa";
-  const expandedAuditMessages = (conversationState.conversation?.messages ?? [])
-    .filter(
-      (
-        message,
-      ): message is ConversationMessageResponse & {
-        trace: NonNullable<ConversationMessageResponse["trace"]>;
-      } =>
-        message.role === "assistant" &&
-        message.trace !== null &&
-        expandedAuditMessageIds.has(message.id),
-    );
+  const auditDrawerMessage =
+    auditDrawerMessageId === null
+      ? null
+      : (conversationState.conversation?.messages ?? []).find(
+          (
+            message,
+          ): message is ConversationMessageResponse & {
+            trace: NonNullable<ConversationMessageResponse["trace"]>;
+          } =>
+            message.role === "assistant" &&
+            message.trace !== null &&
+            message.id === auditDrawerMessageId,
+        ) ?? null;
 
   useEffect(() => {
     const stored = sessionStorage.getItem(SECRET_STORAGE_KEY);
@@ -368,7 +371,7 @@ export default function QueryPage() {
       });
       // Start with auditorias closed so the chat opens centered; the user
       // shifts the layout by clicking "Ver auditoria".
-      setExpandedAuditMessageIds(new Set());
+      setAuditDrawerMessageId(null);
       return;
     }
 
@@ -1028,7 +1031,7 @@ export default function QueryPage() {
         error: null,
       });
       setStreamingAssistantState(createInitialStreamingAssistantState());
-      setExpandedAuditMessageIds(new Set());
+      setAuditDrawerMessageId(null);
       if (pushUrlOnSuccess) {
         writeQueryUrl(
           {
@@ -1212,7 +1215,7 @@ export default function QueryPage() {
         error: null,
       });
       setStreamingAssistantState(createInitialStreamingAssistantState());
-      setExpandedAuditMessageIds(new Set());
+      setAuditDrawerMessageId(null);
       return;
     }
 
@@ -1278,18 +1281,12 @@ export default function QueryPage() {
     });
   }
 
-  function toggleAudit(messageId: string) {
-    setExpandedAuditMessageIds((current) => {
-      const next = new Set(current);
+  function openAuditDrawer(messageId: string) {
+    setAuditDrawerMessageId(messageId);
+  }
 
-      if (next.has(messageId)) {
-        next.delete(messageId);
-      } else {
-        next.add(messageId);
-      }
-
-      return next;
-    });
+  function closeAuditDrawer() {
+    setAuditDrawerMessageId(null);
   }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -1506,14 +1503,47 @@ export default function QueryPage() {
         </section>
 
         <div className={styles.chatLayout}>
-        {expandedAuditMessages.length > 0 ? (
-          <ConversationAuditAside
-            messages={expandedAuditMessages}
-            onClose={(messageId) => toggleAudit(messageId)}
-            onStartFocusedConversation={startFocusedConversationFromSource}
-            handoffState={handoffState}
-          />
-        ) : null}
+        <AuditDrawer
+          open={auditDrawerMessage !== null}
+          onClose={closeAuditDrawer}
+          traceLabel={
+            auditDrawerMessage
+              ? `trace :: ${auditDrawerMessage.trace.id.slice(0, 8)}`
+              : null
+          }
+        >
+          {auditDrawerMessage ? (
+            <>
+              <AuditSummaryBlock
+                blockIndex="[ 01 ] Auditoria da mensagem"
+                metaLabel={`trace :: ${auditDrawerMessage.trace.id.slice(0, 8)}`}
+                traceId={auditDrawerMessage.trace.id}
+                question={auditDrawerMessage.trace.question}
+                metadata={auditDrawerMessage.trace.metadata}
+                audit={auditDrawerMessage.trace.audit}
+                status={auditDrawerMessage.trace.status}
+                errorCode={auditDrawerMessage.trace.errorCode}
+                createdAt={auditDrawerMessage.trace.createdAt}
+              />
+              <RelatedTermsBlock
+                blockIndex="[ 02 ] Termos da mensagem"
+                terms={auditDrawerMessage.trace.relatedTerms}
+              />
+              <SourcesBlock
+                blockIndex="[ 03 ] Fontes da mensagem"
+                sources={auditDrawerMessage.trace.sources}
+                showCitationFlags
+                onStartFocusedConversation={
+                  auditDrawerMessage.trace.mode === "global"
+                    ? startFocusedConversationFromSource
+                    : undefined
+                }
+                handoffState={handoffState}
+              />
+            </>
+          ) : null}
+        </AuditDrawer>
+
         <section className={`${styles.panel} ${styles.chatPanel}`}>
           <header className={styles.panelHeader}>
             <div>
@@ -1551,8 +1581,7 @@ export default function QueryPage() {
                 <ConversationMessageItem
                   key={message.id}
                   message={message}
-                  isAuditExpanded={expandedAuditMessageIds.has(message.id)}
-                  onToggleAudit={() => toggleAudit(message.id)}
+                  onViewAudit={() => openAuditDrawer(message.id)}
                 />
               ))}
               {streamingAssistantState.status === "streaming" ? (
@@ -1767,14 +1796,12 @@ function StatusAlert({ kind, message }: StatusAlertProps) {
 
 type ConversationMessageItemProps = {
   message: ConversationMessageResponse;
-  isAuditExpanded: boolean;
-  onToggleAudit: () => void;
+  onViewAudit: () => void;
 };
 
 function ConversationMessageItem({
   message,
-  isAuditExpanded,
-  onToggleAudit,
+  onViewAudit,
 }: ConversationMessageItemProps) {
   const isAssistant = message.role === "assistant";
 
@@ -1794,10 +1821,10 @@ function ConversationMessageItem({
         {isAssistant && message.trace ? (
           <button
             type="button"
-            onClick={onToggleAudit}
+            onClick={onViewAudit}
             className={`${styles.btn} ${styles.btnSecondary} ${styles.auditToggle}`}
           >
-            {isAuditExpanded ? "Ocultar auditoria" : "Ver auditoria"}
+            Ver auditoria
           </button>
         ) : null}
       </article>
@@ -1859,74 +1886,6 @@ function StreamingConversationMessageItem({
         )}
       </article>
     </li>
-  );
-}
-
-type ConversationAuditAsideProps = {
-  messages: Array<
-    ConversationMessageResponse & {
-      trace: NonNullable<ConversationMessageResponse["trace"]>;
-    }
-  >;
-  onClose: (messageId: string) => void;
-  onStartFocusedConversation: (source: SourceCard) => void;
-  handoffState: HandoffState;
-};
-
-function ConversationAuditAside({
-  messages,
-  onClose,
-  onStartFocusedConversation,
-  handoffState,
-}: ConversationAuditAsideProps) {
-  return (
-    <aside className={styles.auditAside} aria-label="Auditoria da conversa">
-      {messages.map((message) => (
-          <section key={message.id} className={styles.conversationAudit}>
-            <header className={styles.auditAsideHeader}>
-              <span className={styles.subHeadline}>
-                {`// auditoria :: ${message.trace.id.slice(0, 8)}`}
-              </span>
-              <button
-                type="button"
-                onClick={() => onClose(message.id)}
-                className={`${styles.btn} ${styles.btnSecondary} ${styles.auditToggle}`}
-              >
-                Fechar
-              </button>
-            </header>
-
-            <AuditSummaryBlock
-              blockIndex="[ 01 ] Auditoria da mensagem"
-              metaLabel={`trace :: ${message.trace.id.slice(0, 8)}`}
-              traceId={message.trace.id}
-              question={message.trace.question}
-              metadata={message.trace.metadata}
-              audit={message.trace.audit}
-              status={message.trace.status}
-              errorCode={message.trace.errorCode}
-              createdAt={message.trace.createdAt}
-            />
-
-            <RelatedTermsBlock
-              blockIndex="[ 02 ] Termos da mensagem"
-              terms={message.trace.relatedTerms}
-            />
-
-            <SourcesBlock
-              blockIndex="[ 03 ] Fontes da mensagem"
-              sources={message.trace.sources}
-              showCitationFlags
-              onStartFocusedConversation={
-                message.trace.mode === "global"
-                  ? onStartFocusedConversation
-                  : undefined
-              }
-              handoffState={handoffState}
-            />
-        </section>
-      ))}
-    </aside>
   );
 }
 

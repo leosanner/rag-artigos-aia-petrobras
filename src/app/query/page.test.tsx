@@ -1211,7 +1211,7 @@ describe("/query page", () => {
     expect(screen.getByText(/Conversa sem titulo/i)).toBeInTheDocument();
   });
 
-  it("expands assistant-message audit inside the transcript", async () => {
+  it("opens the assistant-message audit inside a side drawer", async () => {
     sessionStorage.setItem("query:secret", SECRET);
     window.history.pushState({}, "", `/query?conversation=${CONVERSATION_ID}`);
     fetchMock.mockResolvedValueOnce(jsonResponse(CONVERSATION_DETAIL_RESPONSE));
@@ -1220,12 +1220,64 @@ describe("/query page", () => {
 
     expect(await screen.findByText(SUCCESS_RESPONSE.answer)).toBeInTheDocument();
     expect(screen.queryByText(/\[ 03 \] Fontes da mensagem/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: /auditoria da mensagem/i }),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /ver auditoria/i }));
 
-    expect(screen.getByText(/\[ 01 \] Auditoria da mensagem/i)).toBeInTheDocument();
-    expect(screen.getByText(/\[ 03 \] Fontes da mensagem/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/citado :: sim/i).length).toBeGreaterThan(0);
+    const drawer = screen.getByRole("dialog", {
+      name: /auditoria da mensagem/i,
+    });
+    expect(drawer).toBeInTheDocument();
+    expect(
+      within(drawer).getByText(/\[ 01 \] Auditoria da mensagem/i),
+    ).toBeInTheDocument();
+    expect(
+      within(drawer).getByText(/\[ 03 \] Fontes da mensagem/i),
+    ).toBeInTheDocument();
+    expect(
+      within(drawer).getAllByText(/citado :: sim/i).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("closes the audit drawer via the close button, ESC, and backdrop click", async () => {
+    sessionStorage.setItem("query:secret", SECRET);
+    window.history.pushState({}, "", `/query?conversation=${CONVERSATION_ID}`);
+    fetchMock.mockResolvedValue(jsonResponse(CONVERSATION_DETAIL_RESPONSE));
+
+    render(<QueryPage />);
+
+    await screen.findByText(SUCCESS_RESPONSE.answer);
+    const viewAudit = screen.getByRole("button", { name: /ver auditoria/i });
+
+    // close via "Fechar auditoria" button
+    fireEvent.click(viewAudit);
+    let drawer = screen.getByRole("dialog", {
+      name: /auditoria da mensagem/i,
+    });
+    fireEvent.click(
+      within(drawer).getByRole("button", { name: /fechar auditoria/i }),
+    );
+    expect(
+      screen.queryByRole("dialog", { name: /auditoria da mensagem/i }),
+    ).not.toBeInTheDocument();
+
+    // close via ESC (cancel event on <dialog>)
+    fireEvent.click(viewAudit);
+    drawer = screen.getByRole("dialog", { name: /auditoria da mensagem/i });
+    fireEvent(drawer, new Event("cancel", { bubbles: false, cancelable: true }));
+    expect(
+      screen.queryByRole("dialog", { name: /auditoria da mensagem/i }),
+    ).not.toBeInTheDocument();
+
+    // close via backdrop click (target === dialog)
+    fireEvent.click(viewAudit);
+    drawer = screen.getByRole("dialog", { name: /auditoria da mensagem/i });
+    fireEvent.click(drawer);
+    expect(
+      screen.queryByRole("dialog", { name: /auditoria da mensagem/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("starts a new focused conversation from a cited source card in the conversation audit", async () => {

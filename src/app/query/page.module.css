@@ -1084,56 +1084,57 @@
   font-size: 0.72rem;
 }
 
-.conversationAudit {
-  display: grid;
-  gap: 18px;
-}
-
-/* Default: no aside — chat panel takes the full width as before.
-   When the user opens an auditoria, the aside renders as a sibling and
-   the layout switches to two columns: aside on the left, chat shifted right. */
 .chatLayout {
   display: grid;
   grid-template-columns: 1fr;
   gap: 24px;
   align-items: start;
-  transition: grid-template-columns 240ms ease;
-}
-
-.chatLayout:has(> .auditAside) {
-  grid-template-columns: minmax(320px, 0.85fr) minmax(0, 1.6fr);
 }
 
 /* =========================================================================
-   Audit aside — same brutalist language as the rest of the page.
+   Audit drawer — slides from the right as a modal <dialog>. Inner blocks
+   reuse the same brutalist density as the previous inline aside.
    ========================================================================= */
 
-.auditAside {
-  position: sticky;
-  top: 24px;
+.auditDrawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(560px, 100vw);
+  max-width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+}
+
+.auditDrawer::backdrop {
+  background: rgba(12, 12, 12, 0.55);
+}
+
+.auditDrawer[open] {
+  animation: auditDrawerIn 240ms ease-out both;
+}
+
+.auditDrawerPanel {
   display: grid;
-  gap: 20px;
-  padding: 22px;
-  border: var(--border);
+  grid-template-rows: auto 1fr;
+  height: 100%;
   background: var(--paper-deep);
-  animation: auditAsideIn 240ms ease-out both;
+  border-left: var(--border);
 }
 
-.auditAside .conversationAudit {
-  display: grid;
-  gap: 18px;
-}
-
-.auditAsideHeader {
+.auditDrawerHeader {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 12px;
+  gap: 16px;
+  padding: 22px 22px 16px;
   border-bottom: var(--border);
 }
 
-.auditAsideHeader .subHeadline {
+.auditDrawerEyebrow {
   margin: 0;
   font-family: var(--font-mono), monospace;
   font-size: 0.7rem;
@@ -1144,86 +1145,87 @@
   opacity: 0.8;
 }
 
-/* Density overrides: the aside is ~320–500px wide, so the default
-   resultBlock padding and the 88px source numeral feel cramped.
-   Same brutalist language, tighter measurements. */
-.auditAside .blockBody {
+.auditDrawerTraceLabel {
+  margin: 4px 0 0;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.78rem;
+  color: var(--ink);
+}
+
+.auditDrawerBody {
+  display: grid;
+  gap: 20px;
+  padding: 22px;
+  overflow-y: auto;
+}
+
+.auditDrawerBody .blockBody {
   padding: 18px 18px 22px;
 }
 
-.auditAside .metaItem {
+.auditDrawerBody .metaItem {
   padding: 12px 14px;
 }
 
-.auditAside .metaValue {
+.auditDrawerBody .metaValue {
   font-size: 0.92rem;
 }
 
-.auditAside .termCard {
+.auditDrawerBody .termCard {
   padding: 12px 14px;
 }
 
-.auditAside .sources {
+.auditDrawerBody .sources {
   gap: 14px;
 }
 
-.auditAside .sourceCard {
+.auditDrawerBody .sourceCard {
   grid-template-columns: 44px 1fr;
   gap: 16px;
   padding: 18px;
 }
 
-.auditAside .sourceNumber {
+.auditDrawerBody .sourceNumber {
   width: 44px;
   height: 44px;
   font-size: 1.5rem;
 }
 
-.auditAside .sourceContent {
+.auditDrawerBody .sourceContent {
   gap: 12px;
 }
 
-.auditAside .sourceTitle {
+.auditDrawerBody .sourceTitle {
   font-size: 0.94rem;
   line-height: 1.4;
 }
 
-.auditAside .sourceExcerpt {
+.auditDrawerBody .sourceExcerpt {
   font-size: 0.86rem;
   line-height: 1.6;
   padding-left: 12px;
 }
 
-.auditAside .sourceMetaRow {
+.auditDrawerBody .sourceMetaRow {
   gap: 6px;
 }
 
-.auditAside .sourceChip {
+.auditDrawerBody .sourceChip {
   min-height: 22px;
   padding: 2px 8px;
   font-size: 0.62rem;
   letter-spacing: 0.06em;
 }
 
-.auditAside .sourceActionButton {
+.auditDrawerBody .sourceActionButton {
   padding: 8px 12px;
   font-size: 0.7rem;
   letter-spacing: 0.08em;
 }
 
-@keyframes auditAsideIn {
-  from { opacity: 0; transform: translateX(-8px); }
+@keyframes auditDrawerIn {
+  from { opacity: 0; transform: translateX(16px); }
   to { opacity: 1; transform: translateX(0); }
-}
-
-@media (max-width: 1024px) {
-  .chatLayout:has(> .auditAside) {
-    grid-template-columns: 1fr;
-  }
-  .auditAside {
-    position: static;
-    max-height: none;
-  }
 }
 
 /* ---------------- Result ---------------- */

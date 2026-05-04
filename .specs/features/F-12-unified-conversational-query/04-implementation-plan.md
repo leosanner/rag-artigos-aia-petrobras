@@ -82,18 +82,19 @@ Quebra do [04-interface-query-page-and-route-removal.md](./04-interface-query-pa
 
 ### Fatia 5 — AuditDrawer substitui o aside inline
 
-- [ ] Criar `src/app/query/components/AuditDrawer.tsx`:
-  - `<dialog>` controlado via `showModal()` / `close()`
-  - Props: `open`, `onClose`, `trace` (sources + audit + relatedTerms + rerankMetadata)
-  - Backdrop click fecha (listener no dialog `click` checando target)
-  - ESC fecha (built-in)
-  - Layout: lado direito, overlay, botão "Fechar"
-- [ ] Cada `ConversationMessageItem` assistant ganha botão "Ver auditoria" que abre o drawer com o `trace` daquela mensagem.
-- [ ] Remover/ajustar `ConversationAuditAside` (substituir o "expand inline" pelo drawer).
-- [ ] **Atualizar teste L1379** ("expands assistant-message audit inside the transcript") para o novo fluxo do drawer.
-- [ ] **Novo teste (d)**: drawer open/close (botão, ESC, outside click).
-- [ ] Adicionar copy `RAG_AUDIT_DRAWER_*` em `constants.ts`.
-- [ ] CSS para `dialog` + `dialog::backdrop` em `page.module.css`.
+- [x] Criado `src/app/query/components/AuditDrawer.tsx`:
+  - `<dialog>` controlado via `showModal()` / `close()` (com fallback para `open` attr)
+  - Props: `open`, `onClose`, `traceLabel`, `children` (page renderiza os blocos AuditSummary/RelatedTerms/Sources)
+  - Backdrop click fecha (listener no `click` do dialog checando `event.target === dialog`)
+  - ESC fecha (`onCancel` → `preventDefault()` + `onClose`)
+  - Layout: lado direito (fixed inset-right), overlay via `::backdrop`, botão "Fechar auditoria"
+- [x] `ConversationMessageItem` assistant ganha botão "Ver auditoria" que abre o drawer com o `trace` daquela mensagem.
+- [x] `ConversationAuditAside` removido; estado `expandedAuditMessageIds` (Set) substituído por `auditDrawerMessageId: string | null`.
+- [x] Teste "expands assistant-message audit inside the transcript" reescrito para verificar o `<dialog role="dialog">` com nome "Auditoria da mensagem".
+- [x] **Novo teste (d)**: drawer open/close (botão "Fechar auditoria", evento `cancel` para ESC, click no backdrop).
+- [x] Copy `RAG_AUDIT_DRAWER_TITLE/CLOSE_LABEL/EMPTY` adicionada em `constants.ts`.
+- [x] CSS `auditDrawer` + `auditDrawer::backdrop` + `auditDrawerBody` no `page.module.css` (densidade interna preservada do antigo `auditAside`).
+- [x] `pnpm vitest run src/app/query/page.test.tsx` ✓ (37 tests) | `pnpm lint` ✓ | `pnpm typecheck` ✓.
 
 ### Fatia 6 — Phase status PT-BR
 

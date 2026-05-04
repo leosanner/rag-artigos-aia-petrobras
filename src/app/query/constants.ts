@@ -76,6 +76,10 @@ export const STRATEGY_TOOLTIP_RERANK =
 export const STRATEGY_FOCUSED_NOTE =
   "No modo focado apenas a estratégia padrão está disponível.";
 
+export const RAG_AUDIT_DRAWER_TITLE = "Auditoria da mensagem";
+export const RAG_AUDIT_DRAWER_CLOSE_LABEL = "Fechar auditoria";
+export const RAG_AUDIT_DRAWER_EMPTY = "Nenhuma mensagem selecionada para auditoria.";
+
 export function truncateExcerptPreview(excerpt: string): string {
   if (excerpt.length <= RAG_SOURCE_EXCERPT_PREVIEW_LENGTH) {
     return excerpt;
