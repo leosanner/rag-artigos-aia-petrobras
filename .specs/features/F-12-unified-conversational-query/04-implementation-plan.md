@@ -23,16 +23,16 @@ Quebra do [04-interface-query-page-and-route-removal.md](./04-interface-query-pa
 
 ### Fatia 1 — Remover painel single-turn
 
-- [ ] Apagar em `src/app/query/page.tsx`:
+- [x] Apagar em `src/app/query/page.tsx`:
   - `singleTurnAskState`, `singleTurnResultState`, `singleTurnQuestion`, `singleTurnTopK`
   - `submitSingleTurnQuestion`, helpers e effects exclusivos
   - `<section aria-labelledby="single-turn-query-title">` block
   - Imports de `ragAskSuccessResponseSchema` no `page.tsx` (ainda mantém schema vivo nesta fatia)
-- [ ] Apagar testes em `src/app/query/page.test.tsx`:
+- [x] Apagar testes em `src/app/query/page.test.tsx`:
   - L965 "submits the dedicated global single-turn rerank flow through /api/rag/ask"
-  - L1614 "shows the no-evidence state…" (se for single-turn)
-  - L1791 "shows safe ask errors…" (se for single-turn) — converter para conversation se necessário
-- [ ] `pnpm vitest run src/app/query/page.test.tsx` verde.
+  - L1614 "shows the no-evidence state…" — confirmado conversation flow, mantido
+  - L1791 "shows safe ask errors…" — confirmado conversation flow, mantido
+- [x] `pnpm vitest run src/app/query/page.test.tsx` verde (37 tests passing).
 
 ### Fatia 2 — Remover histórico de runs
 

@@ -7,7 +7,6 @@ import {
   conversationDetailResponseSchema,
   createConversationResponseSchema,
   listRagDocumentsResponseSchema,
-  ragAskSuccessResponseSchema,
   ragConversationStreamEventSchema,
   ragInvalidRequestResponseSchema,
   ragQueryRunDetailResponseSchema,
@@ -15,7 +14,6 @@ import {
   ragUnauthorizedResponseSchema,
   type ConversationDetailResponse,
   type ConversationMessageResponse,
-  type RagAskSuccessResponse,
   type RagConversationStreamEvent,
   type RagRunAuditResponse,
   type RagRunMetadataResponse,
@@ -204,22 +202,11 @@ type ConversationSubmissionStrategy = Extract<
   RagRetrievalStrategy,
   "standard" | "explore"
 >;
-type SingleTurnSubmissionStrategy = Extract<
-  RagRetrievalStrategy,
-  "standard" | "explore" | "rerank"
->;
 type QueryMode = "global" | "focused";
 
 type ConversationAskState =
   | { kind: "idle" }
   | { kind: "submitting"; strategy: ConversationSubmissionStrategy }
-  | { kind: "invalid_request" }
-  | { kind: "unauthorized" }
-  | { kind: "technical_error"; message: string };
-
-type SingleTurnAskState =
-  | { kind: "idle" }
-  | { kind: "submitting"; strategy: SingleTurnSubmissionStrategy }
   | { kind: "invalid_request" }
   | { kind: "unauthorized" }
   | { kind: "technical_error"; message: string };
@@ -258,12 +245,6 @@ type HandoffState =
   | { status: "idle" }
   | { status: "starting"; sourceChunkId: string };
 
-type SingleTurnResultState = {
-  status: "idle" | "loaded";
-  question: string | null;
-  result: RagAskSuccessResponse | null;
-};
-
 type StreamingAssistantState =
   | { status: "idle" }
   | {
@@ -298,14 +279,6 @@ function createInitialConversationState(): ConversationState {
   };
 }
 
-function createInitialSingleTurnResultState(): SingleTurnResultState {
-  return {
-    status: "idle",
-    question: null,
-    result: null,
-  };
-}
-
 function createInitialStreamingAssistantState(): StreamingAssistantState {
   return {
     status: "idle",
@@ -323,21 +296,13 @@ function createInitialSelectableDocumentsState(): SelectableDocumentsState {
 
 export default function QueryPage() {
   const [question, setQuestion] = useState("");
-  const [singleTurnQuestion, setSingleTurnQuestion] = useState("");
   const [secret, setSecret] = useState("");
   const [queryMode, setQueryMode] = useState<QueryMode>("global");
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const [topK, setTopK] = useState(RAG_RETRIEVAL_DEFAULT_TOP_K);
-  const [singleTurnTopK, setSingleTurnTopK] = useState(
-    RAG_RETRIEVAL_DEFAULT_TOP_K,
-  );
   const [askState, setAskState] = useState<ConversationAskState>({
     kind: "idle",
   });
-  const [singleTurnAskState, setSingleTurnAskState] =
-    useState<SingleTurnAskState>({ kind: "idle" });
-  const [singleTurnResultState, setSingleTurnResultState] =
-    useState<SingleTurnResultState>(createInitialSingleTurnResultState);
   const [recentRunsState, setRecentRunsState] = useState<RecentRunsState>(
     createInitialRecentRunsState,
   );
@@ -363,7 +328,6 @@ export default function QueryPage() {
   const suppressUrlSyncRef = useRef(false);
 
   const trimmedQuestion = question.trim();
-  const trimmedSingleTurnQuestion = singleTurnQuestion.trim();
   const trimmedSecret = secret.trim();
   const selectedDocument =
     selectableDocumentsState.documents.find(
@@ -375,38 +339,14 @@ export default function QueryPage() {
     trimmedSecret.length > 0 &&
     !isSubmitting &&
     (queryMode === "global" || selectedDocument !== null);
-  const isSingleTurnSubmitting = singleTurnAskState.kind === "submitting";
-  const canSubmitSingleTurn =
-    queryMode === "global" &&
-    trimmedSingleTurnQuestion.length > 0 &&
-    trimmedSecret.length > 0 &&
-    !isSingleTurnSubmitting;
   const isStandardSubmitting =
     askState.kind === "submitting" && askState.strategy === "standard";
   const isExploreSubmitting =
     askState.kind === "submitting" && askState.strategy === "explore";
-  const isSingleTurnStandardSubmitting =
-    singleTurnAskState.kind === "submitting" &&
-    singleTurnAskState.strategy === "standard";
-  const isSingleTurnExploreSubmitting =
-    singleTurnAskState.kind === "submitting" &&
-    singleTurnAskState.strategy === "explore";
-  const isSingleTurnRerankSubmitting =
-    singleTurnAskState.kind === "submitting" &&
-    singleTurnAskState.strategy === "rerank";
   const standardButtonLabel =
     isStandardSubmitting ? "Consultando..." : "Consultar base";
   const exploreButtonLabel =
     isExploreSubmitting ? "Explorando..." : "Explorar perspectivas";
-  const singleTurnStandardButtonLabel = isSingleTurnStandardSubmitting
-    ? "Consultando..."
-    : "Consultar base";
-  const singleTurnExploreButtonLabel = isSingleTurnExploreSubmitting
-    ? "Explorando..."
-    : "Explorar perspectivas";
-  const singleTurnRerankButtonLabel = isSingleTurnRerankSubmitting
-    ? "Reranqueando..."
-    : "Rerank";
   const historyButtonLabel =
     recentRunsState.status === "loading"
       ? "Carregando historico..."
@@ -535,7 +475,6 @@ export default function QueryPage() {
     if (value.length === 0) {
       sessionStorage.removeItem(SECRET_STORAGE_KEY);
       resetPersistedAuditState();
-      resetSingleTurnState();
       resetSelectableDocumentsState();
       setConversationState((current) => ({
         ...current,
@@ -553,13 +492,6 @@ export default function QueryPage() {
     setSelectedRunState(createInitialSelectedRunState());
   }
 
-  function resetSingleTurnState() {
-    setSingleTurnQuestion("");
-    setSingleTurnTopK(RAG_RETRIEVAL_DEFAULT_TOP_K);
-    setSingleTurnAskState({ kind: "idle" });
-    setSingleTurnResultState(createInitialSingleTurnResultState());
-  }
-
   function resetSelectableDocumentsState() {
     setSelectableDocumentsState(createInitialSelectableDocumentsState());
     setSelectedDocumentId("");
@@ -569,7 +501,6 @@ export default function QueryPage() {
     sessionStorage.removeItem(SECRET_STORAGE_KEY);
     setSecret("");
     resetPersistedAuditState();
-    resetSingleTurnState();
     resetSelectableDocumentsState();
     setConversationState((current) => ({
       ...current,
@@ -684,137 +615,6 @@ export default function QueryPage() {
       lastLoadedSecret: effectiveSecret,
     });
     return null;
-  }
-
-  async function submitSingleTurnQuestion(
-    strategy: SingleTurnSubmissionStrategy,
-  ) {
-    if (
-      queryMode !== "global" ||
-      trimmedSingleTurnQuestion.length === 0 ||
-      trimmedSecret.length === 0
-    ) {
-      return;
-    }
-
-    setSingleTurnAskState({ kind: "submitting", strategy });
-    setSingleTurnResultState(createInitialSingleTurnResultState());
-
-    const response = await fetchJson("/api/rag/ask", {
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${trimmedSecret}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        question: trimmedSingleTurnQuestion,
-        mode: "global",
-        retrieval: {
-          topK: singleTurnTopK,
-          strategy,
-        },
-      }),
-    });
-
-    if (response.kind === "network_error") {
-      console.error("[rag/query]", {
-        phase: "submitSingleTurnQuestion",
-        kind: "network_error",
-      });
-      setSingleTurnAskState({
-        kind: "technical_error",
-        message: RAG_NETWORK_ERROR_MESSAGE,
-      });
-      return;
-    }
-
-    if (response.status === 200) {
-      const parsed = ragAskSuccessResponseSchema.safeParse(response.body);
-
-      if (!parsed.success) {
-        console.error("[rag/query]", {
-          phase: "submitSingleTurnQuestion",
-          status: response.status,
-          body: response.body,
-          parseError: true,
-        });
-        setSingleTurnAskState({
-          kind: "technical_error",
-          message: formatTechnicalErrorMessage(response.status),
-        });
-        return;
-      }
-
-      setSingleTurnResultState({
-        status: "loaded",
-        question: trimmedSingleTurnQuestion,
-        result: parsed.data,
-      });
-      setSingleTurnQuestion("");
-      setSingleTurnAskState({ kind: "idle" });
-      return;
-    }
-
-    if (response.status === 400) {
-      const parsed = ragInvalidRequestResponseSchema.safeParse(response.body);
-      console.error("[rag/query]", {
-        phase: "submitSingleTurnQuestion",
-        status: response.status,
-        body: response.body,
-      });
-      setSingleTurnAskState(
-        parsed.success
-          ? { kind: "invalid_request" }
-          : {
-              kind: "technical_error",
-              message: formatTechnicalErrorMessage(response.status),
-            },
-      );
-      return;
-    }
-
-    if (response.status === 401) {
-      const parsed = ragUnauthorizedResponseSchema.safeParse(response.body);
-      console.error("[rag/query]", {
-        phase: "submitSingleTurnQuestion",
-        status: response.status,
-        body: response.body,
-      });
-      clearSecret();
-      setSingleTurnAskState(
-        parsed.success
-          ? { kind: "unauthorized" }
-          : {
-              kind: "technical_error",
-              message: formatTechnicalErrorMessage(response.status),
-            },
-      );
-      return;
-    }
-
-    if (response.status === 502 || response.status === 503) {
-      console.error("[rag/query]", {
-        phase: "submitSingleTurnQuestion",
-        status: response.status,
-        body: response.body,
-      });
-      setSingleTurnAskState({
-        kind: "technical_error",
-        message: formatAskFailureMessage(response.body, response.status),
-      });
-      return;
-    }
-
-    console.error("[rag/query]", {
-      phase: "submitSingleTurnQuestion",
-      status: response.status,
-      body: response.body,
-    });
-    setSingleTurnAskState({
-      kind: "technical_error",
-      message: formatTechnicalErrorMessage(response.status),
-    });
   }
 
   async function submitQuestion(strategy: ConversationSubmissionStrategy) {
@@ -1703,11 +1503,6 @@ export default function QueryPage() {
     });
   }
 
-  async function onSingleTurnSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await submitSingleTurnQuestion("standard");
-  }
-
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await submitQuestion("standard");
@@ -1919,226 +1714,6 @@ export default function QueryPage() {
               {newConversationLabel}
             </button>
           </div>
-        </section>
-
-        <section
-          className={styles.panel}
-          aria-labelledby="single-turn-query-title"
-        >
-          <header className={styles.panelHeader}>
-            <div>
-              <h2 id="single-turn-query-title" className={styles.panelTitle}>
-                Consulta unica global
-              </h2>
-              <p className={styles.panelCopy}>
-                Fluxo dedicado do <code>POST /api/rag/ask</code> para pergunta
-                unica na base inteira, com tres estrategias explicitas:
-                standard, explore e rerank.
-              </p>
-            </div>
-          </header>
-
-          {queryMode !== "global" ? (
-            <p className={styles.inlineNote}>
-              A consulta unica com rerank fica disponivel apenas no modo Base
-              inteira. O fluxo focado e o composer conversacional continuam sem
-              rerank nesta etapa.
-            </p>
-          ) : null}
-
-          {singleTurnAskState.kind === "invalid_request" ? (
-            <StatusAlert kind="invalid" message={RAG_INVALID_REQUEST_MESSAGE} />
-          ) : null}
-
-          {singleTurnAskState.kind === "unauthorized" ? (
-            <StatusAlert kind="unauthorized" message={RAG_UNAUTHORIZED_MESSAGE} />
-          ) : null}
-
-          {singleTurnAskState.kind === "technical_error" ? (
-            <StatusAlert
-              kind="technical"
-              message={singleTurnAskState.message}
-            />
-          ) : null}
-
-          <form
-            onSubmit={onSingleTurnSubmit}
-            className={styles.composer}
-            aria-label="Consulta unica global"
-          >
-            <div className={`${styles.field} ${styles.fieldQuestion}`}>
-              <label htmlFor="single-turn-question" className={styles.label}>
-                <span>Pergunta da consulta unica</span>
-                <span className={styles.labelIndex}>[ 04 ]</span>
-              </label>
-              <textarea
-                id="single-turn-question"
-                value={singleTurnQuestion}
-                onChange={(event) => setSingleTurnQuestion(event.target.value)}
-                onKeyDown={(event) => {
-                  if (
-                    event.key === "Enter" &&
-                    !event.shiftKey &&
-                    !event.nativeEvent.isComposing
-                  ) {
-                    event.preventDefault();
-                    if (canSubmitSingleTurn) {
-                      void submitSingleTurnQuestion("standard");
-                    }
-                  }
-                }}
-                rows={3}
-                placeholder="Ex.: Quais tecnicas aparecem com mais frequencia em toda a base?"
-                className={styles.textarea}
-                disabled={queryMode !== "global"}
-              />
-            </div>
-
-            <div className={styles.composerFooter}>
-              <label
-                htmlFor="single-turn-top-k"
-                className={styles.composerTopK}
-              >
-                <span className={styles.composerTopKLabel}>
-                  Fontes da consulta unica
-                </span>
-                <span className={styles.composerTopKSelectWrap}>
-                  <select
-                    id="single-turn-top-k"
-                    value={singleTurnTopK}
-                    onChange={(event) =>
-                      setSingleTurnTopK(readTopKInput(event.target.value))
-                    }
-                    className={styles.composerTopKSelect}
-                    disabled={queryMode !== "global"}
-                  >
-                    {Array.from(
-                      {
-                        length:
-                          RAG_RETRIEVAL_MAX_TOP_K -
-                          RAG_RETRIEVAL_MIN_TOP_K +
-                          1,
-                      },
-                      (_, index) => RAG_RETRIEVAL_MIN_TOP_K + index,
-                    ).map((value) => (
-                      <option key={value} value={value}>
-                        {String(value).padStart(2, "0")}
-                      </option>
-                    ))}
-                  </select>
-                  <span aria-hidden className={styles.composerTopKChevron}>
-                    ▾
-                  </span>
-                </span>
-              </label>
-
-              <div className={styles.composerActions}>
-                <button
-                  type="submit"
-                  disabled={!canSubmitSingleTurn}
-                  className={`${styles.btn} ${
-                    isSingleTurnStandardSubmitting
-                      ? styles.btnLoading
-                      : styles.btnPrimary
-                  }`}
-                >
-                  {singleTurnStandardButtonLabel}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void submitSingleTurnQuestion("explore");
-                  }}
-                  disabled={!canSubmitSingleTurn}
-                  className={`${styles.btn} ${
-                    isSingleTurnExploreSubmitting
-                      ? styles.btnLoading
-                      : styles.btnExplore
-                  }`}
-                >
-                  {singleTurnExploreButtonLabel}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void submitSingleTurnQuestion("rerank");
-                  }}
-                  disabled={!canSubmitSingleTurn}
-                  className={`${styles.btn} ${
-                    isSingleTurnRerankSubmitting
-                      ? styles.btnLoading
-                      : styles.btnSecondary
-                  }`}
-                >
-                  {singleTurnRerankButtonLabel}
-                </button>
-              </div>
-            </div>
-          </form>
-
-          {singleTurnResultState.result ? (
-            <section className={styles.result}>
-              <article className={styles.resultBlock}>
-                <header className={styles.blockHeader}>
-                  <span className={styles.blockIndex}>
-                    [ 01 ] Resposta atual
-                  </span>
-                  <span className={styles.blockMeta}>
-                    status ::{" "}
-                    {formatRunStatus(
-                      singleTurnResultState.result.sources.length === 0
-                        ? "answered_no_evidence"
-                        : "answered",
-                    )}
-                  </span>
-                </header>
-                <div className={styles.blockBody}>
-                  <p className={styles.subHeadline}>Pergunta enviada</p>
-                  <p className={styles.questionSnapshot}>
-                    {singleTurnResultState.question}
-                  </p>
-                  <h2 className={styles.answerHeadline}>
-                    Execucao global single-turn via ask.
-                  </h2>
-                  <p className={styles.answerText}>
-                    {singleTurnResultState.result.answer}
-                  </p>
-                </div>
-              </article>
-
-              <AuditSummaryBlock
-                blockIndex="[ 02 ] Auditoria atual"
-                metaLabel={`trace :: ${singleTurnResultState.result.traceId.slice(
-                  0,
-                  8,
-                )}`}
-                traceId={singleTurnResultState.result.traceId}
-                question={singleTurnResultState.question ?? ""}
-                metadata={singleTurnResultState.result.metadata}
-                audit={singleTurnResultState.result.audit}
-                status={
-                  singleTurnResultState.result.sources.length === 0
-                    ? "answered_no_evidence"
-                    : "answered"
-                }
-              />
-
-              <RelatedTermsBlock
-                blockIndex="[ 03 ] Termos atuais"
-                terms={singleTurnResultState.result.relatedTerms}
-              />
-
-              <SourcesBlock
-                blockIndex="[ 04 ] Fontes atuais"
-                sources={singleTurnResultState.result.sources}
-              />
-            </section>
-          ) : (
-            <p className={styles.emptyPanel}>
-              Envie uma pergunta global para inspecionar a resposta atual com
-              auditoria de rerank quando aplicavel.
-            </p>
-          )}
         </section>
 
         <div className={styles.chatLayout}>

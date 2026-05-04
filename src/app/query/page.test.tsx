@@ -114,40 +114,6 @@ const NO_EVIDENCE_RESPONSE = {
   },
 };
 
-const RERANK_SUCCESS_RESPONSE = {
-  ...SUCCESS_RESPONSE,
-  traceId: "abababab-abab-4aba-8aba-abababababab",
-  sources: [
-    {
-      ...SUCCESS_RESPONSE.sources[0],
-      retrievalScore: 0.91,
-      rerankScore: 0.88,
-    },
-    {
-      ...SUCCESS_RESPONSE.sources[1],
-      retrievalScore: 0.87,
-      rerankScore: 0.81,
-    },
-  ],
-  metadata: {
-    ...SUCCESS_RESPONSE.metadata,
-    retrievalStrategy: "rerank" as const,
-    candidateTopK: 18,
-    rerankerProvider: "test-reranker",
-    rerankerModel: "rerank-v1",
-  },
-  audit: {
-    ...SUCCESS_RESPONSE.audit,
-    reranking: {
-      latencyMs: 41,
-      candidatesEvaluated: 6,
-      inputTokens: 22,
-      estimatedCostUsd: 0.000031,
-    },
-    totalCostUsd: 0.00005163,
-  },
-};
-
 const RUN_SUMMARIES = [
   {
     id: RUN_ID,
@@ -550,15 +516,6 @@ function typeQuestion(value: string): void {
   );
 }
 
-function typeSingleTurnQuestion(value: string): void {
-  fireEvent.change(
-    within(getSingleTurnSection()).getByLabelText(/pergunta da consulta unica/i),
-    {
-      target: { value },
-    },
-  );
-}
-
 function typeSecret(value: string): void {
   fireEvent.change(screen.getByLabelText(/secret de consulta/i), {
     target: { value },
@@ -568,15 +525,6 @@ function typeSecret(value: string): void {
 function setTopK(value: string): void {
   fireEvent.change(
     within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
-    {
-      target: { value },
-    },
-  );
-}
-
-function setSingleTurnTopK(value: string): void {
-  fireEvent.change(
-    within(getSingleTurnSection()).getByLabelText(/fontes da consulta unica/i),
     {
       target: { value },
     },
@@ -597,26 +545,6 @@ function clickExplore(): void {
       name: /explorar perspectivas/i,
     }),
   );
-}
-
-function clickSingleTurnRerank(): void {
-  fireEvent.click(
-    within(getSingleTurnSection()).getByRole("button", {
-      name: /rerank/i,
-    }),
-  );
-}
-
-function getSingleTurnSection(): HTMLElement {
-  const section = screen
-    .getByRole("heading", { name: /consulta unica global/i })
-    .closest("section");
-
-  if (!section) {
-    throw new Error("single-turn section not found");
-  }
-
-  return section;
 }
 
 function getConversationSection(): HTMLElement {
@@ -720,15 +648,10 @@ describe("/query page", () => {
       screen.getByRole("heading", { name: /consulta na base/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: /consulta unica global/i }),
-    ).toBeInTheDocument();
+      screen.queryByRole("heading", { name: /consulta unica global/i }),
+    ).not.toBeInTheDocument();
     expect(
       within(getConversationSection()).getByLabelText(/pergunta/i),
-    ).toBeInTheDocument();
-    expect(
-      within(getSingleTurnSection()).getByLabelText(
-        /pergunta da consulta unica/i,
-      ),
     ).toBeInTheDocument();
     expect(screen.getByLabelText(/secret de consulta/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/base inteira/i)).toBeChecked();
@@ -737,11 +660,6 @@ describe("/query page", () => {
       within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
     ).toHaveValue("6");
     expect(
-      within(getSingleTurnSection()).getByLabelText(
-        /fontes da consulta unica/i,
-      ),
-    ).toHaveValue("6");
-    expect(
       within(getConversationSection()).getByRole("button", {
         name: /consultar base/i,
       }),
@@ -749,21 +667,6 @@ describe("/query page", () => {
     expect(
       within(getConversationSection()).getByRole("button", {
         name: /explorar perspectivas/i,
-      }),
-    ).toBeDisabled();
-    expect(
-      within(getSingleTurnSection()).getByRole("button", {
-        name: /consultar base/i,
-      }),
-    ).toBeDisabled();
-    expect(
-      within(getSingleTurnSection()).getByRole("button", {
-        name: /explorar perspectivas/i,
-      }),
-    ).toBeDisabled();
-    expect(
-      within(getSingleTurnSection()).getByRole("button", {
-        name: /rerank/i,
       }),
     ).toBeDisabled();
     expect(
@@ -823,9 +726,6 @@ describe("/query page", () => {
         name: /explorar perspectivas/i,
       }),
     ).toBeDisabled();
-    expect(
-      within(getSingleTurnSection()).getByRole("button", { name: /rerank/i }),
-    ).toBeDisabled();
 
     selectFocusedDocument(FOCUSED_DOCUMENT_ID);
 
@@ -849,9 +749,6 @@ describe("/query page", () => {
         name: /consultar base/i,
       }),
     ).toBeEnabled();
-    expect(
-      within(getSingleTurnSection()).getByRole("button", { name: /rerank/i }),
-    ).toBeDisabled();
 
     clickFocusedMode();
 
@@ -960,49 +857,6 @@ describe("/query page", () => {
         }),
       }),
     );
-  });
-
-  it("submits the dedicated global single-turn rerank flow through /api/rag/ask", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(RERANK_SUCCESS_RESPONSE));
-
-    render(<QueryPage />);
-    typeSecret(SECRET);
-    typeSingleTurnQuestion("Quais evidencias devem ser reranqueadas?");
-    setSingleTurnTopK("6");
-
-    await act(async () => {
-      clickSingleTurnRerank();
-    });
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/rag/ask",
-      expect.objectContaining({
-        method: "POST",
-        cache: "no-store",
-        headers: expect.objectContaining({
-          Authorization: `Bearer ${SECRET}`,
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({
-          question: "Quais evidencias devem ser reranqueadas?",
-          mode: "global",
-          retrieval: {
-            topK: 6,
-            strategy: "rerank",
-          },
-        }),
-      }),
-    );
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      expect.stringMatching(/\/api\/rag\/conversations\//),
-      expect.anything(),
-    );
-    expect(
-      await screen.findByText("Execucao global single-turn via ask."),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/test-reranker :: rerank-v1/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/rerank :: 0\.88/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/41 ms/i)).toBeInTheDocument();
   });
 
   it("submits focused questions through the conversation route with mode and documentId", async () => {
