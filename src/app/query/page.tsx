@@ -1754,7 +1754,7 @@ export default function QueryPage() {
                           );
                           setAskState({ kind: "idle" });
                         }}
-                        className={styles.select}
+                        className={styles.composerStrategySelect}
                       >
                         {GLOBAL_STRATEGY_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
