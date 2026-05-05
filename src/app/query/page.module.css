@@ -402,26 +402,34 @@
 }
 
 .composerAdvanced {
+  position: relative;
   display: inline-flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 12px;
   font-family: var(--font-mono), monospace;
 }
 
 .composerAdvancedSummary {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: 10px;
+  padding: 9px 14px 9px 12px;
   border: var(--border);
   background: var(--paper);
   font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ink);
   cursor: pointer;
   list-style: none;
+  box-shadow: 4px 4px 0 var(--ink);
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .composerAdvancedSummary::-webkit-details-marker {
@@ -429,56 +437,153 @@
 }
 
 .composerAdvancedSummary::before {
-  content: "▸";
-  font-size: 0.75rem;
+  content: "+";
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  background: var(--ink);
+  color: var(--lime);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: transform 200ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.composerAdvancedSummary:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--ink);
+  background: #fffef7;
+}
+
+.composerAdvancedSummary:active {
+  transform: translate(0, 0);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.composerAdvancedSummary:focus-visible {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 4px 4px 0 var(--blue);
+}
+
+.composerAdvanced[open] .composerAdvancedSummary {
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: 4px 4px 0 var(--lime-deep);
+}
+
+.composerAdvanced[open] .composerAdvancedSummary:hover {
+  background: var(--ink);
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--lime-deep);
 }
 
 .composerAdvanced[open] .composerAdvancedSummary::before {
-  content: "▾";
+  background: var(--lime);
+  color: var(--ink);
+  transform: rotate(45deg);
 }
 
 .composerAdvancedFields {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 12px;
+  gap: 16px;
+  padding: 16px 18px;
   background: var(--paper-deep);
   border: var(--border);
+  box-shadow: 4px 4px 0 var(--ink);
+  position: relative;
+  animation: advancedReveal 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.composerAdvancedFields::before {
+  content: "// PARÂMETROS";
+  position: absolute;
+  top: -10px;
+  left: 14px;
+  padding: 2px 8px;
+  background: var(--lime);
+  border: var(--border);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--ink);
+}
+
+@keyframes advancedReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .composerAdvancedField {
   display: inline-flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink);
 }
 
 .composerAdvancedLabel {
-  opacity: 0.75;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.78;
+}
+
+.composerAdvancedLabel::before {
+  content: "▸";
+  font-size: 0.55rem;
+  color: var(--blue);
+  opacity: 1;
 }
 
 .composerAdvancedInput {
-  width: 96px;
-  padding: 8px 10px;
+  width: 108px;
+  padding: 10px 12px;
   border: var(--border);
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.95rem;
+  font-family: var(--font-mono), "IBM Plex Mono", monospace;
+  font-size: 1.15rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  text-align: center;
   outline: none;
-  transition: border-color 160ms ease;
+  box-shadow: 3px 3px 0 var(--ink);
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.composerAdvancedInput:hover {
+  background: #fffef7;
 }
 
 .composerAdvancedInput:focus-visible {
   border-color: var(--blue);
-  outline: 2px solid var(--blue);
-  outline-offset: 2px;
+  box-shadow: 3px 3px 0 var(--blue);
+  background: var(--paper);
+}
+
+.composerAdvancedInput::-webkit-outer-spin-button,
+.composerAdvancedInput::-webkit-inner-spin-button {
+  opacity: 0.45;
+  height: 28px;
 }
 
 @media (max-width: 720px) {
