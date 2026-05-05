@@ -255,8 +255,6 @@ const GLOBAL_STRATEGY_OPTIONS: ReadonlyArray<{
     tooltip: STRATEGY_TOOLTIP_RERANK,
   },
 ];
-const STRATEGY_TOOLTIP_HOVER_DELAY_MS = 1000;
-
 type ConversationAskState =
   | { kind: "idle" }
   | { kind: "submitting"; strategy: ConversationSubmissionStrategy }
@@ -331,8 +329,6 @@ export default function QueryPage() {
   );
   const [selectedStrategy, setSelectedStrategy] =
     useState<RagRetrievalStrategy>("standard");
-  const [visibleStrategyTooltip, setVisibleStrategyTooltip] =
-    useState<RagRetrievalStrategy | null>(null);
   const [askState, setAskState] = useState<ConversationAskState>({
     kind: "idle",
   });
@@ -353,7 +349,6 @@ export default function QueryPage() {
   });
   const handoffInFlightRef = useRef(false);
   const suppressUrlSyncRef = useRef(false);
-  const strategyTooltipTimerRef = useRef<number | null>(null);
 
   const trimmedQuestion = question.trim();
   const trimmedSecret = secret.trim();
@@ -388,27 +383,6 @@ export default function QueryPage() {
             message.trace !== null &&
             message.id === auditDrawerMessageId,
         ) ?? null);
-
-  const clearStrategyTooltipTimer = () => {
-    if (strategyTooltipTimerRef.current !== null) {
-      window.clearTimeout(strategyTooltipTimerRef.current);
-      strategyTooltipTimerRef.current = null;
-    }
-  };
-
-  const hideStrategyTooltip = () => {
-    clearStrategyTooltipTimer();
-    setVisibleStrategyTooltip(null);
-  };
-
-  const scheduleStrategyTooltip = (strategy: RagRetrievalStrategy) => {
-    clearStrategyTooltipTimer();
-    setVisibleStrategyTooltip(null);
-    strategyTooltipTimerRef.current = window.setTimeout(() => {
-      setVisibleStrategyTooltip(strategy);
-      strategyTooltipTimerRef.current = null;
-    }, STRATEGY_TOOLTIP_HOVER_DELAY_MS);
-  };
 
   useEffect(() => {
     const stored = sessionStorage.getItem(SECRET_STORAGE_KEY);
@@ -453,27 +427,6 @@ export default function QueryPage() {
 
     setIsUrlStateReady(true);
   }, []);
-
-  useEffect(() => {
-    return () => {
-      if (strategyTooltipTimerRef.current !== null) {
-        window.clearTimeout(strategyTooltipTimerRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (queryMode === "global") {
-      return;
-    }
-
-    if (strategyTooltipTimerRef.current !== null) {
-      window.clearTimeout(strategyTooltipTimerRef.current);
-      strategyTooltipTimerRef.current = null;
-    }
-
-    setVisibleStrategyTooltip(null);
-  }, [queryMode]);
 
   useEffect(() => {
     if (!isUrlStateReady || suppressUrlSyncRef.current) {
@@ -1396,7 +1349,6 @@ export default function QueryPage() {
       <div className={styles.container}>
         <header className={styles.header}>
           <div>
-            <p className={styles.eyebrow}>GLOBAL RAG / AUDIT</p>
             <h1 className={styles.title}>
               Consulta na base{" "}
               <span className={styles.titleAccent}>documental</span>
@@ -1449,7 +1401,6 @@ export default function QueryPage() {
                     value="global"
                     checked={queryMode === "global"}
                     onChange={() => {
-                      hideStrategyTooltip();
                       setQueryMode("global");
                       setAskState({ kind: "idle" });
                     }}
@@ -1464,7 +1415,6 @@ export default function QueryPage() {
                     value="focused"
                     checked={queryMode === "focused"}
                     onChange={() => {
-                      hideStrategyTooltip();
                       setQueryMode("focused");
                       setAskState({ kind: "idle" });
                     }}
@@ -1646,6 +1596,33 @@ export default function QueryPage() {
             ) : null}
           </AuditDrawer>
 
+          <section
+            className={`${styles.panel} ${styles.strategyGuide}`}
+            aria-label="Guia de estratégias"
+          >
+            <header className={styles.panelHeader}>
+              <div>
+                <h2 className={styles.panelTitle}>Estratégias de busca</h2>
+                <p className={styles.panelCopy}>
+                  Escolha o modo no seletor abaixo. Em consultas focadas a
+                  estratégia padrão é aplicada automaticamente.
+                </p>
+              </div>
+            </header>
+            <dl className={styles.strategyGuideList}>
+              {GLOBAL_STRATEGY_OPTIONS.map((option) => (
+                <div
+                  key={option.value}
+                  className={styles.strategyGuideItem}
+                  data-strategy={option.value}
+                >
+                  <dt className={styles.strategyGuideTerm}>{option.label}</dt>
+                  <dd className={styles.strategyGuideDesc}>{option.tooltip}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
           <section className={`${styles.panel} ${styles.chatPanel}`}>
             <header className={styles.panelHeader}>
               <div>
@@ -1752,60 +1729,47 @@ export default function QueryPage() {
                   />
                 </div>
 
-                {queryMode === "global" ? (
-                  <div
-                    role="radiogroup"
-                    aria-label="Estratégia"
-                    className={styles.composerStrategy}
-                  >
-                    <ul className={styles.composerStrategyList}>
-                      {GLOBAL_STRATEGY_OPTIONS.map((option) => {
-                        const tooltipId = `query-strategy-${option.value}-tooltip`;
-                        const isOpen =
-                          visibleStrategyTooltip === option.value;
-                        return (
-                          <li
-                            key={option.value}
-                            className={styles.composerStrategyItem}
-                            onMouseEnter={() =>
-                              scheduleStrategyTooltip(option.value)
-                            }
-                            onMouseLeave={hideStrategyTooltip}
-                          >
-                            <label className={styles.composerStrategyOption}>
-                              <input
-                                type="radio"
-                                name="query-strategy"
-                                value={option.value}
-                                aria-describedby={isOpen ? tooltipId : undefined}
-                                checked={selectedStrategy === option.value}
-                                onChange={() => {
-                                  hideStrategyTooltip();
-                                  setSelectedStrategy(option.value);
-                                  setAskState({ kind: "idle" });
-                                }}
-                              />
-                              <span>{option.label}</span>
-                            </label>
-                            {isOpen ? (
-                              <p
-                                id={tooltipId}
-                                role="note"
-                                className={styles.composerStrategyTooltip}
-                              >
-                                {option.tooltip}
-                              </p>
-                            ) : null}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                ) : (
-                  <p className={styles.composerStrategyNote}>
-                    {STRATEGY_FOCUSED_NOTE}
-                  </p>
-                )}
+                {(() => {
+                  const isFocused = queryMode === "focused";
+                  const selectValue: RagRetrievalStrategy = isFocused
+                    ? "standard"
+                    : selectedStrategy;
+                  return (
+                    <div className={styles.composerStrategy}>
+                      <label
+                        htmlFor="query-strategy"
+                        className={styles.composerStrategyLabel}
+                      >
+                        Estratégia
+                      </label>
+                      <select
+                        id="query-strategy"
+                        name="query-strategy"
+                        aria-label="Estratégia"
+                        disabled={isFocused}
+                        value={selectValue}
+                        onChange={(event) => {
+                          setSelectedStrategy(
+                            event.target.value as RagRetrievalStrategy,
+                          );
+                          setAskState({ kind: "idle" });
+                        }}
+                        className={styles.select}
+                      >
+                        {GLOBAL_STRATEGY_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      {isFocused ? (
+                        <p className={styles.composerStrategyNote}>
+                          {STRATEGY_FOCUSED_NOTE}
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                })()}
 
                 <div className={styles.composerFooter}>
                   <details className={styles.composerAdvanced}>

@@ -440,10 +440,14 @@ function clickSubmit(): void {
   );
 }
 
-function selectStrategy(label: RegExp): void {
-  fireEvent.click(
-    within(getConversationSection()).getByRole("radio", { name: label }),
-  );
+function getStrategySelect(): HTMLSelectElement {
+  return within(getConversationSection()).getByLabelText(
+    /^estratégia$/i,
+  ) as HTMLSelectElement;
+}
+
+function selectStrategy(value: "standard" | "explore" | "rerank"): void {
+  fireEvent.change(getStrategySelect(), { target: { value } });
 }
 
 function getConversationSection(): HTMLElement {
@@ -535,14 +539,16 @@ describe("/query page", () => {
         name: /consultar base/i,
       }),
     ).toBeDisabled();
+    expect(getStrategySelect()).toHaveValue("standard");
+    expect(getStrategySelect()).not.toBeDisabled();
     expect(
-      within(getConversationSection()).getByRole("radio", { name: /^padrão$/i }),
-    ).toBeChecked();
-    expect(
-      within(getConversationSection()).getByRole("radio", { name: /^explorar$/i }),
+      within(getStrategySelect()).getByRole("option", { name: /^padrão$/i }),
     ).toBeInTheDocument();
     expect(
-      within(getConversationSection()).getByRole("radio", { name: /^rerank$/i }),
+      within(getStrategySelect()).getByRole("option", { name: /^explorar$/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(getStrategySelect()).getByRole("option", { name: /^rerank$/i }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /carregar historico recente/i }),
@@ -577,30 +583,24 @@ describe("/query page", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the strategy selector only in global mode and a focused-only note in focused mode", async () => {
+  it("disables the strategy selector and locks it to standard when focused mode is active", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(SELECTABLE_DOCUMENTS_RESPONSE));
 
     render(<QueryPage />);
     typeSecret(SECRET);
 
-    expect(
-      within(getConversationSection()).getByRole("radiogroup", {
-        name: /estratégia/i,
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(getConversationSection()).getByRole("radio", { name: /^padrão$/i }),
-    ).toBeChecked();
+    expect(getStrategySelect()).toHaveValue("standard");
+    expect(getStrategySelect()).not.toBeDisabled();
+
+    selectStrategy("rerank");
+    expect(getStrategySelect()).toHaveValue("rerank");
 
     await act(async () => {
       clickFocusedMode();
     });
 
-    expect(
-      within(getConversationSection()).queryByRole("radiogroup", {
-        name: /estratégia/i,
-      }),
-    ).not.toBeInTheDocument();
+    expect(getStrategySelect()).toBeDisabled();
+    expect(getStrategySelect()).toHaveValue("standard");
     expect(
       within(getConversationSection()).getByText(
         /apenas a estratégia padrão está disponível/i,
@@ -609,9 +609,18 @@ describe("/query page", () => {
 
     clickGlobalMode();
 
-    expect(
-      within(getConversationSection()).getByRole("radio", { name: /^padrão$/i }),
-    ).toBeChecked();
+    expect(getStrategySelect()).not.toBeDisabled();
+    expect(getStrategySelect()).toHaveValue("rerank");
+  });
+
+  it("renders a strategy guide describing each available strategy", () => {
+    render(<QueryPage />);
+
+    const guide = screen.getByRole("region", { name: /guia de estratégias/i });
+    expect(within(guide).getByText(/^padrão$/i)).toBeInTheDocument();
+    expect(within(guide).getByText(/^explorar$/i)).toBeInTheDocument();
+    expect(within(guide).getByText(/^rerank$/i)).toBeInTheDocument();
+    expect(within(guide).getByText(/amplia a busca/i)).toBeInTheDocument();
   });
 
   it("hides advanced retrieval controls behind a disclosure that toggles on click", () => {
@@ -648,7 +657,7 @@ describe("/query page", () => {
       ),
     ).not.toBeInTheDocument();
 
-    selectStrategy(/^rerank$/i);
+    selectStrategy("rerank");
 
     const candidateInput = within(getConversationSection()).getByLabelText(
       /candidatos para rerank/i,
@@ -658,51 +667,12 @@ describe("/query page", () => {
     fireEvent.change(candidateInput, { target: { value: "20" } });
     expect(candidateInput).toHaveValue(20);
 
-    selectStrategy(/^padrão$/i);
+    selectStrategy("standard");
 
     expect(
       within(getConversationSection()).queryByLabelText(
         /candidatos para rerank/i,
       ),
-    ).not.toBeInTheDocument();
-  });
-
-  it("shows the per-strategy tooltip after hovering the strategy for 1 second", () => {
-    vi.useFakeTimers();
-
-    render(<QueryPage />);
-    typeSecret(SECRET);
-
-    const exploreStrategy = within(getConversationSection())
-      .getByRole("radio", {
-        name: /explorar/i,
-      })
-      .closest("li");
-
-    expect(exploreStrategy).not.toBeNull();
-
-    fireEvent.mouseEnter(exploreStrategy!);
-
-    act(() => {
-      vi.advanceTimersByTime(999);
-    });
-
-    expect(
-      within(getConversationSection()).queryByRole("note"),
-    ).not.toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(1);
-    });
-
-    expect(within(getConversationSection()).getByRole("note")).toHaveTextContent(
-      /amplia a busca/i,
-    );
-
-    fireEvent.mouseLeave(exploreStrategy!);
-
-    expect(
-      within(getConversationSection()).queryByRole("note"),
     ).not.toBeInTheDocument();
   });
 
@@ -725,11 +695,7 @@ describe("/query page", () => {
         name: /consultar base/i,
       }),
     ).toBeDisabled();
-    expect(
-      within(getConversationSection()).queryByRole("radiogroup", {
-        name: /estratégia/i,
-      }),
-    ).not.toBeInTheDocument();
+    expect(getStrategySelect()).toBeDisabled();
 
     selectFocusedDocument(FOCUSED_DOCUMENT_ID);
 
@@ -832,7 +798,7 @@ describe("/query page", () => {
     );
 
     typeQuestion("Compare as abordagens metodologicas.");
-    selectStrategy(/^explorar$/i);
+    selectStrategy("explore");
 
     await act(async () => {
       clickSubmit();
@@ -1048,7 +1014,7 @@ describe("/query page", () => {
     render(<QueryPage />);
     typeSecret(SECRET);
     typeQuestion("Quais tecnicas aparecem com mais frequencia?");
-    selectStrategy(/^explorar$/i);
+    selectStrategy("explore");
 
     await act(async () => {
       clickSubmit();
@@ -1098,7 +1064,7 @@ describe("/query page", () => {
     render(<QueryPage />);
     typeSecret(SECRET);
     typeQuestion("Quais tecnicas aparecem com mais frequencia?");
-    selectStrategy(/^rerank$/i);
+    selectStrategy("rerank");
 
     await act(async () => {
       clickSubmit();
@@ -1339,16 +1305,7 @@ describe("/query page", () => {
 
     await screen.findByText(SUCCESS_RESPONSE.answer);
 
-    expect(
-      within(getConversationSection()).getByRole("radio", {
-        name: /^padrão$/i,
-      }),
-    ).toBeChecked();
-    expect(
-      within(getConversationSection()).getByRole("radio", {
-        name: /^rerank$/i,
-      }),
-    ).not.toBeChecked();
+    expect(getStrategySelect()).toHaveValue("standard");
     expect(
       within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
     ).toHaveValue(6);
