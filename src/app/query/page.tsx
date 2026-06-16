@@ -59,6 +59,7 @@ import {
   STRATEGY_TOOLTIP_STANDARD,
   truncateExcerptPreview,
 } from "./constants";
+import { Footer } from "../components/Footer";
 import styles from "./page.module.css";
 
 const SECRET_STORAGE_KEY = "query:secret";
@@ -97,7 +98,7 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
 
   return {
     id: "00000000-0000-0000-0000-0000000000aa",
-    title: "Tecnicas recorrentes em AIA",
+    title: "Técnicas recorrentes em AIA",
     createdAt: "2026-04-26T12:00:00.000Z",
     updatedAt: "2026-04-26T12:04:32.000Z",
     lastMessageAt: "2026-04-26T12:04:32.000Z",
@@ -106,7 +107,7 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
         id: "11111111-1111-1111-1111-111111111111",
         role: "user",
         content:
-          "Quais tecnicas de machine learning aparecem com mais frequencia nos estudos de Avaliacao de Impacto Ambiental?",
+          "Quais técnicas de machine learning aparecem com mais frequência nos estudos de Avaliação de Impacto Ambiental?",
         createdAt: "2026-04-26T12:00:10.000Z",
         trace: null,
       },
@@ -114,14 +115,14 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
         id: "22222222-2222-2222-2222-222222222222",
         role: "assistant",
         content:
-          "As tecnicas mais recorrentes nos artigos analisados sao Random Forest e Support Vector Machines para classificacao supervisionada [1], seguidas por redes convolucionais aplicadas a sensoriamento remoto [2]. Estudos mais recentes combinam ensembles com features derivadas de indices espectrais [3].",
+          "As técnicas mais recorrentes nos artigos analisados são Random Forest e Support Vector Machines para classificação supervisionada [1], seguidas por redes convolucionais aplicadas a sensoriamento remoto [2]. Estudos mais recentes combinam ensembles com features derivadas de índices espectrais [3].",
         createdAt: "2026-04-26T12:00:32.000Z",
         trace: {
           id: "33333333-3333-3333-3333-333333333333",
           question:
-            "Quais tecnicas de machine learning aparecem com mais frequencia nos estudos de Avaliacao de Impacto Ambiental?",
+            "Quais técnicas de machine learning aparecem com mais frequência nos estudos de Avaliação de Impacto Ambiental?",
           answer:
-            "As tecnicas mais recorrentes nos artigos analisados sao Random Forest e Support Vector Machines para classificacao supervisionada [1], seguidas por redes convolucionais aplicadas a sensoriamento remoto [2].",
+            "As técnicas mais recorrentes nos artigos analisados são Random Forest e Support Vector Machines para classificação supervisionada [1], seguidas por redes convolucionais aplicadas a sensoriamento remoto [2].",
           mode: "global",
           documentId: null,
           status: "answered",
@@ -146,7 +147,7 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
             },
             {
               rank: 3,
-              term: "classificacao supervisionada",
+              term: "classificação supervisionada",
               ngramSize: 2,
               frequency: 11,
               sourceCoverageCount: 6,
@@ -165,10 +166,10 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
               chunkId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
               documentId: "dddddddd-dddd-dddd-dddd-dddddddddddd",
               documentTitle:
-                "Machine learning para AIA - revisao sistematica (2022).pdf",
+                "Machine learning para AIA - revisão sistemática (2022).pdf",
               chunkIndex: 4,
               excerpt:
-                "Entre os 31 estudos revisados, Random Forest aparece em 19 trabalhos como classificador principal, frequentemente comparado a SVM em cenarios de cobertura do solo.",
+                "Entre os 31 estudos revisados, Random Forest aparece em 19 trabalhos como classificador principal, frequentemente comparado a SVM em cenários de cobertura do solo.",
               retrievalScore: 0.87,
               rerankScore: null,
               documentPipelineVersion: "ingest-v1",
@@ -184,7 +185,7 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
                 "CNNs aplicadas a imagens Sentinel-2 em estudos de impacto.pdf",
               chunkIndex: 7,
               excerpt:
-                "A arquitetura U-Net foi usada para segmentar areas degradadas com IoU medio de 0.78, superando metodos baseados em indices espectrais isolados.",
+                "A arquitetura U-Net foi usada para segmentar áreas degradadas com IoU médio de 0.78, superando métodos baseados em índices espectrais isolados.",
               retrievalScore: 0.81,
               rerankScore: null,
               documentPipelineVersion: "ingest-v1",
@@ -197,7 +198,7 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
               chunkId: "cccccccc-cccc-cccc-cccc-cccccccccccc",
               documentId: "ffffffff-ffff-ffff-ffff-ffffffffffff",
               documentTitle:
-                "Ensembles e indices espectrais em monitoramento ambiental.pdf",
+                "Ensembles e índices espectrais em monitoramento ambiental.pdf",
               chunkIndex: 2,
               excerpt:
                 "Modelos do tipo gradient boosting alimentados por NDVI, NDWI e EVI superaram baselines tradicionais em 4 das 6 bacias estudadas.",
@@ -215,7 +216,7 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
         id: "44444444-4444-4444-4444-444444444444",
         role: "user",
         content:
-          "E quanto a metricas de avaliacao? Quais sao reportadas com mais frequencia?",
+          "E quanto a métricas de avaliação? Quais são reportadas com mais frequência?",
         createdAt: "2026-04-26T12:04:10.000Z",
         trace: null,
       },
@@ -223,7 +224,7 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
         id: "55555555-5555-5555-5555-555555555555",
         role: "assistant",
         content:
-          "As metricas mais reportadas sao acuracia global e kappa para classificacao [1], alem de IoU e F1-score nos trabalhos baseados em CNN [2]. Estudos com forte componente de validacao de campo tambem reportam matriz de confusao por classe.",
+          "As métricas mais reportadas são acurácia global e kappa para classificação [1], além de IoU e F1-score nos trabalhos baseados em CNN [2]. Estudos com forte componente de validação de campo também reportam matriz de confusão por classe.",
         createdAt: "2026-04-26T12:04:32.000Z",
         trace: null,
       },
@@ -365,9 +366,6 @@ export default function QueryPage() {
   const effectiveStrategy: RagRetrievalStrategy =
     queryMode === "focused" ? "standard" : selectedStrategy;
   const submitButtonLabel = isSubmitting ? "Consultando..." : "Consultar base";
-  const conversationTitle =
-    conversationState.conversation?.title ??
-    (conversationId ? "Conversa sem titulo" : "Nenhuma conversa ativa");
   const newConversationLabel =
     conversationState.status === "loading" ? "Carregando..." : "Nova conversa";
   const auditDrawerMessage =
@@ -1345,35 +1343,28 @@ export default function QueryPage() {
   }
 
   return (
+    <>
     <main className={styles.page}>
       <div className={styles.container}>
         <header className={styles.header}>
           <div>
             <h1 className={styles.title}>
               Consulta na base{" "}
-              <span className={styles.titleAccent}>documental</span>
+              <span className={styles.titleAccent}>de artigos</span>
             </h1>
             <p className={styles.lede}>
               Faça uma pergunta sobre toda a base ou restrinja a consulta a um
-              documento especifico. Todas as respostas mantem citacoes inline,
-              fontes numeradas e trilha de auditoria. Apenas usuarios com o
-              secret podem consultar ou ler o historico persistido.
+              documento específico. Todas as respostas mantêm citações inline,
+              fontes numeradas e trilha de auditoria. Apenas usuários com o
+              secret podem consultar ou ler o histórico persistido.
             </p>
           </div>
-
-          <aside className={styles.sysStamp} aria-hidden="true">
-            <span>SYS / STATUS</span>
-            <span>retrieval :: hybrid-v1</span>
-            <span>embedding :: 3-large</span>
-            <span>audit :: f05-enabled</span>
-          </aside>
         </header>
 
         <section className={styles.toolbar} aria-label="Controles da consulta">
           <div className={`${styles.field} ${styles.fieldSecret}`}>
             <label htmlFor="query-secret" className={styles.label}>
               <span>Secret de consulta</span>
-              <span className={styles.labelIndex}>[ 01 ]</span>
             </label>
             <input
               id="query-secret"
@@ -1390,7 +1381,6 @@ export default function QueryPage() {
             <fieldset className={styles.modeFieldset}>
               <legend className={styles.label}>
                 <span>Modo de consulta</span>
-                <span className={styles.labelIndex}>[ 02 ]</span>
               </legend>
 
               <div className={styles.modeOptions}>
@@ -1419,7 +1409,7 @@ export default function QueryPage() {
                       setAskState({ kind: "idle" });
                     }}
                   />
-                  <span>Documento especifico</span>
+                  <span>Documento específico</span>
                 </label>
               </div>
             </fieldset>
@@ -1429,19 +1419,18 @@ export default function QueryPage() {
             <div className={`${styles.field} ${styles.fieldFocusedDocument}`}>
               <label htmlFor="query-document" className={styles.label}>
                 <span>Documento alvo</span>
-                <span className={styles.labelIndex}>[ 03 ]</span>
               </label>
 
               {trimmedSecret.length === 0 ? (
                 <p className={styles.inlineNote}>
-                  Informe o secret para listar documentos disponiveis.
+                  Informe o secret para listar documentos disponíveis.
                 </p>
               ) : null}
 
               {trimmedSecret.length > 0 &&
               selectableDocumentsState.status === "loading" ? (
                 <p className={styles.inlineNote}>
-                  Carregando documentos disponiveis...
+                  Carregando documentos disponíveis...
                 </p>
               ) : null}
 
@@ -1482,7 +1471,7 @@ export default function QueryPage() {
                     }
                     className={styles.select}
                   >
-                    <option value="">Selecione um documento focavel</option>
+                    <option value="">Selecione um documento focável</option>
                     {selectableDocumentsState.documents.map((document) => (
                       <option key={document.id} value={document.id}>
                         {document.title}
@@ -1627,10 +1616,6 @@ export default function QueryPage() {
             <header className={styles.panelHeader}>
               <div>
                 <h2 className={styles.panelTitle}>Conversa</h2>
-                <p className={styles.panelCopy}>
-                  {conversationTitle}
-                  {conversationId ? ` :: ${conversationId.slice(0, 8)}` : ""}
-                </p>
               </div>
             </header>
 
@@ -1651,7 +1636,7 @@ export default function QueryPage() {
             {conversationState.error === "not_found" ? (
               <StatusAlert
                 kind="technical"
-                message="Conversa nao encontrada ou indisponivel para recarga."
+                message="Conversa não encontrada ou indisponível para recarga."
               />
             ) : null}
 
@@ -1724,7 +1709,7 @@ export default function QueryPage() {
                       }
                     }}
                     rows={3}
-                    placeholder="Ex.: Quais tecnicas aparecem com mais frequencia nos estudos ou neste documento?"
+                    placeholder="Ex.: Quais técnicas aparecem com mais frequência nos estudos ou neste documento?"
                     className={styles.textarea}
                   />
                 </div>
@@ -1844,6 +1829,8 @@ export default function QueryPage() {
         </div>
       </div>
     </main>
+    <Footer />
+    </>
   );
 }
 
@@ -1890,7 +1877,6 @@ function ConversationMessageItem({
       <article className={styles.transcriptBubble}>
         <header className={styles.transcriptHeader}>
           <span>{isAssistant ? "Assistente" : "Operador"}</span>
-          <span>{formatTimestamp(message.createdAt)}</span>
         </header>
         <p className={styles.transcriptText}>{message.content}</p>
 
@@ -2036,7 +2022,7 @@ function AuditSummaryBlock({
           value={
             metadata.rerankerProvider && metadata.rerankerModel
               ? `${metadata.rerankerProvider} :: ${metadata.rerankerModel}`
-              : "nao aplicado"
+              : "não aplicado"
           }
         />
         <MetaItem label="// latency" value={`${audit.latencyMs} ms`} />
@@ -2067,7 +2053,7 @@ function AuditSummaryBlock({
         <MetaItem
           label="// rerank latency"
           value={
-            audit.reranking ? `${audit.reranking.latencyMs} ms` : "nao aplicado"
+            audit.reranking ? `${audit.reranking.latencyMs} ms` : "não aplicado"
           }
         />
         <MetaItem
@@ -2075,7 +2061,7 @@ function AuditSummaryBlock({
           value={
             audit.reranking
               ? String(audit.reranking.inputTokens)
-              : "nao aplicado"
+              : "não aplicado"
           }
         />
         <MetaItem
@@ -2083,7 +2069,7 @@ function AuditSummaryBlock({
           value={
             audit.reranking
               ? formatUsd(audit.reranking.estimatedCostUsd)
-              : "nao aplicado"
+              : "não aplicado"
           }
         />
         <MetaItem label="// total cost" value={formatUsd(audit.totalCostUsd)} />
@@ -2218,7 +2204,7 @@ function SourcesBlock({
                       </span>
                       {showCitationFlags ? (
                         <span className={styles.sourceChip}>
-                          citado :: {source.citedInAnswer ? "sim" : "nao"}
+                          citado :: {source.citedInAnswer ? "sim" : "não"}
                         </span>
                       ) : null}
                     </div>
@@ -2464,15 +2450,15 @@ function formatRunStatus(status: RagQueryRunSummaryResponse["status"]): string {
     case "answered":
       return "respondida";
     case "answered_no_evidence":
-      return "respondida sem evidencia";
+      return "respondida sem evidência";
     case "generation_failed":
       return "falha segura";
     case "generation_unavailable":
-      return "geracao indisponivel";
+      return "geração indisponível";
     case "reranking_failed":
       return "reranking com falha segura";
     case "reranking_unavailable":
-      return "reranking indisponivel";
+      return "reranking indisponível";
   }
 }
 
