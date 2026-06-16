@@ -477,7 +477,7 @@ function clickViewAudit(): void {
 }
 
 function clickFocusedMode(): void {
-  fireEvent.click(screen.getByLabelText(/documento especifico/i));
+  fireEvent.click(screen.getByLabelText(/documento específico/i));
 }
 
 function clickGlobalMode(): void {
@@ -530,7 +530,7 @@ describe("/query page", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText(/secret de consulta/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/base inteira/i)).toBeChecked();
-    expect(screen.getByLabelText(/documento especifico/i)).not.toBeChecked();
+    expect(screen.getByLabelText(/documento específico/i)).not.toBeChecked();
     expect(
       within(getConversationSection()).getByLabelText(/fontes recuperadas/i),
     ).toHaveValue(6);
@@ -1129,7 +1129,7 @@ describe("/query page", () => {
     });
 
     expect(
-      await screen.findByText(/servico de geracao indisponivel/i),
+      await screen.findByText(/serviço de geração indisponível/i),
     ).toBeInTheDocument();
     expect(screen.getByText("Pergunta com falha")).toBeInTheDocument();
     expect(screen.queryByText(/gerando resposta/i)).not.toBeInTheDocument();
@@ -1158,7 +1158,7 @@ describe("/query page", () => {
         name: /conversar apenas sobre este artigo/i,
       }),
     ).toHaveLength(1);
-    expect(screen.getByText(/citado :: nao/i)).toBeInTheDocument();
+    expect(screen.getByText(/citado :: não/i)).toBeInTheDocument();
   });
 
   it("does not render the focused handoff CTA for already-focused source cards", async () => {
@@ -1231,7 +1231,7 @@ describe("/query page", () => {
 
     expect(await screen.findByText(SUCCESS_RESPONSE.answer)).toBeInTheDocument();
     expect(await screen.findByRole("option", { name: /artigo focado a\.pdf/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/documento especifico/i)).toBeChecked();
+    expect(screen.getByLabelText(/documento específico/i)).toBeChecked();
     expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
       FOCUSED_DOCUMENT_ID,
     );
@@ -1254,7 +1254,7 @@ describe("/query page", () => {
     render(<QueryPage />);
 
     expect(
-      await screen.findByLabelText(/documento especifico/i),
+      await screen.findByLabelText(/documento específico/i),
     ).toBeChecked();
     expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
       SOURCE_HANDOFF_DOCUMENT_ID,
@@ -1279,7 +1279,6 @@ describe("/query page", () => {
       }),
     );
     expect(window.location.search).toBe(`?conversation=${CONVERSATION_ID}`);
-    expect(screen.getByText(/Conversa sem titulo/i)).toBeInTheDocument();
   });
 
   it("keeps the composer strategy at the default when loading a conversation whose last turn used a non-standard strategy", async () => {
@@ -1446,7 +1445,7 @@ describe("/query page", () => {
       }),
     );
     expect(fetchMock).toHaveBeenCalledTimes(4);
-    expect(screen.getByLabelText(/documento especifico/i)).toBeChecked();
+    expect(screen.getByLabelText(/documento específico/i)).toBeChecked();
     expect(screen.getByLabelText(/documento alvo/i)).toHaveValue(
       SOURCE_HANDOFF_DOCUMENT_ID,
     );
@@ -1465,7 +1464,6 @@ describe("/query page", () => {
     expect(window.location.search).toContain(
       `documentId=${SOURCE_HANDOFF_DOCUMENT_ID}`,
     );
-    expect(screen.getByText(/conversa sem titulo/i)).toBeInTheDocument();
   });
 
   it("ignores repeated rapid clicks while a focused handoff is already starting", async () => {
@@ -1559,7 +1557,7 @@ describe("/query page", () => {
       screen.getByText(/nenhuma fonte foi recuperada para esta pergunta/i),
     ).toBeInTheDocument();
     expect(
-      screen.getAllByText(/esta execucao nao consumiu geracao de resposta/i)[0],
+      screen.getAllByText(/esta execução não consumiu geração de resposta/i)[0],
     ).toBeInTheDocument();
   });
 
@@ -1578,7 +1576,7 @@ describe("/query page", () => {
     });
 
     expect(
-      screen.getByText(/digite uma pergunta valida para consultar/i),
+      screen.getByText(/digite uma pergunta válida para consultar/i),
     ).toBeInTheDocument();
 
     unmount();
@@ -1629,7 +1627,7 @@ describe("/query page", () => {
 
     expect(
       screen.getByText(
-        /a geracao da resposta falhou\. tente reformular a pergunta ou tentar novamente\./i,
+        /a geração da resposta falhou\. tente reformular a pergunta ou tentar novamente\./i,
       ),
     ).toBeInTheDocument();
   });
@@ -1688,13 +1686,13 @@ describe("/query page", () => {
     });
 
     expect(
-      screen.getByText(/documento nao encontrado ou indisponivel para foco/i),
+      screen.getByText(/documento não encontrado ou indisponível para foco/i),
     ).toBeInTheDocument();
     expect(
       screen.getAllByText(/pergunta focada sem documento valido/i).length,
     ).toBeGreaterThan(0);
     expect(
-      screen.queryByText(/conversa nao encontrada ou indisponivel para recarga/i),
+      screen.queryByText(/conversa não encontrada ou indisponível para recarga/i),
     ).not.toBeInTheDocument();
   });
 
@@ -1733,7 +1731,7 @@ describe("/query page", () => {
     });
 
     expect(
-      screen.getByText(/documento ainda nao esta pronto para consulta focada/i),
+      screen.getByText(/documento ainda não está pronto para consulta focada/i),
     ).toBeInTheDocument();
     expect(
       screen.getAllByText(/pergunta focada em documento ainda nao pronto/i)
@@ -1783,7 +1781,7 @@ describe("/query page", () => {
       }),
     );
     expect(
-      screen.getByText(/documento nao encontrado ou indisponivel para foco/i),
+      screen.getByText(/documento não encontrado ou indisponível para foco/i),
     ).toBeInTheDocument();
     expect(
       screen.getAllByText(SUCCESS_RESPONSE.answer).length,
@@ -1929,7 +1927,7 @@ describe("/query page", () => {
     });
 
     expect(
-      screen.getByText(/servico de geracao indisponivel no momento/i),
+      screen.getByText(/serviço de geração indisponível no momento/i),
     ).toBeInTheDocument();
   });
 

@@ -1,0 +1,119 @@
+/* =========================================================================
+   Project footer — Petrobras institutional. Falls back to sane values when
+   the host page does not expose the design tokens, so it is reusable as-is.
+   ========================================================================= */
+
+.footer {
+  position: relative;
+  border-top: 3px solid var(--pb-green, #008542);
+  background: #ffffff;
+  font-family: var(--font-body, "IBM Plex Sans"), "IBM Plex Sans", sans-serif;
+  color: #2e2f33;
+}
+
+/* Yellow-over-green corner mark echoing the BR logo. */
+.footer::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 0;
+  width: 96px;
+  height: 3px;
+  background: var(--pb-yellow, #ffcd00);
+}
+
+.inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 40px;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 48px 24px 32px;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 440px;
+}
+
+.logo {
+  display: block;
+  height: auto;
+  width: 148px;
+}
+
+.tagline {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: #5b6168;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.navTitle {
+  font-family: var(--font-inst, "Mulish"), "Mulish", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pb-green, #008542);
+}
+
+.navList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #3a3d42;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 140ms ease;
+}
+
+.navLink::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: var(--pb-yellow, #ffcd00);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.navLink:hover {
+  color: var(--pb-green-deep, #006b35);
+}
+
+.navLink:hover::before {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.navLink:focus-visible {
+  outline: 2px solid var(--pb-green, #008542);
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .inner {
+    flex-direction: column;
+    gap: 28px;
+    padding: 36px 18px 24px;
+  }
+}

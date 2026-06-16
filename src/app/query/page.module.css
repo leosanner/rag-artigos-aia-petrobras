@@ -11,9 +11,9 @@
 }
 
 .page {
-  --ink: #0a0a0a;
-  --paper: #fafaf7;
-  --paper-deep: #f0efe7;
+  --ink: #2e2f33;
+  --paper: #ffffff;
+  --paper-deep: #f3f5f6;
   --lime: #c2f04a;
   --lime-deep: #a9dc2e;
   --blue: #2b4bff;
@@ -21,30 +21,28 @@
   --yellow: #ffd60a;
   --danger: #ff4d3d;
 
-  --border: 2px solid var(--ink);
+  /* Petrobras institutional palette (colour pass — header/toolbar/strategy) */
+  --pb-green: #008542;
+  --pb-green-deep: #006b35;
+  --pb-yellow: #ffcd00;
+  --pb-blue: #0072c6;
+
+  /* Soft, institutional framing — corporate pass (borders + shadows) */
+  --line: #e1e5e9;
+  --radius: 6px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+  --shadow-lifted: 0 6px 16px rgba(16, 24, 40, 0.1),
+    0 2px 6px rgba(16, 24, 40, 0.06);
+
+  --border: 1px solid var(--line);
 
   position: relative;
   min-height: 100vh;
   padding: 48px 16px 96px;
-  background:
-    radial-gradient(circle at 1px 1px, rgba(10, 10, 10, 0.14) 1px, transparent 0) 0 0 / 22px 22px,
-    var(--paper);
+  background: var(--paper);
   font-family: var(--font-body), "IBM Plex Sans", sans-serif;
   color: var(--ink);
   overflow-x: hidden;
-}
-
-.page::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    -45deg,
-    transparent 0 42px,
-    rgba(10, 10, 10, 0.02) 42px 43px
-  );
-  pointer-events: none;
-  z-index: 0;
 }
 
 .container {
@@ -93,52 +91,38 @@
 
 .title {
   margin: 0;
-  font-family: var(--font-display), "Fraunces", serif;
-  font-weight: 700;
-  font-size: clamp(2.8rem, 6vw, 4.4rem);
-  line-height: 0.94;
-  letter-spacing: -0.02em;
+  font-family: var(--font-inst), "Mulish", "IBM Plex Sans", sans-serif;
+  font-weight: 800;
+  font-size: clamp(2.2rem, 4.6vw, 3.3rem);
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  color: var(--ink);
   max-width: none;
+}
+
+.title::after {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 5px;
+  margin-top: 22px;
+  background: var(--pb-yellow);
+  border-radius: 2px;
 }
 
 .titleAccent {
   display: inline;
-  background-image: linear-gradient(var(--yellow), var(--yellow));
-  background-repeat: no-repeat;
-  background-size: 100% 38%;
-  background-position: 0 88%;
-  padding: 0 2px;
+  color: inherit;
+  background: none;
+  padding: 0;
 }
 
 .lede {
   margin: 18px 0 0;
   max-width: 620px;
-  color: var(--ink);
   font-size: 1.02rem;
-  line-height: 1.55;
-  opacity: 0.78;
-}
-
-.sysStamp {
-  display: grid;
-  gap: 6px;
-  padding: 12px 14px;
-  border: var(--border);
-  background: var(--paper);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.72rem;
-  line-height: 1.2;
-  min-width: 200px;
-}
-
-.sysStamp span:first-child {
-  color: var(--blue);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-}
-
-.sysStamp span:last-child {
-  opacity: 0.6;
+  line-height: 1.6;
+  opacity: 0.72;
 }
 
 /* ---------------- Toolbar + Composer ---------------- */
@@ -272,7 +256,8 @@
   line-height: 1.3;
   cursor: pointer;
   outline: none;
-  box-shadow: 4px 4px 0 var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   transition:
     transform 120ms ease,
     box-shadow 120ms ease,
@@ -285,19 +270,17 @@
 }
 
 .composerStrategySelect:hover:not(:disabled) {
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0 var(--ink);
+  box-shadow: var(--shadow-lifted);
   background-color: #fffef7;
 }
 
 .composerStrategySelect:active:not(:disabled) {
-  transform: translate(0, 0);
-  box-shadow: 2px 2px 0 var(--ink);
+  box-shadow: var(--shadow);
 }
 
 .composerStrategySelect:focus-visible {
   border-color: var(--blue);
-  box-shadow: 4px 4px 0 var(--blue);
+  box-shadow: 0 0 0 3px rgba(43, 75, 255, 0.3);
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'><path d='M3 6l5 5 5-5' stroke='%232b4bff' stroke-width='2' stroke-linecap='square' stroke-linejoin='miter'/></svg>");
 }
 
@@ -314,7 +297,7 @@
     );
   background-repeat: no-repeat, repeat;
   background-position: right 14px center, 0 0;
-  box-shadow: 2px 2px 0 rgba(10, 10, 10, 0.35);
+  box-shadow: none;
 }
 
 .composerStrategySelect option {
@@ -329,7 +312,7 @@
   gap: 8px;
   margin: 0;
   padding: 6px 10px;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--line);
   background: var(--yellow);
   font-family: var(--font-mono), monospace;
   font-size: 0.66rem;
@@ -365,23 +348,24 @@
   padding: 14px 16px 14px 18px;
   border: var(--border);
   background: linear-gradient(180deg, #fffef7 0%, var(--paper) 100%);
+  border-radius: var(--radius);
   box-shadow:
-    inset 8px 0 0 var(--ink),
-    6px 6px 0 rgba(10, 10, 10, 0.08);
+    inset 4px 0 0 var(--ink),
+    var(--shadow);
 }
 
 .strategyGuideItem[data-strategy="explore"] {
   background: linear-gradient(180deg, #f7ffd7 0%, var(--paper) 100%);
   box-shadow:
-    inset 8px 0 0 var(--lime-deep),
-    6px 6px 0 rgba(10, 10, 10, 0.08);
+    inset 4px 0 0 var(--lime-deep),
+    var(--shadow);
 }
 
 .strategyGuideItem[data-strategy="rerank"] {
   background: linear-gradient(180deg, #eef2ff 0%, var(--paper) 100%);
   box-shadow:
-    inset 8px 0 0 var(--blue),
-    6px 6px 0 rgba(10, 10, 10, 0.08);
+    inset 4px 0 0 var(--blue),
+    var(--shadow);
 }
 
 .strategyGuideTerm {
@@ -407,29 +391,26 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
-  font-family: var(--font-mono), monospace;
+  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
 }
 
 .composerAdvancedSummary {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 14px 9px 12px;
-  border: var(--border);
-  background: var(--paper);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--ink);
+  gap: 8px;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  box-shadow: none;
+  border-radius: 4px;
+  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--pb-green-deep);
   cursor: pointer;
   list-style: none;
-  box-shadow: 4px 4px 0 var(--ink);
-  transition:
-    transform 120ms ease,
-    box-shadow 120ms ease,
-    background 120ms ease,
-    color 120ms ease;
+  transition: color 120ms ease;
 }
 
 .composerAdvancedSummary::-webkit-details-marker {
@@ -438,79 +419,37 @@
 
 .composerAdvancedSummary::before {
   content: "+";
-  display: inline-grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  background: var(--ink);
-  color: var(--lime);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   font-weight: 700;
   line-height: 1;
+  color: currentColor;
   transition: transform 200ms cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 .composerAdvancedSummary:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0 var(--ink);
-  background: #fffef7;
-}
-
-.composerAdvancedSummary:active {
-  transform: translate(0, 0);
-  box-shadow: 2px 2px 0 var(--ink);
+  color: var(--pb-green);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .composerAdvancedSummary:focus-visible {
-  outline: none;
-  border-color: var(--blue);
-  box-shadow: 4px 4px 0 var(--blue);
-}
-
-.composerAdvanced[open] .composerAdvancedSummary {
-  background: var(--ink);
-  color: var(--paper);
-  box-shadow: 4px 4px 0 var(--lime-deep);
-}
-
-.composerAdvanced[open] .composerAdvancedSummary:hover {
-  background: var(--ink);
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0 var(--lime-deep);
+  outline: 2px solid var(--pb-green);
+  outline-offset: 3px;
 }
 
 .composerAdvanced[open] .composerAdvancedSummary::before {
-  background: var(--lime);
-  color: var(--ink);
   transform: rotate(45deg);
 }
 
 .composerAdvancedFields {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 18px;
   padding: 16px 18px;
   background: var(--paper-deep);
   border: var(--border);
-  box-shadow: 4px 4px 0 var(--ink);
-  position: relative;
+  border-radius: var(--radius);
   animation: advancedReveal 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-.composerAdvancedFields::before {
-  content: "// PARÂMETROS";
-  position: absolute;
-  top: -10px;
-  left: 14px;
-  padding: 2px 8px;
-  background: var(--lime);
-  border: var(--border);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  color: var(--ink);
 }
 
 @keyframes advancedReveal {
@@ -527,26 +466,19 @@
 .composerAdvancedField {
   display: inline-flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink);
+  gap: 8px;
+  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: #5b6168;
 }
 
 .composerAdvancedLabel {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  opacity: 0.78;
-}
-
-.composerAdvancedLabel::before {
-  content: "▸";
-  font-size: 0.55rem;
-  color: var(--blue);
-  opacity: 1;
 }
 
 .composerAdvancedInput {
@@ -556,13 +488,14 @@
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-mono), "IBM Plex Mono", monospace;
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-align: center;
   outline: none;
-  box-shadow: 3px 3px 0 var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   transition:
     transform 120ms ease,
     box-shadow 120ms ease,
@@ -571,12 +504,12 @@
 }
 
 .composerAdvancedInput:hover {
-  background: #fffef7;
+  background: var(--paper-deep);
 }
 
 .composerAdvancedInput:focus-visible {
-  border-color: var(--blue);
-  box-shadow: 3px 3px 0 var(--blue);
+  border-color: var(--pb-green);
+  box-shadow: 0 0 0 3px rgba(0, 133, 66, 0.18);
   background: var(--paper);
 }
 
@@ -625,24 +558,8 @@
 }
 
 .fieldSecret {
-  background: linear-gradient(var(--paper), var(--paper)) padding-box,
-    var(--paper);
+  background: var(--paper);
   position: relative;
-}
-
-.fieldSecret::after {
-  content: "ENCRYPTED";
-  position: absolute;
-  top: -12px;
-  right: 16px;
-  padding: 3px 10px;
-  background: var(--blue);
-  color: var(--paper);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.64rem;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  border: var(--border);
 }
 
 .fieldQuestion {
@@ -677,35 +594,6 @@
   background: var(--paper-deep);
 }
 
-.fieldMode::after {
-  content: "MODE";
-  position: absolute;
-  top: -12px;
-  right: 16px;
-  padding: 3px 10px;
-  background: var(--blue);
-  color: var(--paper);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.64rem;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  border: var(--border);
-}
-
-.fieldFocusedDocument::after {
-  content: "FOCUS";
-  position: absolute;
-  top: -12px;
-  right: 16px;
-  padding: 3px 10px;
-  background: var(--lime);
-  color: var(--ink);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.64rem;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  border: var(--border);
-}
 
 .fieldControls::after {
   content: "TOP-K";
@@ -1144,7 +1032,7 @@
 .emptyPanel {
   margin: 0;
   padding: 22px;
-  border: 2px dashed var(--ink);
+  border: 1px dashed var(--line);
   background: var(--paper);
   font-family: var(--font-mono), monospace;
   font-size: 0.9rem;
@@ -1170,21 +1058,25 @@
 
 .transcriptBubble {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   width: min(760px, 100%);
-  padding: 18px;
+  padding: 18px 20px;
   border: var(--border);
   background: var(--paper);
 }
 
 .transcriptAssistant .transcriptBubble {
   justify-self: start;
-  background: var(--paper);
+  background: var(--paper-deep);
+  border-color: var(--line);
+  border-radius: 16px 16px 16px 4px;
 }
 
 .transcriptUser .transcriptBubble {
   justify-self: end;
-  background: var(--lime);
+  background: #e9f4ee;
+  border-color: #cfe6d8;
+  border-radius: 16px 16px 4px 16px;
 }
 
 .transcriptHeader {
@@ -1192,11 +1084,16 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 10px;
-  font-family: var(--font-mono), monospace;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #6b7178;
+}
+
+.transcriptAssistant .transcriptHeader {
+  color: var(--pb-green);
 }
 
 .transcriptText {
@@ -1573,7 +1470,7 @@
 
 .metaItem {
   padding: 16px 20px;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--line);
   margin: -1px 0 0 -1px;
   background: var(--paper);
   font-family: var(--font-mono), monospace;
@@ -1617,7 +1514,7 @@
   display: grid;
   gap: 6px;
   padding: 16px 20px;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--line);
   margin: -1px 0 0 -1px;
   background: var(--paper);
 }
@@ -1714,7 +1611,7 @@
   color: var(--ink);
   opacity: 0.85;
   padding-left: 18px;
-  border-left: 2px solid var(--ink);
+  border-left: 2px solid var(--line);
 }
 
 .sourceMetaRow {
@@ -1729,7 +1626,7 @@
   align-items: center;
   min-height: 32px;
   padding: 6px 10px;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--line);
   background: var(--paper-deep);
   font-family: var(--font-mono), monospace;
   font-size: 0.72rem;
@@ -1751,7 +1648,7 @@
 .emptySources {
   margin: 0;
   padding: 22px;
-  border: 2px dashed var(--ink);
+  border: 1px dashed var(--line);
   font-family: var(--font-mono), monospace;
   font-size: 0.92rem;
   text-align: center;
@@ -1782,9 +1679,10 @@
 .historyItemActive::before {
   content: "";
   position: absolute;
-  inset: -2px auto -2px -2px;
+  inset: 0 auto 0 0;
   width: 4px;
   background: var(--lime);
+  border-radius: var(--radius) 0 0 var(--radius);
 }
 
 .historyItemSummary {
@@ -1905,6 +1803,62 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* =========================================================================
+   Corporate pass — soft rounded corners on the recurring surfaces.
+   Table-like grids (.metaItem/.termCard) and large numeral tiles stay square
+   on purpose; the colour tokens are handled in a later pass.
+   ========================================================================= */
+
+.eyebrow,
+.composer,
+.field,
+.modeOption,
+.input,
+.select,
+.textarea,
+.rangeBadge,
+.documentSummary,
+.composerStrategyNote,
+.btn,
+.alert,
+.alertBadge,
+.panel,
+.emptyPanel,
+.transcriptBubble,
+.streamingSourceCard,
+.streamingRelatedTerms,
+.streamingRelatedTermsChip,
+.questionSnapshot,
+.sourceCard,
+.sourceNumber,
+.sourceChip,
+.emptySources,
+.historyItem {
+  border-radius: var(--radius);
+}
+
+/* Containers whose first child is a full-width strip header: clip to round. */
+.resultBlock,
+.runsPanel {
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* Subtle elevation on the prominent cards/panels. */
+.composer,
+.panel,
+.runsPanel,
+.resultBlock,
+.sourceCard,
+.transcriptBubble,
+.alert {
+  box-shadow: var(--shadow);
+}
+
+.btn {
+  box-shadow: var(--shadow);
+}
+
 /* ---------------- Responsive ---------------- */
 
 @media (max-width: 860px) {
@@ -1934,4 +1888,84 @@
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* =========================================================================
+   Petrobras institutional colour pass — scoped to the header region:
+   the toolbar (secret / mode / focused doc / actions) and the strategy
+   guide. Lower sections (chat, sources, history) keep the previous palette
+   until the next increment.
+   ========================================================================= */
+
+/* Toolbar field labels: quiet sentence-case grey instead of mono caps. */
+.toolbar .label {
+  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: #5b6168;
+}
+
+/* Green focus on toolbar inputs/selects. */
+.toolbar .input:focus,
+.toolbar .select:focus {
+  border-color: var(--pb-green);
+  box-shadow: 0 0 0 3px rgba(0, 133, 66, 0.15);
+}
+
+/* Mode radios: plain sans, green selection. */
+.fieldMode .modeOption {
+  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fieldMode .modeOption input {
+  accent-color: var(--pb-green);
+}
+
+/* Toolbar action buttons: institutional outline with green hover. */
+.toolbarActions .btn {
+  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+.toolbarActions .btn:hover:not(:disabled) {
+  background: var(--paper-deep);
+  border-color: var(--pb-green);
+  color: var(--pb-green-deep);
+}
+
+/* Strategy guide → institutional white cards, green/yellow/blue accents. */
+.strategyGuide .panelTitle {
+  font-family: var(--font-inst), "Mulish", "IBM Plex Sans", sans-serif;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.strategyGuideItem {
+  background: var(--paper);
+  box-shadow: inset 4px 0 0 var(--pb-green), var(--shadow);
+}
+
+.strategyGuideItem[data-strategy="explore"] {
+  background: var(--paper);
+  box-shadow: inset 4px 0 0 var(--pb-yellow), var(--shadow);
+}
+
+.strategyGuideItem[data-strategy="rerank"] {
+  background: var(--paper);
+  box-shadow: inset 4px 0 0 var(--pb-blue), var(--shadow);
+}
+
+.strategyGuideTerm {
+  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
+  letter-spacing: 0.08em;
+  color: var(--ink);
 }
