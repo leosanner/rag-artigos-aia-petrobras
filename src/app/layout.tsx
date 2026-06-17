@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AIA Insight",
+  title: "Estudo de caso: RAG",
   description: "Exploracao documental com RAG, governanca e rastreabilidade"
 };
 
