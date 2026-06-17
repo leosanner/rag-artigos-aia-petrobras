@@ -1232,10 +1232,11 @@
 
 .auditDrawerPanel {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
   background: var(--paper-deep);
   border-left: var(--border);
+  overflow: hidden;
 }
 
 .auditDrawerHeader {
@@ -1243,33 +1244,60 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 22px 22px 16px;
+  padding: 22px 22px 18px;
+  background: var(--paper);
   border-bottom: var(--border);
 }
 
-.auditDrawerEyebrow {
+/* Institutional title: Mulish, sentence case, green status dot + yellow
+   underline accent echoing the page hero title. Scoped under the header so
+   it outweighs the base `.page p` typography reset. */
+.auditDrawerHeader .auditDrawerEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   margin: 0;
-  font-family: var(--font-mono), monospace;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+  font-family: var(--font-inst), "Mulish", "IBM Plex Sans", sans-serif;
+  font-size: 1.08rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-transform: none;
   color: var(--ink);
-  opacity: 0.8;
+  opacity: 1;
 }
 
-.auditDrawerTraceLabel {
-  margin: 4px 0 0;
-  font-family: var(--font-mono), monospace;
-  font-size: 0.78rem;
-  color: var(--ink);
+.auditDrawerHeader .auditDrawerEyebrow::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--pb-green);
+  flex-shrink: 0;
+}
+
+/* Close control adopts the institutional toolbar-button voice. */
+.auditDrawerHeader .btn {
+  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+.auditDrawerHeader .btn:hover:not(:disabled) {
+  background: var(--paper-deep);
+  border-color: var(--pb-green);
+  color: var(--pb-green-deep);
 }
 
 .auditDrawerBody {
   display: grid;
   gap: 20px;
   padding: 22px;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .auditDrawerBody .blockBody {
@@ -1301,7 +1329,13 @@
 .auditDrawerBody .sourceNumber {
   width: 44px;
   height: 44px;
-  font-size: 1.5rem;
+  font-family: var(--font-inst), "Mulish", "IBM Plex Sans", sans-serif;
+  font-style: normal;
+  font-weight: 800;
+  font-size: 1.35rem;
+  color: var(--pb-blue);
+  background: rgba(0, 114, 198, 0.1);
+  border: 1px solid rgba(0, 114, 198, 0.28);
 }
 
 .auditDrawerBody .sourceContent {
@@ -1339,6 +1373,74 @@
 @keyframes auditDrawerIn {
   from { opacity: 0; transform: translateX(16px); }
   to { opacity: 1; transform: translateX(0); }
+}
+
+/* -------------------------------------------------------------------------
+   Audit blocks — institutional pass. These three blocks render only inside
+   the drawer, so the overrides are scoped to .auditDrawerBody. Loud full-fill
+   header bars (ink / lime / blue) become quiet white cards carrying a single
+   Petrobras accent strip on the left edge — the same device the strategy
+   guide uses — mapped green (parameters) / yellow (terms) / blue (sources).
+   ------------------------------------------------------------------------- */
+
+.auditDrawerBody .resultBlock {
+  background: var(--paper);
+}
+
+/* Header strip: white, ink Mulish title, mono grey count — no colour fill. */
+.auditDrawerBody .resultBlock .blockHeader {
+  padding: 14px 18px;
+  background: var(--paper);
+  color: var(--ink);
+  border-bottom: var(--border);
+  font-family: var(--font-inst), "Mulish", "IBM Plex Sans", sans-serif;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: -0.005em;
+  text-transform: none;
+}
+
+.auditDrawerBody .blockIndex {
+  gap: 12px;
+}
+
+.auditDrawerBody .blockIndex::before {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.auditDrawerBody .blockMeta {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #5b6168;
+  opacity: 1;
+}
+
+/* Per-section accent — left strip + matching index dot. */
+.auditDrawerBody .metaBlockAccent {
+  background: var(--paper);
+  box-shadow: inset 4px 0 0 var(--pb-green), var(--shadow);
+}
+.auditDrawerBody .metaBlockAccent .blockIndex::before {
+  background: var(--pb-green);
+}
+
+.auditDrawerBody .termsBlockAccent {
+  box-shadow: inset 4px 0 0 var(--pb-yellow), var(--shadow);
+}
+.auditDrawerBody .termsBlockAccent .blockIndex::before {
+  background: var(--pb-yellow);
+}
+
+.auditDrawerBody .sourcesBlockAccent {
+  box-shadow: inset 4px 0 0 var(--pb-blue), var(--shadow);
+}
+.auditDrawerBody .sourcesBlockAccent .blockIndex::before {
+  background: var(--pb-blue);
 }
 
 /* ---------------- Result ---------------- */
@@ -1530,16 +1632,6 @@
   font-family: var(--font-body), "IBM Plex Sans", sans-serif;
   font-size: 1rem;
   font-weight: 700;
-}
-
-.termMeta {
-  margin: 0;
-  font-family: var(--font-mono), monospace;
-  font-size: 0.76rem;
-  line-height: 1.5;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.72;
 }
 
 /* Sources */

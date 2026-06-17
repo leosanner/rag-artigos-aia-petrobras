@@ -1547,18 +1547,12 @@ export default function QueryPage() {
           <AuditDrawer
             open={auditDrawerMessage !== null}
             onClose={closeAuditDrawer}
-            traceLabel={
-              auditDrawerMessage
-                ? `trace :: ${auditDrawerMessage.trace.id.slice(0, 8)}`
-                : null
-            }
           >
             {auditDrawerMessage ? (
               <>
                 <AuditSummaryBlock
-                  blockIndex="[ 01 ] Auditoria da mensagem"
-                  metaLabel={`trace :: ${auditDrawerMessage.trace.id.slice(0, 8)}`}
-                  traceId={auditDrawerMessage.trace.id}
+                  blockIndex="Parâmetros da consulta"
+                  metaLabel=""
                   question={auditDrawerMessage.trace.question}
                   metadata={auditDrawerMessage.trace.metadata}
                   audit={auditDrawerMessage.trace.audit}
@@ -1567,11 +1561,11 @@ export default function QueryPage() {
                   createdAt={auditDrawerMessage.trace.createdAt}
                 />
                 <RelatedTermsBlock
-                  blockIndex="[ 02 ] Termos da mensagem"
+                  blockIndex="Termos relacionados"
                   terms={auditDrawerMessage.trace.relatedTerms}
                 />
                 <SourcesBlock
-                  blockIndex="[ 03 ] Fontes da mensagem"
+                  blockIndex="Fontes consultadas"
                   sources={auditDrawerMessage.trace.sources}
                   showCitationFlags
                   onStartFocusedConversation={
@@ -1977,7 +1971,6 @@ function StreamingConversationMessageItem({
 type AuditSummaryBlockProps = {
   blockIndex: string;
   metaLabel: string;
-  traceId: string;
   question: string;
   metadata: RagRunMetadataResponse;
   audit: RagRunAuditResponse;
@@ -1989,7 +1982,6 @@ type AuditSummaryBlockProps = {
 function AuditSummaryBlock({
   blockIndex,
   metaLabel,
-  traceId,
   question,
   metadata,
   audit,
@@ -2004,7 +1996,6 @@ function AuditSummaryBlock({
         <span className={styles.blockMeta}>{metaLabel}</span>
       </header>
       <div className={styles.metaGrid}>
-        <MetaItem label="// trace id" value={traceId} />
         <MetaItem label="// question chars" value={String(question.length)} />
         <MetaItem
           label="// strategy"
@@ -2120,10 +2111,6 @@ function RelatedTermsBlock({
               <li key={`${term.rank}-${term.term}`} className={styles.termCard}>
                 <p className={styles.termTitle}>
                   #{term.rank} {term.term}
-                </p>
-                <p className={styles.termMeta}>
-                  ngram :: {term.ngramSize} | freq :: {term.frequency} |
-                  cobertura :: {term.sourceCoverageCount}
                 </p>
               </li>
             ))}

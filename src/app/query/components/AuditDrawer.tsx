@@ -11,16 +11,10 @@ import styles from "../page.module.css";
 type AuditDrawerProps = {
   open: boolean;
   onClose: () => void;
-  traceLabel: string | null;
   children: ReactNode;
 };
 
-export function AuditDrawer({
-  open,
-  onClose,
-  traceLabel,
-  children,
-}: AuditDrawerProps) {
+export function AuditDrawer({ open, onClose, children }: AuditDrawerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -68,14 +62,7 @@ export function AuditDrawer({
     >
       <div className={styles.auditDrawerPanel}>
         <header className={styles.auditDrawerHeader}>
-          <div>
-            <p className={styles.auditDrawerEyebrow}>
-              {RAG_AUDIT_DRAWER_TITLE}
-            </p>
-            {traceLabel ? (
-              <p className={styles.auditDrawerTraceLabel}>{traceLabel}</p>
-            ) : null}
-          </div>
+          <p className={styles.auditDrawerEyebrow}>{RAG_AUDIT_DRAWER_TITLE}</p>
           <button
             type="button"
             onClick={onClose}
