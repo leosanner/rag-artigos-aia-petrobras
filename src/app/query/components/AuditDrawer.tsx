@@ -42,6 +42,28 @@ export function AuditDrawer({ open, onClose, children }: AuditDrawerProps) {
     }
   }, [open]);
 
+  // Trava o scroll da pagina enquanto a gaveta esta aberta. O painel ja contem
+  // a propria rolagem, mas a roda sobre o backdrop — e o fallback nao-modal,
+  // quando showModal nao existe — ainda alcancava o conteudo atras.
+  useEffect(() => {
+    if (!open) return;
+
+    const { body, documentElement } = document;
+    const previousOverflow = body.style.overflow;
+    const previousPaddingRight = body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - documentElement.clientWidth;
+
+    body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      body.style.overflow = previousOverflow;
+      body.style.paddingRight = previousPaddingRight;
+    };
+  }, [open]);
+
   function handleBackdropClick(event: React.MouseEvent<HTMLDialogElement>) {
     if (event.target === dialogRef.current) {
       onClose();
