@@ -32,7 +32,7 @@ export default function Home() {
     >
       <div className={styles.container}>
         <header className={styles.header}>
-          <span className={styles.eyebrow}>Sistema :: AIA Insight / DEMO</span>
+          <span className={styles.eyebrow}>Sistema :: Estudo de caso: RAG / DEMO</span>
           <div>
             <h1 className={styles.title}>
               Plataforma RAG{" "}

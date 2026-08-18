@@ -903,7 +903,7 @@ describe("/query page", () => {
       clickViewAudit();
     });
 
-    expect(screen.getByText(CURRENT_TRACE_ID)).toBeInTheDocument();
+    expect(screen.getByText(/par[âa]metros da consulta/i)).toBeInTheDocument();
     expect(
       screen.getAllByText(/classificacao supervisionada/i).length,
     ).toBeGreaterThan(0);
@@ -980,7 +980,9 @@ describe("/query page", () => {
         "Os documentos destacam classificacao supervisionada [1] [2].",
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByText(CURRENT_TRACE_ID)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/par[âa]metros da consulta/i),
+    ).not.toBeInTheDocument();
 
     await act(async () => {
       stream.push(
@@ -1000,7 +1002,9 @@ describe("/query page", () => {
       clickViewAudit();
     });
 
-    expect(await screen.findByText(CURRENT_TRACE_ID)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/par[âa]metros da consulta/i),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/recuperando candidatos/i)).not.toBeInTheDocument();
   });
 
@@ -1318,7 +1322,7 @@ describe("/query page", () => {
     render(<QueryPage />);
 
     expect(await screen.findByText(SUCCESS_RESPONSE.answer)).toBeInTheDocument();
-    expect(screen.queryByText(/\[ 03 \] Fontes da mensagem/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/fontes consultadas/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("dialog", { name: /auditoria da mensagem/i }),
     ).not.toBeInTheDocument();
@@ -1330,10 +1334,10 @@ describe("/query page", () => {
     });
     expect(drawer).toBeInTheDocument();
     expect(
-      within(drawer).getByText(/\[ 01 \] Auditoria da mensagem/i),
+      within(drawer).getByText(/par[âa]metros da consulta/i),
     ).toBeInTheDocument();
     expect(
-      within(drawer).getByText(/\[ 03 \] Fontes da mensagem/i),
+      within(drawer).getByText(/fontes consultadas/i),
     ).toBeInTheDocument();
     expect(
       within(drawer).getAllByText(/citado :: sim/i).length,
