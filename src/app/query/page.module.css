@@ -1293,8 +1293,15 @@
   color: var(--pb-green-deep);
 }
 
+/* `grid-auto-rows: max-content` e obrigatorio aqui: os blocos usam
+   `overflow: hidden` (para o header em faixa respeitar o border-radius), o que
+   zera a altura minima automatica deles. Num container de altura definida como
+   este, as trilhas `auto` encolhem abaixo do conteudo e cada bloco fica cortado
+   em vez de a gaveta rolar. */
 .auditDrawerBody {
   display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
   gap: 20px;
   padding: 22px;
   min-height: 0;
