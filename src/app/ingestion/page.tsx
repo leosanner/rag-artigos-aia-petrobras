@@ -9,7 +9,13 @@ import {
   type IngestionRunDetailResponse,
 } from "@/application/ingestion/schemas";
 
+import { LocaleSwitcher } from "../components/LocaleSwitcher";
 import { INGESTION_POLL_INTERVAL_MS } from "./constants";
+import {
+  describeIngestionError,
+  useIngestionMessages,
+  type IngestionRunError,
+} from "./messages";
 
 const SECRET_STORAGE_KEY = "ingestion:secret";
 
@@ -20,13 +26,14 @@ type StartState =
   | { kind: "polling"; detail: IngestionRunDetailResponse }
   | { kind: "conflict"; activeRunId: string | null }
   | { kind: "unauthorized" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; error: IngestionRunError };
 
 function isTerminalStatus(status: IngestionRunDetailResponse["status"]): boolean {
   return status === "completed" || status === "failed";
 }
 
 export default function IngestionPage() {
+  const t = useIngestionMessages();
   const [secret, setSecret] = useState<string>("");
   const [state, setState] = useState<StartState>({ kind: "idle" });
   const pollRunIdRef = useRef<string | null>(null);
@@ -61,7 +68,7 @@ export default function IngestionPage() {
     if (!response.ok) {
       setState({
         kind: "error",
-        message: `Failed to fetch run status (HTTP ${response.status})`,
+        error: { code: "poll_http", httpStatus: response.status },
       });
       pollRunIdRef.current = null;
       return;
@@ -72,7 +79,7 @@ export default function IngestionPage() {
     if (!parsed.success) {
       setState({
         kind: "error",
-        message: "Received a malformed run detail response",
+        error: { code: "malformed_detail" },
       });
       pollRunIdRef.current = null;
       return;
@@ -131,9 +138,10 @@ export default function IngestionPage() {
     } catch (error) {
       setState({
         kind: "error",
-        message: `Network error while starting the run: ${
-          error instanceof Error ? error.message : "unknown"
-        }`,
+        error: {
+          code: "network",
+          detail: error instanceof Error ? error.message : null,
+        },
       });
       return;
     }
@@ -145,7 +153,7 @@ export default function IngestionPage() {
       if (!parsed.success) {
         setState({
           kind: "error",
-          message: "Received a malformed queued response",
+          error: { code: "malformed_queued" },
         });
         return;
       }
@@ -171,7 +179,7 @@ export default function IngestionPage() {
 
     setState({
       kind: "error",
-      message: `Unexpected response (HTTP ${response.status})`,
+      error: { code: "unexpected", httpStatus: response.status },
     });
   }, [secret, clearSecret]);
 
@@ -189,18 +197,25 @@ export default function IngestionPage() {
         padding: "0 1rem",
       }}
     >
-      <h1>Document ingestion</h1>
-      <p>
-        Start a new ingestion run to pick up new PDFs from the configured Drive
-        folder. The operator secret is kept only in this browser tab.
-      </p>
+      <header
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: "1rem",
+        }}
+      >
+        <h1 style={{ margin: 0 }}>{t.title}</h1>
+        <LocaleSwitcher />
+      </header>
+      <p>{t.lede}</p>
 
       <section style={{ marginTop: "1.5rem" }}>
         <label
           htmlFor="ingestion-secret"
           style={{ display: "block", fontWeight: 600 }}
         >
-          Operator secret
+          {t.secretLabel}
         </label>
         <input
           id="ingestion-secret"
@@ -216,43 +231,43 @@ export default function IngestionPage() {
             onClick={onStart}
             disabled={secret.length === 0 || state.kind === "starting"}
           >
-            {state.kind === "starting" ? "Starting..." : "Start ingestion run"}
+            {state.kind === "starting" ? t.starting : t.start}
           </button>
           <button
             type="button"
             onClick={clearSecret}
             disabled={secret.length === 0}
           >
-            Clear secret
+            {t.clearSecret}
           </button>
         </div>
       </section>
 
       <section style={{ marginTop: "2rem" }}>
         {state.kind === "unauthorized" && (
-          <p role="alert">
-            Operator secret was rejected. Please re-enter it and try again.
-          </p>
+          <p role="alert">{t.unauthorized}</p>
         )}
 
         {state.kind === "conflict" && (
           <div role="alert">
             <p>
-              Another ingestion run is already active. Active run id:{" "}
-              <code>{state.activeRunId ?? "unknown"}</code>
+              {t.conflict}{" "}
+              <code>{state.activeRunId ?? t.unknownRun}</code>
             </p>
             {state.activeRunId !== null && (
               <button
                 type="button"
                 onClick={() => inspectActiveRun(state.activeRunId as string)}
               >
-                Poll active run
+                {t.pollActiveRun}
               </button>
             )}
           </div>
         )}
 
-        {state.kind === "error" && <p role="alert">{state.message}</p>}
+        {state.kind === "error" && (
+          <p role="alert">{describeIngestionError(t, state.error)}</p>
+        )}
 
         {(state.kind === "queued" || state.kind === "polling") && (
           <IngestionRunView state={state} />
@@ -270,22 +285,37 @@ function IngestionRunView({
   const runId = state.kind === "queued" ? state.runId : state.detail.id;
   const status = state.kind === "queued" ? "queued" : state.detail.status;
   const detail = state.kind === "polling" ? state.detail : null;
+  const t = useIngestionMessages();
 
   return (
     <article>
-      <h2>Run</h2>
+      <h2>{t.run.title}</h2>
       <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.25rem" }}>
         <li>
-          Run id: <code>{runId}</code>
+          {t.run.id}: <code>{runId}</code>
         </li>
-        <li>Status: {status}</li>
+        <li>
+          {t.run.status}: {t.run.runStatus[status]}
+        </li>
         {detail && (
           <>
-            <li>Selected: {detail.selectedCount}</li>
-            <li>Processed: {detail.processedCount}</li>
-            <li>Failed: {detail.failedCount}</li>
-            <li>Skipped (existing): {detail.skippedExistingCount}</li>
-            {detail.lastError && <li>Last error: {detail.lastError}</li>}
+            <li>
+              {t.run.selected}: {detail.selectedCount}
+            </li>
+            <li>
+              {t.run.processed}: {detail.processedCount}
+            </li>
+            <li>
+              {t.run.failed}: {detail.failedCount}
+            </li>
+            <li>
+              {t.run.skippedExisting}: {detail.skippedExistingCount}
+            </li>
+            {detail.lastError && (
+              <li>
+                {t.run.lastError}: {detail.lastError}
+              </li>
+            )}
           </>
         )}
       </ul>
@@ -293,10 +323,10 @@ function IngestionRunView({
         <table style={{ marginTop: "1rem", width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
-              <th align="left">Title</th>
-              <th align="left">Drive file id</th>
-              <th align="left">Status</th>
-              <th align="left">Last error</th>
+              <th align="left">{t.items.title}</th>
+              <th align="left">{t.items.driveFileId}</th>
+              <th align="left">{t.items.status}</th>
+              <th align="left">{t.items.lastError}</th>
             </tr>
           </thead>
           <tbody>
@@ -306,7 +336,7 @@ function IngestionRunView({
                 <td>
                   <code>{item.driveFileId}</code>
                 </td>
-                <td>{item.status}</td>
+                <td>{t.items.itemStatus[item.status]}</td>
                 <td>{item.lastError ?? "-"}</td>
               </tr>
             ))}

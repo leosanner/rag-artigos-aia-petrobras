@@ -2,6 +2,24 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - feat(i18n): localize home, /ingestion, /indexing, and footer
+
+Date: 2026-10-22
+
+Changed:
+
+- Added typed PT/EN dictionaries for the home page (`src/app/messages.ts`),
+  `/ingestion`, and `/indexing`, plus inline PT/EN copy in the shared
+  `Footer`. Each page header now shows the `LocaleSwitcher`.
+- `/ingestion` now defaults to PT-BR (previously English-only per F-01
+  RN-B04-08, now superseded by AD-023). PT copy on `/` and `/indexing`
+  gained proper accents.
+- Run errors on `/ingestion` and `/indexing` are stored as codes, so an
+  alert on screen re-renders when the locale changes. Run/item statuses are
+  shown as translated labels.
+- The home content moved to `src/app/components/HomeContent.tsx` (client)
+  so it follows locale changes without a reload.
+
 ## (unreleased) - feat(i18n): PT/EN language selector on /query
 
 Date: 2026-10-22

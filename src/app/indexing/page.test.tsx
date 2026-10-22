@@ -1,6 +1,8 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LocaleProvider } from "@/i18n/LocaleProvider";
+
 import IndexingPage from "./page";
 import { INDEXING_POLL_INTERVAL_MS } from "./constants";
 
@@ -23,7 +25,7 @@ function typeSecret(value: string): void {
 }
 
 function clickStart(): void {
-  fireEvent.click(screen.getByRole("button", { name: /iniciar indexacao/i }));
+  fireEvent.click(screen.getByRole("button", { name: /iniciar indexação/i }));
 }
 
 describe("/indexing page", () => {
@@ -46,8 +48,8 @@ describe("/indexing page", () => {
   it("renders Portuguese operator copy and keeps Start disabled until a secret is typed", () => {
     render(<IndexingPage />);
 
-    expect(screen.getByText(/indexacao de documentos/i)).toBeInTheDocument();
-    const button = screen.getByRole("button", { name: /iniciar indexacao/i });
+    expect(screen.getByText(/indexação de documentos/i)).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: /iniciar indexação/i });
     expect(button).toBeDisabled();
 
     typeSecret(SECRET);
@@ -68,7 +70,7 @@ describe("/indexing page", () => {
     );
     render(<IndexingPage />);
     typeSecret(SECRET);
-    fireEvent.change(screen.getByLabelText(/documento especifico/i), {
+    fireEvent.change(screen.getByLabelText(/documento específico/i), {
       target: { value: DOCUMENT_ID },
     });
     fireEvent.click(screen.getByLabelText(/recriar chunks existentes/i));
@@ -149,7 +151,7 @@ describe("/indexing page", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(INDEXING_POLL_INTERVAL_MS);
     });
-    expect(screen.getByText(/completed/i)).toBeInTheDocument();
+    expect(screen.getByText(/status:\s*concluída/i)).toBeInTheDocument();
 
     const callCount = fetchMock.mock.calls.length;
     await act(async () => {
@@ -185,7 +187,7 @@ describe("/indexing page", () => {
       clickStart();
     });
 
-    expect(screen.getByText(/outra indexacao ja esta ativa/i)).toBeInTheDocument();
+    expect(screen.getByText(/outra indexação já está ativa/i)).toBeInTheDocument();
     expect(screen.getByText(ACTIVE_RUN_ID)).toBeInTheDocument();
   });
 
@@ -219,7 +221,7 @@ describe("/indexing page", () => {
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /acompanhar execucao ativa/i }),
+        screen.getByRole("button", { name: /acompanhar execução ativa/i }),
       );
     });
 
@@ -233,7 +235,7 @@ describe("/indexing page", () => {
       `/api/rag/indexing/runs/${ACTIVE_RUN_ID}`,
       expect.objectContaining({ method: "GET" }),
     );
-    expect(screen.getByText(/status:\s*processing/i)).toBeInTheDocument();
+    expect(screen.getByText(/status:\s*processando/i)).toBeInTheDocument();
   });
 
   it("does not render the secret outside the password input", async () => {
@@ -253,5 +255,64 @@ describe("/indexing page", () => {
     const input = screen.getByLabelText(/segredo do operador/i) as HTMLInputElement;
     expect(input.type).toBe("password");
     expect(document.body.textContent ?? "").not.toContain(SECRET);
+  });
+
+  describe("locale", () => {
+    afterEach(() => {
+      document.cookie = "locale=; path=/; max-age=0";
+    });
+
+    it("renders English copy, run statuses, and errors when the provider starts in English", async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ activeRunId: ACTIVE_RUN_ID }, { status: 409 }),
+      );
+      render(
+        <LocaleProvider initialLocale="en">
+          <IndexingPage />
+        </LocaleProvider>,
+      );
+
+      expect(
+        screen.getByRole("heading", { name: /document indexing/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText(/specific document/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/rebuild existing chunks/i)).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText(/operator secret/i), {
+        target: { value: SECRET },
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /start indexing/i }));
+      });
+
+      expect(
+        screen.getByText(/another indexing run is already active/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/indexação/i)).not.toBeInTheDocument();
+    });
+
+    it("re-renders an error already on screen when the locale changes", async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({}, { status: 500 }));
+      render(
+        <LocaleProvider initialLocale="pt-BR">
+          <IndexingPage />
+        </LocaleProvider>,
+      );
+      typeSecret(SECRET);
+
+      await act(async () => {
+        clickStart();
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Resposta inesperada (HTTP 500)",
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "English" }));
+
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Unexpected response (HTTP 500)",
+      );
+      expect(document.cookie).toContain("locale=en");
+    });
   });
 });

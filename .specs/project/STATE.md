@@ -36,6 +36,14 @@ alerts store codes, not text, so they re-render when the locale changes.
 `src/infrastructure/ai/openai-generation-provider.ts`, and the conversation
 messages handler. `POST /api/rag/conversations/:id/messages` accepts an
 optional `answerLanguage` (`pt-BR` | `en`, defaults to `pt-BR`).
+**Extension (2026-10-22):** The selector now covers `/`, `/ingestion`,
+`/indexing`, and the shared `Footer`, each with its own typed dictionary
+(`src/app/messages.ts`, `src/app/{ingestion,indexing}/messages.ts`). This
+supersedes F-01 RN-B04-08 (`/ingestion` English-only): the page now defaults
+to PT-BR like the rest of the UI. Run and item statuses are shown as
+translated labels; API payloads keep the raw enum values. The home page
+content moved to a client component (`HomeContent`) so it re-renders when
+the locale changes, while `page.tsx` keeps loading the fonts.
 
 ### AD-022: Audit access becomes per-message and inline; the global runs index and per-run drawer are removed from `/query` (2026-05-02)
 
