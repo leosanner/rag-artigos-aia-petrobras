@@ -15,6 +15,7 @@ import {
   type RagRetrievalStrategy,
 } from "@/domain/rag";
 import type { ServerEnv } from "@/env/server";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/locales";
 import { logRagError } from "@/infrastructure/observability/log-rag-error";
 
 import { estimateOpenAiGenerationCostUsd } from "./openai-pricing";
@@ -107,7 +108,11 @@ export class OpenAiGenerationProvider implements GenerationProvider {
     try {
       const result = await this.generateTextFn({
         model: this.modelFactory(generationModel),
-        system: buildSystemPrompt(input.promptVersion, input.retrievalStrategy),
+        system: buildSystemPrompt(
+          input.promptVersion,
+          input.retrievalStrategy,
+          input.answerLanguage ?? DEFAULT_LOCALE,
+        ),
         prompt: buildUserPrompt(
           input.question,
           input.promptContext,
@@ -163,7 +168,11 @@ export class OpenAiGenerationProvider implements GenerationProvider {
     try {
       const result = this.streamTextFn({
         model: this.modelFactory(generationModel),
-        system: buildSystemPrompt(input.promptVersion, input.retrievalStrategy),
+        system: buildSystemPrompt(
+          input.promptVersion,
+          input.retrievalStrategy,
+          input.answerLanguage ?? DEFAULT_LOCALE,
+        ),
         prompt: buildUserPrompt(
           input.question,
           input.promptContext,
@@ -230,18 +239,24 @@ export function createOpenAiGenerationProviderFromEnv(
   });
 }
 
+const ANSWER_LANGUAGE_INSTRUCTIONS: Record<Locale, string> = {
+  "pt-BR": "Responda sempre em português do Brasil.",
+  en: "Always answer in English.",
+};
+
 function buildSystemPrompt(
   promptVersion: string,
   retrievalStrategy: RagRetrievalStrategy,
+  answerLanguage: Locale,
 ): string {
   const baseInstructions = [
     `Versão do prompt: ${promptVersion}`,
     "Você é um assistente de RAG para uma base de artigos científicos.",
-    "Responda sempre em português do Brasil.",
+    ANSWER_LANGUAGE_INSTRUCTIONS[answerLanguage],
     "Use apenas o contexto numerado fornecido como base factual da resposta.",
     "Toda afirmação factual apoiada nas fontes deve usar marcadores inline no formato [n].",
     "Nunca invente fontes, trechos ou citações.",
-    `Se o contexto não sustentar a resposta, responda exatamente com: "${buildNoEvidenceAnswer()}".`,
+    `Se o contexto não sustentar a resposta, responda exatamente com: "${buildNoEvidenceAnswer(answerLanguage)}".`,
   ];
 
   if (retrievalStrategy === "explore") {

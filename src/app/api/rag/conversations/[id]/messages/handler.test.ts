@@ -215,6 +215,33 @@ describe("POST /api/rag/conversations/:id/messages handler", () => {
     });
   });
 
+  it("forwards the requested answer language to the use case", async () => {
+    const appendMessage = buildAppendMessage({
+      status: "answered",
+      userMessage: userMessage(),
+      assistantMessage: assistantMessage(),
+    });
+    const handler = createRagConversationMessagesHandler({
+      appendMessage,
+      getConversationDetail: buildGetConversationDetail(),
+      streamMessage: buildStreamMessage(),
+      secret: VALID_SECRET,
+    });
+
+    const response = await handler(
+      post(
+        { content: "Which techniques appear?", answerLanguage: "en" },
+        { Authorization: `Bearer ${VALID_SECRET}` },
+      ),
+      context(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(appendMessage.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ answerLanguage: "en" }),
+    );
+  });
+
   it("returns 401, 400, and 404 for protected, invalid, or missing conversations", async () => {
     const appendMessage = buildAppendMessage({ status: "not_found" });
     const handler = createRagConversationMessagesHandler({

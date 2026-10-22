@@ -241,6 +241,115 @@ function createService(
 }
 
 describe("AnswerQuestion", () => {
+  describe("answer language", () => {
+    it("asks generation for an English answer and records a language-specific prompt version", async () => {
+      const { service, generationProvider, runsRepository } = createService({
+        answer: "The second source is the most relevant [2].",
+      });
+
+      const result = await service.execute({
+        question: "Which approaches appear most often?",
+        mode: "global",
+        answerLanguage: "en",
+      });
+
+      expect(generationProvider.generateAnswer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          answerLanguage: "en",
+          promptVersion: `${PROMPT_VERSION}.en`,
+        }),
+      );
+      expect(result).toMatchObject({
+        kind: "answered",
+        status: "answered",
+        metadata: { promptVersion: `${PROMPT_VERSION}.en` },
+      });
+      expect(runsRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ promptVersion: `${PROMPT_VERSION}.en` }),
+      );
+    });
+
+    it("forwards the answer language on the streaming path", async () => {
+      const { service, generationProvider } = createService({
+        answer: "Answer [1].",
+      });
+
+      await service.executeStream(
+        {
+          question: "Which approaches appear most often?",
+          mode: "global",
+          answerLanguage: "en",
+        },
+        {},
+      );
+
+      expect(generationProvider.streamAnswer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          answerLanguage: "en",
+          promptVersion: `${PROMPT_VERSION}.en`,
+        }),
+      );
+    });
+
+    it("returns the English no-evidence answer when retrieval finds nothing", async () => {
+      const { service, runsRepository } = createService({ matches: [] });
+
+      const result = await service.execute({
+        question: "Is there anything about this?",
+        mode: "global",
+        answerLanguage: "en",
+      });
+
+      expect(result).toMatchObject({
+        kind: "answered",
+        status: "answered_no_evidence",
+        answer: buildNoEvidenceAnswer("en"),
+      });
+      expect(runsRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          answer: buildNoEvidenceAnswer("en"),
+          promptVersion: `${PROMPT_VERSION}.en`,
+        }),
+      );
+    });
+
+    it("canonicalizes a generated no-evidence answer to the requested language", async () => {
+      const { service } = createService({
+        answer: buildNoEvidenceAnswer("en"),
+      });
+
+      const result = await service.execute({
+        question: "Is there anything about this?",
+        mode: "global",
+        answerLanguage: "en",
+      });
+
+      expect(result).toMatchObject({
+        status: "answered_no_evidence",
+        answer: buildNoEvidenceAnswer("en"),
+      });
+    });
+
+    it("defaults to Portuguese and keeps the base prompt version when no language is given", async () => {
+      const { service, generationProvider } = createService();
+
+      const result = await service.execute({
+        question: "Quais abordagens aparecem?",
+        mode: "global",
+      });
+
+      expect(generationProvider.generateAnswer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          answerLanguage: "pt-BR",
+          promptVersion: PROMPT_VERSION,
+        }),
+      );
+      expect(result).toMatchObject({
+        metadata: { promptVersion: PROMPT_VERSION },
+      });
+    });
+  });
+
   it("rejects a focused request when classification returns not_processed without calling embedding, generation, or persisting a run", async () => {
     const {
       service,
@@ -563,6 +672,7 @@ describe("AnswerQuestion", () => {
       promptVersion: PROMPT_VERSION,
       generationModel: GENERATION_MODEL,
       retrievalStrategy: "standard",
+      answerLanguage: "pt-BR",
     });
     expect(runsRepository.create).toHaveBeenCalledWith({
       question,

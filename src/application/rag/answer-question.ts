@@ -10,6 +10,7 @@ import {
   getCandidateTopK,
   isNoEvidenceAnswer,
   normalizeRetrievalSettings,
+  resolvePromptVersionForLanguage,
   toSafeGenerationFailureCode,
   type RagQueryRunErrorCode,
   type RagQueryRunStatus,
@@ -18,6 +19,7 @@ import {
   type RetrievedChunkMatch,
   type RerankedChunkMatch,
 } from "@/domain/rag";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/locales";
 import type {
   PersistRagQueryRunInput,
   PersistedRagSourceSnapshot,
@@ -63,7 +65,6 @@ export type AnswerQuestionStreamCallbacks = {
   onAnswerDelta?: (textDelta: string) => Promise<void> | void;
 };
 
-const NO_EVIDENCE_ANSWER = buildNoEvidenceAnswer();
 const ZERO_EMBEDDING_USAGE: EmbeddingUsage = {
   inputTokens: 0,
   estimatedCostUsd: 0,
@@ -134,10 +135,22 @@ export class AnswerQuestion {
 
     const mode: "global" | "focused" = input.mode;
     const retrieval = normalizeRetrievalSettings(input.retrieval);
+    const answerLanguage = input.answerLanguage ?? DEFAULT_LOCALE;
+    const noEvidenceAnswer = buildNoEvidenceAnswer(answerLanguage);
+    const promptVersion = resolvePromptVersionForLanguage(
+      this.promptVersion,
+      answerLanguage,
+    );
     const retrievalQuestion =
       input.conversationContext?.transcript ?? input.question;
     const startedAtMs = this.nowMs();
-    const baseMetadata = this.buildMetadata(mode, documentId, retrieval, null);
+    const baseMetadata = this.buildMetadata(
+      mode,
+      documentId,
+      retrieval,
+      promptVersion,
+      null,
+    );
     let retrievalResult: Awaited<ReturnType<RetrieveChunks["search"]>>;
 
     try {
@@ -202,6 +215,7 @@ export class AnswerQuestion {
       mode,
       documentId,
       retrieval,
+      promptVersion,
       reranking?.metadata ?? null,
     );
 
@@ -219,7 +233,7 @@ export class AnswerQuestion {
       const persisted = await this.persistRun(
         this.buildPersistInput({
           question: input.question,
-          answer: NO_EVIDENCE_ANSWER,
+          answer: noEvidenceAnswer,
           status: "answered_no_evidence",
           errorCode: null,
           metadata,
@@ -235,7 +249,7 @@ export class AnswerQuestion {
         kind: "answered",
         status: "answered_no_evidence",
         traceId: persisted.id,
-        answer: NO_EVIDENCE_ANSWER,
+        answer: noEvidenceAnswer,
         mode,
         sources: [],
         relatedTerms,
@@ -303,13 +317,16 @@ export class AnswerQuestion {
               question: input.question,
               conversationContext: input.conversationContext,
               promptContext,
-              promptVersion: this.promptVersion,
+              promptVersion,
               generationModel: this.generationModel,
               retrievalStrategy: retrieval.strategy,
+              answerLanguage,
             })
           : await this.streamGeneratedAnswer({
               input,
               promptContext,
+              promptVersion,
+              answerLanguage,
               retrieval,
               callbacks,
             });
@@ -331,7 +348,7 @@ export class AnswerQuestion {
         const persisted = await this.persistRun(
           this.buildPersistInput({
             question: input.question,
-            answer: NO_EVIDENCE_ANSWER,
+            answer: noEvidenceAnswer,
             status: "answered_no_evidence",
             errorCode: null,
             metadata,
@@ -347,7 +364,7 @@ export class AnswerQuestion {
           kind: "answered",
           status: "answered_no_evidence",
           traceId: persisted.id,
-          answer: NO_EVIDENCE_ANSWER,
+          answer: noEvidenceAnswer,
           mode,
           sources: [],
           relatedTerms: noEvidenceRelatedTerms,
@@ -359,11 +376,11 @@ export class AnswerQuestion {
       answer = generatedAnswer;
 
       citedSourceNumbers =
-        answer === NO_EVIDENCE_ANSWER
+        answer === noEvidenceAnswer
           ? new Set<number>()
           : new Set(extractCitationNumbers(answer));
 
-      if (answer !== NO_EVIDENCE_ANSWER) {
+      if (answer !== noEvidenceAnswer) {
         assertValidCitationMarkers(answer, sources);
       }
     } catch (error) {
@@ -374,7 +391,7 @@ export class AnswerQuestion {
           requestTraceId: input.requestTraceId,
           failureCode,
           generationModel: this.generationModel,
-          promptVersion: this.promptVersion,
+          promptVersion,
           sourcesCount: sources.length,
         },
         error,
@@ -444,6 +461,8 @@ export class AnswerQuestion {
   private async streamGeneratedAnswer(input: {
     input: AnswerQuestionInput;
     promptContext: string;
+    promptVersion: string;
+    answerLanguage: Locale;
     retrieval: RagRetrievalSettings;
     callbacks: AnswerQuestionStreamCallbacks;
   }) {
@@ -453,9 +472,10 @@ export class AnswerQuestion {
       question: input.input.question,
       conversationContext: input.input.conversationContext,
       promptContext: input.promptContext,
-      promptVersion: this.promptVersion,
+      promptVersion: input.promptVersion,
       generationModel: this.generationModel,
       retrievalStrategy: input.retrieval.strategy,
+      answerLanguage: input.answerLanguage,
       onTextDelta: async (textDelta) => {
         await input.callbacks.onAnswerDelta?.(textDelta);
       },
@@ -466,6 +486,7 @@ export class AnswerQuestion {
     mode: "global" | "focused",
     documentId: string | null,
     retrieval: RagRetrievalSettings,
+    promptVersion: string,
     reranking:
       | {
           rerankerProvider: string;
@@ -479,7 +500,7 @@ export class AnswerQuestion {
       topK: retrieval.topK,
       retrievalStrategy: retrieval.strategy,
       candidateTopK: getCandidateTopK(retrieval),
-      promptVersion: this.promptVersion,
+      promptVersion,
       generationModel: this.generationModel,
       embeddingModel: this.retrieveChunks.embeddingModel,
       rerankerProvider: reranking?.rerankerProvider ?? null,

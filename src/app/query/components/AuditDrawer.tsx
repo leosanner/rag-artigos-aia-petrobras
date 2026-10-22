@@ -2,10 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 
-import {
-  RAG_AUDIT_DRAWER_CLOSE_LABEL,
-  RAG_AUDIT_DRAWER_TITLE,
-} from "../constants";
+import { useQueryMessages } from "../messages";
 import styles from "../page.module.css";
 
 type AuditDrawerProps = {
@@ -16,6 +13,7 @@ type AuditDrawerProps = {
 
 export function AuditDrawer({ open, onClose, children }: AuditDrawerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const t = useQueryMessages();
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -73,7 +71,7 @@ export function AuditDrawer({ open, onClose, children }: AuditDrawerProps) {
   return (
     <dialog
       ref={dialogRef}
-      aria-label={RAG_AUDIT_DRAWER_TITLE}
+      aria-label={t.audit.drawerTitle}
       className={styles.auditDrawer}
       onClick={handleBackdropClick}
       onCancel={(event) => {
@@ -84,13 +82,13 @@ export function AuditDrawer({ open, onClose, children }: AuditDrawerProps) {
     >
       <div className={styles.auditDrawerPanel}>
         <header className={styles.auditDrawerHeader}>
-          <p className={styles.auditDrawerEyebrow}>{RAG_AUDIT_DRAWER_TITLE}</p>
+          <p className={styles.auditDrawerEyebrow}>{t.audit.drawerTitle}</p>
           <button
             type="button"
             onClick={onClose}
             className={`${styles.btn} ${styles.btnSecondary}`}
           >
-            {RAG_AUDIT_DRAWER_CLOSE_LABEL}
+            {t.audit.drawerClose}
           </button>
         </header>
 

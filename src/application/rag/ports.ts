@@ -6,6 +6,7 @@ import type {
   RetrievedChunkMatch,
   RerankedChunkMatch,
 } from "@/domain/rag";
+import type { Locale } from "@/i18n/locales";
 import type {
   FocusedDocumentClassification,
   SelectableDocumentRow,
@@ -74,6 +75,7 @@ export type GenerateAnswerInput = {
   promptVersion: string;
   generationModel: string;
   retrievalStrategy: RagRetrievalStrategy;
+  answerLanguage?: Locale;
 };
 
 export type StreamAnswerInput = GenerateAnswerInput & {

@@ -17,6 +17,7 @@ import {
   type SelectableRagDocument as DomainSelectableRagDocument,
   SelectableRagDocumentSchema,
 } from "@/domain/rag";
+import { localeSchema, type Locale } from "@/i18n/locales";
 
 const ragRetrievalStrategySchema = RagRetrievalStrategySchema;
 
@@ -106,6 +107,7 @@ export type AnswerQuestionConversationContext = {
 type AnswerQuestionInputExtensions = {
   conversationContext?: AnswerQuestionConversationContext;
   requestTraceId?: string;
+  answerLanguage?: Locale;
 };
 export type GlobalAnswerQuestionInput = {
   question: string;
@@ -404,6 +406,7 @@ export const appendConversationMessageGlobalRequestSchema = z
     content: z.string().trim().min(1),
     retrievalSettings: conversationRagRetrievalInputSchema.optional(),
     mode: z.literal("global").optional(),
+    answerLanguage: localeSchema.optional(),
   })
   .strict();
 
@@ -413,6 +416,7 @@ export const appendConversationMessageFocusedRequestSchema = z
     retrievalSettings: focusedConversationRagRetrievalInputSchema.optional(),
     mode: z.literal("focused"),
     documentId: z.string().uuid(),
+    answerLanguage: localeSchema.optional(),
   })
   .strict();
 

@@ -1,11 +1,41 @@
 # State
 
-**Last Updated:** 2026-05-02
+**Last Updated:** 2026-10-22
 **Current Work:** `F-12 / Unified Conversational Query` has been specified and supersedes the contracts of `F-04`, `F-06`, and `F-08`. Implementation is queued: collapse `/query` onto the conversational surface, lift rerank to per-turn granularity, retire `POST /api/rag/ask`, and relocate audit access to a per-message drawer. F-10 streaming transport stays active. Fresh independent reviews of `F-07`, `F-08`, and `F-10` remain pending per `CLAUDE.md`.
 
 ---
 
 ## Recent Decisions
+
+### AD-023: PT-BR/EN locale selector, starting with `/query`; answer language follows the UI (2026-10-22)
+
+**Decision:** Reverse the "no i18n in v1" rule. The UI supports `pt-BR`
+(default) and `en`. The choice lives in a `locale` cookie read by the root
+layout (`<html lang>` and a `LocaleProvider` context), so SSR renders the
+right language without a flash and the URL does not change. Copy lives in
+typed per-page dictionaries (`src/app/query/messages.ts`), without an i18n
+library. A shared `LocaleSwitcher` (PT | EN) sits in the `/query` header.
+`/query` sends `answerLanguage` on every conversation turn; the generation
+prompt asks for an answer in that language and the insufficient-evidence
+answer is localized. `/ingestion` and `/indexing` are not translated yet.
+**Reason:** The demo now has English-speaking stakeholders. Using a cookie
+instead of locale routing (`/en/...`) avoids restructuring `src/app` into
+`[locale]` segments for a two-language POC. Typed dictionaries make a
+missing translation a compile error. The answer language is a distinct
+prompt, so it is traced through `promptVersion`: `pt-BR` keeps the base
+version (`f04-global-rag-v1`, so existing traces stay comparable) and `en`
+records `f04-global-rag-v1.en`. This needs no schema migration.
+**Trade-off:** Reading the cookie in the root layout makes every page
+dynamically rendered. Answer language is inferred from `promptVersion`,
+not from a dedicated column. Related terms (deterministic n-grams over the
+PT corpus) and previously persisted answers are not translated. Error
+alerts store codes, not text, so they re-render when the locale changes.
+**Impact:** `src/i18n/*`, `src/app/layout.tsx`,
+`src/app/components/LocaleSwitcher.*`, `src/app/query/{page.tsx,messages.ts,constants.ts}`,
+`src/domain/rag/answer-rules.ts`, `src/application/rag/{schemas,answer-question,append-conversation-message,stream-conversation-message,ports}.ts`,
+`src/infrastructure/ai/openai-generation-provider.ts`, and the conversation
+messages handler. `POST /api/rag/conversations/:id/messages` accepts an
+optional `answerLanguage` (`pt-BR` | `en`, defaults to `pt-BR`).
 
 ### AD-022: Audit access becomes per-message and inline; the global runs index and per-run drawer are removed from `/query` (2026-05-02)
 

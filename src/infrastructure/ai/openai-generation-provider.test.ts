@@ -88,6 +88,64 @@ describe("OpenAiGenerationProvider", () => {
     );
   });
 
+  it("instructs the model to answer in English when English is requested", async () => {
+    const model = { provider: "openai", modelId: GENERATION_MODEL };
+    const generateText = vi.fn().mockResolvedValue({
+      text: "Answer in English [1].",
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+    });
+    const provider = new OpenAiGenerationProvider({
+      defaultGenerationModel: GENERATION_MODEL,
+      modelFactory: vi.fn().mockReturnValue(model),
+      generateText,
+    });
+
+    await provider.generateAnswer({
+      question: "What do the documents say?",
+      promptContext: "[1] Título: artigo.pdf\nChunk: 0\nTrecho:\nTexto",
+      promptVersion: `${PROMPT_VERSION}.en`,
+      generationModel: GENERATION_MODEL,
+      retrievalStrategy: "standard",
+      answerLanguage: "en",
+    });
+
+    const call = generateText.mock.calls[0]?.[0] as { system: string };
+    expect(call.system).toContain("Always answer in English.");
+    expect(call.system).not.toContain("Responda sempre em português do Brasil.");
+    expect(call.system).toContain(buildNoEvidenceAnswer("en"));
+    expect(call.system).not.toContain(buildNoEvidenceAnswer("pt-BR"));
+  });
+
+  it("instructs the model to answer in English on the streaming path", async () => {
+    const model = { provider: "openai", modelId: GENERATION_MODEL };
+    const streamText = vi.fn().mockReturnValue({
+      textStream: streamChunks(["Answer [1]."]),
+      usage: Promise.resolve({
+        inputTokens: 10,
+        outputTokens: 5,
+        totalTokens: 15,
+      }),
+    });
+    const provider = new OpenAiGenerationProvider({
+      defaultGenerationModel: GENERATION_MODEL,
+      modelFactory: vi.fn().mockReturnValue(model),
+      streamText,
+    });
+
+    await provider.streamAnswer({
+      question: "What do the documents say?",
+      promptContext: "[1] Título: artigo.pdf\nChunk: 0\nTrecho:\nTexto",
+      promptVersion: `${PROMPT_VERSION}.en`,
+      generationModel: GENERATION_MODEL,
+      retrievalStrategy: "standard",
+      answerLanguage: "en",
+    });
+
+    const call = streamText.mock.calls[0]?.[0] as { system: string };
+    expect(call.system).toContain("Always answer in English.");
+    expect(call.system).toContain(buildNoEvidenceAnswer("en"));
+  });
+
   it("adds explore-mode instructions for cited perspectives only when requested", async () => {
     const model = { provider: "openai", modelId: GENERATION_MODEL };
     const modelFactory = vi.fn().mockReturnValue(model);

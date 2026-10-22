@@ -1,12 +1,18 @@
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/locales";
+
 export const GENERATION_FAILURE_CODES = Object.freeze([
   "generation_failed",
   "generation_unavailable",
 ] as const);
 
 export type GenerationFailureCode = (typeof GENERATION_FAILURE_CODES)[number];
-const NO_EVIDENCE_ANSWER =
-  "Não encontrei nada relacionado a essa pergunta na base de dados.";
-const NORMALIZED_NO_EVIDENCE_ANSWER = normalizeNoEvidenceAnswer(NO_EVIDENCE_ANSWER);
+const NO_EVIDENCE_ANSWERS: Readonly<Record<Locale, string>> = Object.freeze({
+  "pt-BR": "Não encontrei nada relacionado a essa pergunta na base de dados.",
+  en: "I could not find anything related to this question in the database.",
+});
+const NORMALIZED_NO_EVIDENCE_ANSWERS = new Set(
+  Object.values(NO_EVIDENCE_ANSWERS).map(normalizeNoEvidenceAnswer),
+);
 const LEGACY_NO_EVIDENCE_ANSWERS = new Set([
   "Não encontrei nada relacionado a essa pergunta na base.",
   "Não encontrei nada relacionado a essa pergunta na base de dados consultada.",
@@ -24,15 +30,28 @@ export class GenerationFailure extends Error {
   }
 }
 
-export function buildNoEvidenceAnswer(): string {
-  return NO_EVIDENCE_ANSWER;
+export function buildNoEvidenceAnswer(
+  language: Locale = DEFAULT_LOCALE,
+): string {
+  return NO_EVIDENCE_ANSWERS[language];
+}
+
+// Each answer language is a distinct prompt, so the persisted prompt version
+// must identify it. Portuguese keeps the base version for trace continuity.
+export function resolvePromptVersionForLanguage(
+  basePromptVersion: string,
+  language: Locale,
+): string {
+  return language === DEFAULT_LOCALE
+    ? basePromptVersion
+    : `${basePromptVersion}.${language}`;
 }
 
 export function isNoEvidenceAnswer(answer: string): boolean {
   const normalizedAnswer = normalizeNoEvidenceAnswer(answer);
 
   return (
-    normalizedAnswer === NORMALIZED_NO_EVIDENCE_ANSWER ||
+    NORMALIZED_NO_EVIDENCE_ANSWERS.has(normalizedAnswer) ||
     LEGACY_NO_EVIDENCE_ANSWERS.has(normalizedAnswer)
   );
 }

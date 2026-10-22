@@ -81,6 +81,9 @@ export function createRagConversationMessagesHandler(
             conversationId: parsedId.data,
             userMessageContent: parsedBody.data.content,
             retrievalSettings: parsedBody.data.retrievalSettings,
+            ...(parsedBody.data.answerLanguage !== undefined
+              ? { answerLanguage: parsedBody.data.answerLanguage }
+              : {}),
             mode: "focused" as const,
             documentId: parsedBody.data.documentId,
             requestTraceId,
@@ -89,6 +92,9 @@ export function createRagConversationMessagesHandler(
             conversationId: parsedId.data,
             userMessageContent: parsedBody.data.content,
             retrievalSettings: parsedBody.data.retrievalSettings,
+            ...(parsedBody.data.answerLanguage !== undefined
+              ? { answerLanguage: parsedBody.data.answerLanguage }
+              : {}),
             requestTraceId,
           };
 

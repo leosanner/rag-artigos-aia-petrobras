@@ -35,6 +35,35 @@ describe("ragAskRequestSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it.each(["pt-BR", "en"] as const)(
+    "accepts answerLanguage=%s on global and focused conversation requests",
+    (answerLanguage) => {
+      expect(
+        appendConversationMessageRequestSchema.safeParse({
+          content: "Which techniques appear?",
+          answerLanguage,
+        }).success,
+      ).toBe(true);
+      expect(
+        appendConversationMessageRequestSchema.safeParse({
+          content: "Which techniques appear?",
+          mode: "focused",
+          documentId: "11111111-1111-4111-8111-111111111111",
+          answerLanguage,
+        }).success,
+      ).toBe(true);
+    },
+  );
+
+  it("rejects unsupported answer languages", () => {
+    const result = appendConversationMessageRequestSchema.safeParse({
+      content: "Quelles techniques?",
+      answerLanguage: "fr",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it("accepts rerank on the public global conversation request surface", () => {
     const result = appendConversationMessageRequestSchema.safeParse({
       content: "Quais tecnicas aparecem com mais frequencia?",

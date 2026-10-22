@@ -480,6 +480,35 @@ describe("AppendConversationMessage", () => {
     expect(messageRows[1]?.traceId).toBe(result.assistantMessage.trace?.id);
   });
 
+  it("forwards the requested answer language to the turn engine", async () => {
+    const conversation = await createConversation.execute();
+    const { answerQuestion, invocations } = createFakeAnswerQuestion(
+      db,
+      runsRepository,
+      conversation.id,
+      {
+        status: "answered",
+        answer: "The base highlights supervised classification [1].",
+      },
+    );
+    const service = new AppendConversationMessage({
+      conversations,
+      messages,
+      answerQuestion,
+    });
+
+    await service.execute({
+      conversationId: conversation.id,
+      userMessageContent: "How is remote sensing used?",
+      answerLanguage: "en",
+    });
+
+    expect(invocations).toHaveLength(1);
+    expect(invocations[0]?.input).toEqual(
+      expect.objectContaining({ answerLanguage: "en" }),
+    );
+  });
+
   it("forwards retrieval settings unchanged, caps transcript context to the previous four messages, and appends assistant rows for answered_no_evidence", async () => {
     const conversation = await createConversation.execute();
     await conversations.updateTitleIfUnset(conversation.id, "Titulo inicial");

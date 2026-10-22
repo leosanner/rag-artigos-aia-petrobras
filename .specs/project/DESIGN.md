@@ -2,7 +2,7 @@
 
 Contrato visual do projeto. Toda nova UI deve ser justificável por este documento. Decisões que conflitem com o que está aqui precisam ser registradas como AD em [STATE.md](./STATE.md) antes de irem para código.
 
-Idioma da UI: **PT-BR** por padrão. Exceções deliberadas (ex.: `/ingestion`) vivem na spec da feature.
+Idioma da UI: **PT-BR** por padrão, com opção **EN** via seletor PT | EN (AD-023; começa por `/query`). Exceções deliberadas (ex.: `/ingestion`) vivem na spec da feature.
 
 ---
 

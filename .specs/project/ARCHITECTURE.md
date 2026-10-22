@@ -46,7 +46,7 @@ This document is the canonical project-scope and architecture reference for AIA 
 - Per-user OAuth on Google Drive. The system uses a Service Account and a fixed folder.
 - Manual PDF upload through the UI.
 - Support for non-PDF formats.
-- Internationalization. The UI is expected to be in Portuguese.
+- Full internationalization. The UI defaults to Portuguese, and an English option is being rolled out page by page via a cookie-based locale and typed dictionaries (AD-023).
 
 ---
 
