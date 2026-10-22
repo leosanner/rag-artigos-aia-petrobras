@@ -3,7 +3,7 @@
 ## Scope
 
 **In scope:**
-- Operator-facing `/ingestion` page in English to start a document ingestion run and monitor its progress.
+- Operator-facing `/ingestion` page (originally English-only; PT-BR by default with an EN option since AD-023) to start a document ingestion run and monitor its progress.
 - `POST /api/ingestion/sync` route that requires the configured operator secret, creates an ingestion run, enqueues asynchronous processing through Inngest, and returns immediately with a run id.
 - `GET /api/ingestion/runs/:id` route that returns the run status and per-document processing results for polling by the page.
 - `/api/inngest` route that hosts the Inngest function used to process ingestion runs.

@@ -253,6 +253,24 @@ describe("StreamConversationMessage", () => {
     );
   });
 
+  it("forwards the requested answer language to the turn engine", async () => {
+    const { service, answerQuestion } = createService();
+
+    await service.execute(
+      {
+        conversationId: CONVERSATION_ID,
+        userMessageContent: "Which techniques appear?",
+        answerLanguage: "en",
+      },
+      { onEvent: async () => {} },
+    );
+
+    expect(answerQuestion.executeStream).toHaveBeenCalledWith(
+      expect.objectContaining({ answerLanguage: "en" }),
+      expect.anything(),
+    );
+  });
+
   it("emits done directly for a no-evidence answer without sources or deltas", async () => {
     const events: string[] = [];
     const { service, messages } = createService({

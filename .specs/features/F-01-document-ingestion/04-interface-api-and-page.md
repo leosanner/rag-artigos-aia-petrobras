@@ -37,7 +37,7 @@ Two pieces of the parent `spec.md` §Technical Design live here by natural fit -
 - RN-B04-05: `GET /api/ingestion/runs/:id` returns aggregate counts and per-item statuses, with no secrets, database URLs, Drive private keys, or raw provider traces (inherits RF-12).
 - RN-B04-06: The id path parameter of `GET /api/ingestion/runs/:id` must be a UUID; otherwise the response is 400 without touching the repository.
 - RN-B04-07: `GET /api/ingestion/runs/:id` returns 404 when no run with the given id exists.
-- RN-B04-08: The `/ingestion` page must be in English (parent `spec.md` In scope).
+- RN-B04-08: ~~The `/ingestion` page must be in English (parent `spec.md` In scope).~~ Superseded by AD-023 (2026-10-22): the page defaults to PT-BR and offers EN through the shared locale selector.
 - RN-B04-09: The `/ingestion` page must not embed the operator secret in code, in `NEXT_PUBLIC_*` env, or in static rendering; the operator provides it at runtime and the client only forwards it in the `Authorization` header.
 - RN-B04-10: All operational responses (`POST /api/ingestion/sync`, `GET /api/ingestion/runs/:id`) must send `Cache-Control: no-store`.
 - RN-B04-11: Route handlers must validate every response body with Zod before calling `NextResponse.json` (RN-14).
@@ -76,7 +76,7 @@ Every RF below has at least one dedicated test. Prefix `RF-B04-` to distinguish 
 
 **Operator page**:
 
-- [ ] RF-B04-20: The `/ingestion` page renders in English, shows an "Operator secret" input, and disables "Start ingestion run" until the field has a non-empty value.
+- [ ] RF-B04-20: The `/ingestion` page renders in English, shows an "Operator secret" input, and disables "Start ingestion run" until the field has a non-empty value. (Copy is localized since AD-023: PT-BR "Segredo do operador" / "Iniciar ingestão" by default.)
 - [ ] RF-B04-21: Submitting "Start ingestion run" calls `fetch("/api/ingestion/sync", { method: "POST", headers: { Authorization: \`Bearer <secret>\` } })` and never includes the secret in the URL or the body.
 - [ ] RF-B04-22: On 202 the page displays the returned run id and queued status, then polls `GET /api/ingestion/runs/:id` at a fixed interval, updating the displayed counts and per-item statuses, and stops polling when the run reaches `completed` or `failed`.
 - [ ] RF-B04-23: On 401 the page shows an "Operator secret was rejected" message, clears the stored secret, and does not start polling.

@@ -4,6 +4,7 @@ import {
   filterPromptHistory,
   type FocusedDocumentRejectionReason,
 } from "@/domain/rag";
+import type { Locale } from "@/i18n/locales";
 import type { ConversationMessageRepository } from "@/repositories/conversation-message-repository";
 import type { ConversationRepository } from "@/repositories/conversation-repository";
 
@@ -24,6 +25,7 @@ type StreamConversationMessageInputBase = {
   userMessageContent: string;
   retrievalSettings?: ConversationRagRetrievalInput;
   requestTraceId?: string;
+  answerLanguage?: Locale;
 };
 
 export type StreamConversationMessageInput =
@@ -146,6 +148,9 @@ export class StreamConversationMessage {
               }),
             },
             requestTraceId: input.requestTraceId,
+            ...(input.answerLanguage !== undefined
+              ? { answerLanguage: input.answerLanguage }
+              : {}),
           }
         : {
             question: input.userMessageContent,
@@ -158,6 +163,9 @@ export class StreamConversationMessage {
               }),
             },
             requestTraceId: input.requestTraceId,
+            ...(input.answerLanguage !== undefined
+              ? { answerLanguage: input.answerLanguage }
+              : {}),
           };
 
     const callbacks: AnswerQuestionStreamCallbacks = isExploreTurn

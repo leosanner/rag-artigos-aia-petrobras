@@ -9,7 +9,13 @@ import {
   type IndexingRunDetailResponse,
 } from "@/application/indexing/schemas";
 
+import { LocaleSwitcher } from "../components/LocaleSwitcher";
 import { INDEXING_POLL_INTERVAL_MS } from "./constants";
+import {
+  describeIndexingError,
+  useIndexingMessages,
+  type IndexingRunError,
+} from "./messages";
 
 const SECRET_STORAGE_KEY = "indexing:secret";
 
@@ -20,13 +26,14 @@ type StartState =
   | { kind: "polling"; detail: IndexingRunDetailResponse }
   | { kind: "conflict"; activeRunId: string | null }
   | { kind: "unauthorized" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; error: IndexingRunError };
 
 function isTerminalStatus(status: IndexingRunDetailResponse["status"]): boolean {
   return status === "completed" || status === "failed";
 }
 
 export default function IndexingPage() {
+  const t = useIndexingMessages();
   const [secret, setSecret] = useState("");
   const [documentId, setDocumentId] = useState("");
   const [force, setForce] = useState(false);
@@ -63,7 +70,7 @@ export default function IndexingPage() {
     if (!response.ok) {
       setState({
         kind: "error",
-        message: `Falha ao consultar a execucao (HTTP ${response.status})`,
+        error: { code: "poll_http", httpStatus: response.status },
       });
       pollRunIdRef.current = null;
       return;
@@ -74,7 +81,7 @@ export default function IndexingPage() {
     if (!parsed.success) {
       setState({
         kind: "error",
-        message: "A resposta da execucao veio em formato invalido",
+        error: { code: "malformed_detail" },
       });
       pollRunIdRef.current = null;
       return;
@@ -140,9 +147,10 @@ export default function IndexingPage() {
     } catch (error) {
       setState({
         kind: "error",
-        message: `Erro de rede ao iniciar indexacao: ${
-          error instanceof Error ? error.message : "desconhecido"
-        }`,
+        error: {
+          code: "network",
+          detail: error instanceof Error ? error.message : null,
+        },
       });
       return;
     }
@@ -154,7 +162,7 @@ export default function IndexingPage() {
       if (!parsed.success) {
         setState({
           kind: "error",
-          message: "A resposta de fila veio em formato invalido",
+          error: { code: "malformed_queued" },
         });
         return;
       }
@@ -180,7 +188,7 @@ export default function IndexingPage() {
 
     setState({
       kind: "error",
-      message: `Resposta inesperada (HTTP ${response.status})`,
+      error: { code: "unexpected", httpStatus: response.status },
     });
   }, [clearSecret, documentId, force, secret]);
 
@@ -198,15 +206,22 @@ export default function IndexingPage() {
         padding: "0 1rem",
       }}
     >
-      <h1>Indexacao de documentos</h1>
-      <p>
-        Inicie a indexacao manual dos documentos processados. O segredo fica
-        somente nesta aba do navegador.
-      </p>
+      <header
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: "1rem",
+        }}
+      >
+        <h1 style={{ margin: 0 }}>{t.title}</h1>
+        <LocaleSwitcher />
+      </header>
+      <p>{t.lede}</p>
 
       <section style={{ marginTop: "1.5rem" }}>
         <label htmlFor="indexing-secret" style={{ display: "block", fontWeight: 600 }}>
-          Segredo do operador
+          {t.secretLabel}
         </label>
         <input
           id="indexing-secret"
@@ -223,14 +238,14 @@ export default function IndexingPage() {
           htmlFor="indexing-document-id"
           style={{ display: "block", fontWeight: 600 }}
         >
-          Documento especifico
+          {t.documentIdLabel}
         </label>
         <input
           id="indexing-document-id"
           type="text"
           value={documentId}
           onChange={(event) => setDocumentId(event.target.value)}
-          placeholder="UUID opcional do documento"
+          placeholder={t.documentIdPlaceholder}
           style={{ width: "100%", padding: "0.5rem", marginTop: "0.25rem" }}
         />
       </section>
@@ -243,7 +258,7 @@ export default function IndexingPage() {
             checked={force}
             onChange={(event) => setForce(event.target.checked)}
           />{" "}
-          Recriar chunks existentes
+          {t.forceLabel}
         </label>
       </section>
 
@@ -253,40 +268,42 @@ export default function IndexingPage() {
           onClick={onStart}
           disabled={secret.length === 0 || state.kind === "starting"}
         >
-          {state.kind === "starting" ? "Iniciando..." : "Iniciar indexacao"}
+          {state.kind === "starting" ? t.starting : t.start}
         </button>
         <button
           type="button"
           onClick={clearSecret}
           disabled={secret.length === 0}
         >
-          Limpar segredo
+          {t.clearSecret}
         </button>
       </div>
 
       <section style={{ marginTop: "2rem" }}>
         {state.kind === "unauthorized" && (
-          <p role="alert">O segredo foi recusado. Informe novamente.</p>
+          <p role="alert">{t.unauthorized}</p>
         )}
 
         {state.kind === "conflict" && (
           <div role="alert">
             <p>
-              Outra indexacao ja esta ativa. Execucao ativa:{" "}
-              <code>{state.activeRunId ?? "desconhecida"}</code>
+              {t.conflict}{" "}
+              <code>{state.activeRunId ?? t.unknownRun}</code>
             </p>
             {state.activeRunId !== null && (
               <button
                 type="button"
                 onClick={() => inspectActiveRun(state.activeRunId as string)}
               >
-                Acompanhar execucao ativa
+                {t.pollActiveRun}
               </button>
             )}
           </div>
         )}
 
-        {state.kind === "error" && <p role="alert">{state.message}</p>}
+        {state.kind === "error" && (
+          <p role="alert">{describeIndexingError(t, state.error)}</p>
+        )}
 
         {(state.kind === "queued" || state.kind === "polling") && (
           <IndexingRunView state={state} />
@@ -304,10 +321,11 @@ function IndexingRunView({
   const runId = state.kind === "queued" ? state.runId : state.detail.id;
   const status = state.kind === "queued" ? "queued" : state.detail.status;
   const detail = state.kind === "polling" ? state.detail : null;
+  const t = useIndexingMessages();
 
   return (
     <article>
-      <h2>Execucao</h2>
+      <h2>{t.run.title}</h2>
       <ul
         style={{
           listStyle: "none",
@@ -318,16 +336,30 @@ function IndexingRunView({
         }}
       >
         <li>
-          Id: <code>{runId}</code>
+          {t.run.id}: <code>{runId}</code>
         </li>
-        <li>Status: {status}</li>
+        <li>
+          {t.run.status}: {t.run.runStatus[status]}
+        </li>
         {detail && (
           <>
-            <li>Selecionados: {detail.selectedCount}</li>
-            <li>Processados: {detail.processedCount}</li>
-            <li>Falhos: {detail.failedCount}</li>
-            <li>Ignorados: {detail.skippedCount}</li>
-            {detail.lastError && <li>Ultimo erro: {detail.lastError}</li>}
+            <li>
+              {t.run.selected}: {detail.selectedCount}
+            </li>
+            <li>
+              {t.run.processed}: {detail.processedCount}
+            </li>
+            <li>
+              {t.run.failed}: {detail.failedCount}
+            </li>
+            <li>
+              {t.run.skipped}: {detail.skippedCount}
+            </li>
+            {detail.lastError && (
+              <li>
+                {t.run.lastError}: {detail.lastError}
+              </li>
+            )}
           </>
         )}
       </ul>
@@ -338,11 +370,11 @@ function IndexingRunView({
         >
           <thead>
             <tr>
-              <th align="left">Titulo</th>
-              <th align="left">Documento</th>
-              <th align="left">Status</th>
-              <th align="left">Chunks</th>
-              <th align="left">Erro</th>
+              <th align="left">{t.items.title}</th>
+              <th align="left">{t.items.document}</th>
+              <th align="left">{t.items.status}</th>
+              <th align="left">{t.items.chunks}</th>
+              <th align="left">{t.items.error}</th>
             </tr>
           </thead>
           <tbody>
@@ -352,7 +384,7 @@ function IndexingRunView({
                 <td>
                   <code>{item.documentId ?? "-"}</code>
                 </td>
-                <td>{item.status}</td>
+                <td>{t.items.itemStatus[item.status]}</td>
                 <td>{item.chunkCount}</td>
                 <td>{item.lastError ?? "-"}</td>
               </tr>

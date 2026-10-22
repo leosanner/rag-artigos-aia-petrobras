@@ -5,6 +5,7 @@ import {
   GenerationFailure,
   buildNoEvidenceAnswer,
   isNoEvidenceAnswer,
+  resolvePromptVersionForLanguage,
   toSafeGenerationFailureCode,
 } from "./answer-rules";
 
@@ -12,6 +13,30 @@ describe("buildNoEvidenceAnswer", () => {
   it("returns the exact formal Portuguese insufficient-evidence answer", () => {
     expect(buildNoEvidenceAnswer()).toBe(
       "Não encontrei nada relacionado a essa pergunta na base de dados.",
+    );
+  });
+
+  it("returns the Portuguese answer when Portuguese is requested explicitly", () => {
+    expect(buildNoEvidenceAnswer("pt-BR")).toBe(buildNoEvidenceAnswer());
+  });
+
+  it("returns the exact English insufficient-evidence answer", () => {
+    expect(buildNoEvidenceAnswer("en")).toBe(
+      "I could not find anything related to this question in the database.",
+    );
+  });
+});
+
+describe("resolvePromptVersionForLanguage", () => {
+  it("keeps the base prompt version for Portuguese so existing traces stay stable", () => {
+    expect(resolvePromptVersionForLanguage("f04-global-rag-v1", "pt-BR")).toBe(
+      "f04-global-rag-v1",
+    );
+  });
+
+  it("suffixes the prompt version with the language for English answers", () => {
+    expect(resolvePromptVersionForLanguage("f04-global-rag-v1", "en")).toBe(
+      "f04-global-rag-v1.en",
     );
   });
 });
@@ -39,6 +64,15 @@ describe("isNoEvidenceAnswer", () => {
     ];
 
     expect(variants.map(isNoEvidenceAnswer)).toEqual([true, true, true]);
+  });
+
+  it("matches the English insufficient-evidence answer and its normalized variants", () => {
+    const variants = [
+      buildNoEvidenceAnswer("en"),
+      "  i could not find anything related to this question in the database! ",
+    ];
+
+    expect(variants.map(isNoEvidenceAnswer)).toEqual([true, true]);
   });
 
   it("rejects nearby but non-canonical wording", () => {

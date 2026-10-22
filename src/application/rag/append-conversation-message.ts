@@ -5,6 +5,7 @@ import {
   type FocusedDocumentRejectionReason,
   type RagQueryRunErrorCode,
 } from "@/domain/rag";
+import type { Locale } from "@/i18n/locales";
 import type { ConversationRepository } from "@/repositories/conversation-repository";
 import type { ConversationMessageRepository } from "@/repositories/conversation-message-repository";
 
@@ -21,6 +22,7 @@ type AppendConversationMessageInputBase = {
   userMessageContent: string;
   retrievalSettings?: ConversationRagRetrievalInput;
   requestTraceId?: string;
+  answerLanguage?: Locale;
 };
 
 export type AppendConversationMessageInput =
@@ -157,6 +159,9 @@ export class AppendConversationMessage {
               }),
             },
             requestTraceId: input.requestTraceId,
+            ...(input.answerLanguage !== undefined
+              ? { answerLanguage: input.answerLanguage }
+              : {}),
           }
         : {
             question: input.userMessageContent,
@@ -169,6 +174,9 @@ export class AppendConversationMessage {
               }),
             },
             requestTraceId: input.requestTraceId,
+            ...(input.answerLanguage !== undefined
+              ? { answerLanguage: input.answerLanguage }
+              : {}),
           };
 
     const turnResult = await this.answerQuestion.execute(turnInput);

@@ -5,6 +5,8 @@ import {
   RAG_SOURCE_EXCERPT_PREVIEW_LENGTH,
   truncateExcerptPreview,
 } from "./constants";
+import { LocaleProvider } from "@/i18n/LocaleProvider";
+
 import QueryPage from "./page";
 
 const LONG_EXCERPT = `${"A".repeat(RAG_SOURCE_EXCERPT_PREVIEW_LENGTH)} trecho extra para truncar`;
@@ -556,6 +558,123 @@ describe("/query page", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  describe("language selector", () => {
+    beforeEach(() => {
+      document.cookie = "locale=; path=/; max-age=0";
+      document.documentElement.lang = "pt-BR";
+    });
+
+    it("renders English copy when the provider starts in English", () => {
+      render(
+        <LocaleProvider initialLocale="en">
+          <QueryPage />
+        </LocaleProvider>,
+      );
+
+      expect(
+        screen.getByRole("heading", { name: /search the article base/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText(/query secret/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/entire base/i)).toBeChecked();
+      expect(
+        screen.getByRole("heading", { name: /^conversation$/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /^english$/i }),
+      ).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("switches between Portuguese and English and remembers the choice in a cookie", () => {
+      render(
+        <LocaleProvider initialLocale="pt-BR">
+          <QueryPage />
+        </LocaleProvider>,
+      );
+
+      expect(
+        screen.getByRole("button", { name: /^português$/i }),
+      ).toHaveAttribute("aria-pressed", "true");
+
+      fireEvent.click(screen.getByRole("button", { name: /^english$/i }));
+
+      expect(
+        screen.getByRole("heading", { name: /search the article base/i }),
+      ).toBeInTheDocument();
+      expect(document.cookie).toContain("locale=en");
+      expect(document.documentElement.lang).toBe("en");
+
+      fireEvent.click(screen.getByRole("button", { name: /^português$/i }));
+
+      expect(
+        screen.getByRole("heading", { name: /consulta na base/i }),
+      ).toBeInTheDocument();
+      expect(document.cookie).toContain("locale=pt-BR");
+      expect(document.documentElement.lang).toBe("pt-BR");
+    });
+
+    it("asks for English answers when the interface is in English", async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+      );
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(
+          appendResponseFromAsk(SUCCESS_RESPONSE, "Which techniques appear?"),
+        ),
+      );
+
+      render(
+        <LocaleProvider initialLocale="en">
+          <QueryPage />
+        </LocaleProvider>,
+      );
+      fireEvent.change(screen.getByLabelText(/query secret/i), {
+        target: { value: SECRET },
+      });
+      fireEvent.change(screen.getByLabelText(/^question/i), {
+        target: { value: "Which techniques appear?" },
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /search base/i }));
+      });
+
+      const [, init] = fetchMock.mock.calls[1]!;
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        content: "Which techniques appear?",
+        answerLanguage: "en",
+      });
+    });
+
+    it("re-renders an existing error message in the newly selected language", async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(CREATE_CONVERSATION_RESPONSE, { status: 201 }),
+      );
+      fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+      render(
+        <LocaleProvider initialLocale="pt-BR">
+          <QueryPage />
+        </LocaleProvider>,
+      );
+      typeSecret(SECRET);
+      typeQuestion("Pergunta offline");
+
+      await act(async () => {
+        clickSubmit();
+      });
+
+      expect(
+        screen.getByText(/falha de rede ao falar com o servidor/i),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: /^english$/i }));
+
+      expect(
+        screen.getByText(/network error while reaching the server/i),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("lazy-loads selectable documents only after focused mode is enabled", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(SELECTABLE_DOCUMENTS_RESPONSE));
 
@@ -793,6 +912,7 @@ describe("/query page", () => {
             topK: 8,
             strategy: "standard",
           },
+          answerLanguage: "pt-BR",
         }),
       }),
     );
@@ -820,6 +940,7 @@ describe("/query page", () => {
             topK: 8,
             strategy: "explore",
           },
+          answerLanguage: "pt-BR",
         }),
       }),
     );
@@ -877,6 +998,7 @@ describe("/query page", () => {
             topK: 6,
             strategy: "standard",
           },
+          answerLanguage: "pt-BR",
         }),
       }),
     );

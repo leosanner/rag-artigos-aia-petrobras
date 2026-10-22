@@ -60,7 +60,7 @@ Repository (persistence isolation), Strategy (swap extractor/refiner/chunker/emb
 - **Failures are first-class states**, not invisible logs. `failed` documents must be reprocessable.
 - **Chunking reads `refined_text` only**, and only from documents with status `processed`.
 - TypeScript is `strict`. Validate env vars with Zod at boundaries ([src/env/server.ts](src/env/server.ts)) — don't read `process.env` directly elsewhere.
-- **UI language is Portuguese** (PT-BR) by default. No i18n in v1. Feature specs may define a deliberate exception; `F-01 / Document Ingestion` uses English for `/ingestion`.
+- **UI language is Portuguese** (PT-BR) by default, with an English option (AD-023): a `locale` cookie read by the root layout, a shared `LocaleSwitcher`, and typed per-page dictionaries (`src/app/query/messages.ts` is the reference). No i18n library. When translating a page, add both `pt-BR` and `en` entries. `/query` sends `answerLanguage` so generated answers follow the UI. Every page (`/`, `/query`, `/ingestion`, `/indexing`) and the shared `Footer` are localized.
 - **Milestone features follow the spec-first workflow.** For any feature listed in [.specs/project/ROADMAP.md](.specs/project/ROADMAP.md) (M1 ingestion, M2 RAG, M3 XAI/observability, M4 agents):
   1. **Discuss** the feature with the user to align scope, invariants, and open questions.
   2. **Spec** — invoke `/feature-spec` to produce the contract at `.specs/features/F-NN-<slug>/spec.md`. The agent may ask follow-up questions to ground each section; the spec is the authoritative input for implementation and review.

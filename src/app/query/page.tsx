@@ -16,7 +16,6 @@ import {
   type RagRunAuditResponse,
   type RagRunMetadataResponse,
   type RagQueryRunDetailResponse,
-  type RagQueryRunSummaryResponse,
   type RagSource,
   type RagStreamSource,
   type RelatedTerm,
@@ -30,40 +29,20 @@ import {
   RAG_RETRIEVAL_MIN_TOP_K,
   type RagRetrievalStrategy,
 } from "@/domain/rag";
+import { useLocale } from "@/i18n/LocaleProvider";
 
 import { AuditDrawer } from "./components/AuditDrawer";
+import { truncateExcerptPreview } from "./constants";
 import {
-  formatTechnicalErrorMessage,
-  RAG_EMPTY_SOURCES_MESSAGE,
-  RAG_FOCUSED_DOCUMENT_NOT_FOCUSABLE_MESSAGE,
-  RAG_FOCUSED_DOCUMENT_NOT_FOUND_MESSAGE,
-  RAG_FOCUSED_DOCUMENTS_EMPTY_MESSAGE,
-  RAG_FOCUSED_DOCUMENTS_ERROR_MESSAGE,
-  RAG_GENERATION_FAILED_MESSAGE,
-  RAG_GENERATION_UNAVAILABLE_MESSAGE,
-  RAG_INVALID_REQUEST_MESSAGE,
-  RAG_NETWORK_ERROR_MESSAGE,
-  RAG_NO_GENERATION_AUDIT_MESSAGE,
-  RAG_PHASE_COPY_GENERATING,
-  RAG_PHASE_COPY_RERANKING,
-  RAG_PHASE_COPY_RETRIEVING,
-  RAG_STREAM_RELATED_TERMS_TITLE,
-  RAG_TECHNICAL_ERROR_MESSAGE,
-  RAG_UNAUTHORIZED_MESSAGE,
-  STRATEGY_FOCUSED_NOTE,
-  STRATEGY_LABEL_EXPLORE,
-  STRATEGY_LABEL_RERANK,
-  STRATEGY_LABEL_STANDARD,
-  STRATEGY_TOOLTIP_EXPLORE,
-  STRATEGY_TOOLTIP_RERANK,
-  STRATEGY_TOOLTIP_STANDARD,
-  truncateExcerptPreview,
-} from "./constants";
+  describeTechnicalError,
+  useQueryMessages,
+  type QueryTechnicalError,
+} from "./messages";
 import { Footer } from "../components/Footer";
+import { LocaleSwitcher } from "../components/LocaleSwitcher";
 import styles from "./page.module.css";
 
 const SECRET_STORAGE_KEY = "query:secret";
-const SOURCE_FOCUS_ACTION_LABEL = "Conversar apenas sobre este artigo";
 
 // ---------------------------------------------------------------------------
 // Mock visual para iteracao de design — ativar com ?mock=1 na URL.
@@ -235,33 +214,18 @@ const MOCK_CONVERSATION: ConversationDetailResponse = (() => {
 type ConversationSubmissionStrategy = RagRetrievalStrategy;
 type QueryMode = "global" | "focused";
 
-const GLOBAL_STRATEGY_OPTIONS: ReadonlyArray<{
-  value: RagRetrievalStrategy;
-  label: string;
-  tooltip: string;
-}> = [
-  {
-    value: "standard",
-    label: STRATEGY_LABEL_STANDARD,
-    tooltip: STRATEGY_TOOLTIP_STANDARD,
-  },
-  {
-    value: "explore",
-    label: STRATEGY_LABEL_EXPLORE,
-    tooltip: STRATEGY_TOOLTIP_EXPLORE,
-  },
-  {
-    value: "rerank",
-    label: STRATEGY_LABEL_RERANK,
-    tooltip: STRATEGY_TOOLTIP_RERANK,
-  },
-];
+const GLOBAL_STRATEGIES = [
+  "standard",
+  "explore",
+  "rerank",
+] as const satisfies ReadonlyArray<RagRetrievalStrategy>;
+
 type ConversationAskState =
   | { kind: "idle" }
   | { kind: "submitting"; strategy: ConversationSubmissionStrategy }
   | { kind: "invalid_request" }
   | { kind: "unauthorized" }
-  | { kind: "technical_error"; message: string };
+  | { kind: "technical_error"; error: QueryTechnicalError };
 
 type LoadErrorKind = "unauthorized" | "technical";
 
@@ -320,6 +284,8 @@ function createInitialSelectableDocumentsState(): SelectableDocumentsState {
 }
 
 export default function QueryPage() {
+  const t = useQueryMessages();
+  const { locale } = useLocale();
   const [question, setQuestion] = useState("");
   const [secret, setSecret] = useState("");
   const [queryMode, setQueryMode] = useState<QueryMode>("global");
@@ -365,9 +331,13 @@ export default function QueryPage() {
     (queryMode === "global" || selectedDocument !== null);
   const effectiveStrategy: RagRetrievalStrategy =
     queryMode === "focused" ? "standard" : selectedStrategy;
-  const submitButtonLabel = isSubmitting ? "Consultando..." : "Consultar base";
+  const submitButtonLabel = isSubmitting
+    ? t.conversation.submitting
+    : t.conversation.submit;
   const newConversationLabel =
-    conversationState.status === "loading" ? "Carregando..." : "Nova conversa";
+    conversationState.status === "loading"
+      ? t.toolbar.loading
+      : t.toolbar.newConversation;
   const auditDrawerMessage =
     auditDrawerMessageId === null
       ? null
@@ -602,7 +572,7 @@ export default function QueryPage() {
       } else {
         setAskState({
           kind: "technical_error",
-          message: formatTechnicalErrorMessage(response.status),
+          error: { code: "http", httpStatus: response.status },
         });
       }
       return null;
@@ -663,6 +633,7 @@ export default function QueryPage() {
                     topK,
                     strategy,
                   },
+                  answerLanguage: locale,
                 }
               : {
                   content: trimmedQuestion,
@@ -670,6 +641,7 @@ export default function QueryPage() {
                     topK,
                     strategy,
                   },
+                  answerLanguage: locale,
                 },
           ),
         },
@@ -681,7 +653,7 @@ export default function QueryPage() {
       });
       setAskState({
         kind: "technical_error",
-        message: RAG_NETWORK_ERROR_MESSAGE,
+        error: { code: "network" },
       });
       return;
     }
@@ -707,7 +679,7 @@ export default function QueryPage() {
         });
         setAskState({
           kind: "technical_error",
-          message: formatTechnicalErrorMessage(response.status),
+          error: { code: "http", httpStatus: response.status },
         });
         return;
       }
@@ -723,7 +695,7 @@ export default function QueryPage() {
         });
         setAskState({
           kind: "technical_error",
-          message: formatTechnicalErrorMessage(response.status),
+          error: { code: "http", httpStatus: response.status },
         });
         return;
       }
@@ -749,7 +721,7 @@ export default function QueryPage() {
           ? { kind: "invalid_request" }
           : {
               kind: "technical_error",
-              message: formatTechnicalErrorMessage(response.status),
+              error: { code: "http", httpStatus: response.status },
             },
       );
       return;
@@ -773,7 +745,7 @@ export default function QueryPage() {
       } else {
         setAskState({
           kind: "technical_error",
-          message: formatTechnicalErrorMessage(response.status),
+          error: { code: "http", httpStatus: response.status },
         });
       }
       return;
@@ -786,7 +758,7 @@ export default function QueryPage() {
         appendTranscriptMessages([parsed.data.userMessage]);
         setAskState({
           kind: "technical_error",
-          message: RAG_FOCUSED_DOCUMENT_NOT_FOUND_MESSAGE,
+          error: { code: "document_not_found" },
         });
         return;
       }
@@ -803,7 +775,7 @@ export default function QueryPage() {
       });
       setAskState({
         kind: "technical_error",
-        message: formatTechnicalErrorMessage(response.status),
+        error: { code: "http", httpStatus: response.status },
       });
       return;
     }
@@ -815,7 +787,7 @@ export default function QueryPage() {
         appendTranscriptMessages([parsed.data.userMessage]);
         setAskState({
           kind: "technical_error",
-          message: RAG_FOCUSED_DOCUMENT_NOT_FOCUSABLE_MESSAGE,
+          error: { code: "document_not_focusable" },
         });
         return;
       }
@@ -827,7 +799,7 @@ export default function QueryPage() {
       });
       setAskState({
         kind: "technical_error",
-        message: formatTechnicalErrorMessage(response.status),
+        error: { code: "http", httpStatus: response.status },
       });
       return;
     }
@@ -853,14 +825,13 @@ export default function QueryPage() {
         parsed.success && "errorCode" in parsed.data
           ? parsed.data.errorCode
           : null;
-      const message =
-        errorCode === "generation_failed"
-          ? RAG_GENERATION_FAILED_MESSAGE
-          : errorCode === "generation_unavailable"
-            ? RAG_GENERATION_UNAVAILABLE_MESSAGE
-            : formatTechnicalErrorMessage(response.status);
+      const error: QueryTechnicalError =
+        errorCode === "generation_failed" ||
+        errorCode === "generation_unavailable"
+          ? { code: errorCode }
+          : { code: "http", httpStatus: response.status };
 
-      setAskState({ kind: "technical_error", message });
+      setAskState({ kind: "technical_error", error });
       return;
     }
 
@@ -871,7 +842,7 @@ export default function QueryPage() {
     });
     setAskState({
       kind: "technical_error",
-      message: formatTechnicalErrorMessage(response.status),
+      error: { code: "http", httpStatus: response.status },
     });
   }
 
@@ -880,7 +851,7 @@ export default function QueryPage() {
       setStreamingAssistantState(createInitialStreamingAssistantState());
       setAskState({
         kind: "technical_error",
-        message: formatTechnicalErrorMessage(response.status),
+        error: { code: "http", httpStatus: response.status },
       });
       return;
     }
@@ -966,7 +937,7 @@ export default function QueryPage() {
         setStreamingAssistantState(createInitialStreamingAssistantState());
         setAskState({
           kind: "technical_error",
-          message: formatStreamErrorMessage(event.status),
+          error: toStreamTechnicalError(event.status),
         });
         return;
       }
@@ -982,7 +953,7 @@ export default function QueryPage() {
     if (!sawTerminalEvent) {
       setAskState({
         kind: "technical_error",
-        message: RAG_TECHNICAL_ERROR_MESSAGE,
+        error: { code: "technical" },
       });
     }
   }
@@ -1040,7 +1011,7 @@ export default function QueryPage() {
       });
       setAskState({
         kind: "technical_error",
-        message: RAG_NETWORK_ERROR_MESSAGE,
+        error: { code: "network" },
       });
       return null;
     }
@@ -1062,7 +1033,7 @@ export default function QueryPage() {
         });
         setAskState({
           kind: "technical_error",
-          message: formatTechnicalErrorMessage(response.status),
+          error: { code: "http", httpStatus: response.status },
         });
         return null;
       }
@@ -1120,7 +1091,7 @@ export default function QueryPage() {
         });
         setAskState({
           kind: "technical_error",
-          message: formatTechnicalErrorMessage(response.status),
+          error: { code: "http", httpStatus: response.status },
         });
       }
       return null;
@@ -1138,7 +1109,7 @@ export default function QueryPage() {
     });
     setAskState({
       kind: "technical_error",
-      message: formatTechnicalErrorMessage(response.status),
+      error: { code: "http", httpStatus: response.status },
     });
     return null;
   }
@@ -1172,7 +1143,7 @@ export default function QueryPage() {
       if (!documents.some((document) => document.id === source.documentId)) {
         setAskState({
           kind: "technical_error",
-          message: RAG_FOCUSED_DOCUMENT_NOT_FOUND_MESSAGE,
+          error: { code: "document_not_found" },
         });
         return;
       }
@@ -1349,22 +1320,18 @@ export default function QueryPage() {
         <header className={styles.header}>
           <div>
             <h1 className={styles.title}>
-              Consulta na base{" "}
-              <span className={styles.titleAccent}>de artigos</span>
+              {t.header.titleLead}{" "}
+              <span className={styles.titleAccent}>{t.header.titleAccent}</span>
             </h1>
-            <p className={styles.lede}>
-              Faça uma pergunta sobre toda a base ou restrinja a consulta a um
-              documento específico. Todas as respostas mantêm citações inline,
-              fontes numeradas e trilha de auditoria. Apenas usuários com o
-              secret podem consultar ou ler o histórico persistido.
-            </p>
+            <p className={styles.lede}>{t.header.lede}</p>
           </div>
+          <LocaleSwitcher />
         </header>
 
-        <section className={styles.toolbar} aria-label="Controles da consulta">
+        <section className={styles.toolbar} aria-label={t.toolbar.ariaLabel}>
           <div className={`${styles.field} ${styles.fieldSecret}`}>
             <label htmlFor="query-secret" className={styles.label}>
-              <span>Secret de consulta</span>
+              <span>{t.toolbar.secretLabel}</span>
             </label>
             <input
               id="query-secret"
@@ -1380,7 +1347,7 @@ export default function QueryPage() {
           <div className={`${styles.field} ${styles.fieldMode}`}>
             <fieldset className={styles.modeFieldset}>
               <legend className={styles.label}>
-                <span>Modo de consulta</span>
+                <span>{t.toolbar.modeLegend}</span>
               </legend>
 
               <div className={styles.modeOptions}>
@@ -1395,7 +1362,7 @@ export default function QueryPage() {
                       setAskState({ kind: "idle" });
                     }}
                   />
-                  <span>Base inteira</span>
+                  <span>{t.toolbar.modeGlobal}</span>
                 </label>
 
                 <label className={styles.modeOption}>
@@ -1409,7 +1376,7 @@ export default function QueryPage() {
                       setAskState({ kind: "idle" });
                     }}
                   />
-                  <span>Documento específico</span>
+                  <span>{t.toolbar.modeFocused}</span>
                 </label>
               </div>
             </fieldset>
@@ -1418,19 +1385,19 @@ export default function QueryPage() {
           {queryMode === "focused" ? (
             <div className={`${styles.field} ${styles.fieldFocusedDocument}`}>
               <label htmlFor="query-document" className={styles.label}>
-                <span>Documento alvo</span>
+                <span>{t.toolbar.focusedDocumentLabel}</span>
               </label>
 
               {trimmedSecret.length === 0 ? (
                 <p className={styles.inlineNote}>
-                  Informe o secret para listar documentos disponíveis.
+                  {t.toolbar.focusedSecretRequired}
                 </p>
               ) : null}
 
               {trimmedSecret.length > 0 &&
               selectableDocumentsState.status === "loading" ? (
                 <p className={styles.inlineNote}>
-                  Carregando documentos disponíveis...
+                  {t.toolbar.focusedDocumentsLoading}
                 </p>
               ) : null}
 
@@ -1438,7 +1405,7 @@ export default function QueryPage() {
               selectableDocumentsState.status === "error" ? (
                 <div className={styles.inlineActionRow}>
                   <p className={styles.inlineNote}>
-                    {RAG_FOCUSED_DOCUMENTS_ERROR_MESSAGE}
+                    {t.errors.focusedDocumentsError}
                   </p>
                   <button
                     type="button"
@@ -1447,7 +1414,7 @@ export default function QueryPage() {
                     }}
                     className={`${styles.btn} ${styles.btnSecondary}`}
                   >
-                    Tentar novamente
+                    {t.toolbar.retry}
                   </button>
                 </div>
               ) : null}
@@ -1456,7 +1423,7 @@ export default function QueryPage() {
               selectableDocumentsState.status === "loaded" &&
               selectableDocumentsState.documents.length === 0 ? (
                 <p className={styles.inlineNote}>
-                  {RAG_FOCUSED_DOCUMENTS_EMPTY_MESSAGE}
+                  {t.errors.focusedDocumentsEmpty}
                 </p>
               ) : null}
 
@@ -1471,7 +1438,9 @@ export default function QueryPage() {
                     }
                     className={styles.select}
                   >
-                    <option value="">Selecione um documento focável</option>
+                    <option value="">
+                      {t.toolbar.selectDocumentPlaceholder}
+                    </option>
                     {selectableDocumentsState.documents.map((document) => (
                       <option key={document.id} value={document.id}>
                         {document.title}
@@ -1486,30 +1455,31 @@ export default function QueryPage() {
                       </p>
                       {selectedDocument.authors ? (
                         <p className={styles.documentSummaryMeta}>
-                          autores :: {selectedDocument.authors}
+                          {t.toolbar.documentAuthors} :: {selectedDocument.authors}
                         </p>
                       ) : null}
                       {selectedDocument.publicationYear ? (
                         <p className={styles.documentSummaryMeta}>
-                          ano :: {selectedDocument.publicationYear}
+                          {t.toolbar.documentYear} ::{" "}
+                          {selectedDocument.publicationYear}
                         </p>
                       ) : null}
                       {selectedDocument.doi ? (
                         <p className={styles.documentSummaryMeta}>
-                          doi :: {selectedDocument.doi}
+                          {t.toolbar.documentDoi} :: {selectedDocument.doi}
                         </p>
                       ) : null}
                       <p className={styles.documentSummaryMeta}>
-                        chunks indexados :: {selectedDocument.chunkCount}
+                        {t.toolbar.documentChunks} :: {selectedDocument.chunkCount}
                       </p>
                       <p className={styles.documentSummaryMeta}>
-                        atualizado ::{" "}
+                        {t.toolbar.documentUpdated} ::{" "}
                         {formatTimestamp(selectedDocument.updatedAt)}
                       </p>
                     </div>
                   ) : (
                     <p className={styles.inlineNote}>
-                      Escolha um documento para habilitar a consulta focada.
+                      {t.toolbar.chooseDocumentHint}
                     </p>
                   )}
                 </>
@@ -1524,7 +1494,7 @@ export default function QueryPage() {
               disabled={trimmedSecret.length === 0}
               className={`${styles.btn} ${styles.btnSecondary}`}
             >
-              Limpar secret
+              {t.toolbar.clearSecret}
             </button>
             <button
               type="button"
@@ -1551,7 +1521,7 @@ export default function QueryPage() {
             {auditDrawerMessage ? (
               <>
                 <AuditSummaryBlock
-                  blockIndex="Parâmetros da consulta"
+                  blockIndex={t.audit.summaryTitle}
                   metaLabel=""
                   question={auditDrawerMessage.trace.question}
                   metadata={auditDrawerMessage.trace.metadata}
@@ -1561,11 +1531,11 @@ export default function QueryPage() {
                   createdAt={auditDrawerMessage.trace.createdAt}
                 />
                 <RelatedTermsBlock
-                  blockIndex="Termos relacionados"
+                  blockIndex={t.audit.relatedTermsTitle}
                   terms={auditDrawerMessage.trace.relatedTerms}
                 />
                 <SourcesBlock
-                  blockIndex="Fontes consultadas"
+                  blockIndex={t.audit.sourcesTitle}
                   sources={auditDrawerMessage.trace.sources}
                   showCitationFlags
                   onStartFocusedConversation={
@@ -1581,26 +1551,27 @@ export default function QueryPage() {
 
           <section
             className={`${styles.panel} ${styles.strategyGuide}`}
-            aria-label="Guia de estratégias"
+            aria-label={t.strategies.guideAriaLabel}
           >
             <header className={styles.panelHeader}>
               <div>
-                <h2 className={styles.panelTitle}>Estratégias de busca</h2>
-                <p className={styles.panelCopy}>
-                  Escolha o modo no seletor abaixo. Em consultas focadas a
-                  estratégia padrão é aplicada automaticamente.
-                </p>
+                <h2 className={styles.panelTitle}>{t.strategies.guideTitle}</h2>
+                <p className={styles.panelCopy}>{t.strategies.guideCopy}</p>
               </div>
             </header>
             <dl className={styles.strategyGuideList}>
-              {GLOBAL_STRATEGY_OPTIONS.map((option) => (
+              {GLOBAL_STRATEGIES.map((strategy) => (
                 <div
-                  key={option.value}
+                  key={strategy}
                   className={styles.strategyGuideItem}
-                  data-strategy={option.value}
+                  data-strategy={strategy}
                 >
-                  <dt className={styles.strategyGuideTerm}>{option.label}</dt>
-                  <dd className={styles.strategyGuideDesc}>{option.tooltip}</dd>
+                  <dt className={styles.strategyGuideTerm}>
+                    {t.strategies[strategy].label}
+                  </dt>
+                  <dd className={styles.strategyGuideDesc}>
+                    {t.strategies[strategy].tooltip}
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -1609,33 +1580,33 @@ export default function QueryPage() {
           <section className={`${styles.panel} ${styles.chatPanel}`}>
             <header className={styles.panelHeader}>
               <div>
-                <h2 className={styles.panelTitle}>Conversa</h2>
+                <h2 className={styles.panelTitle}>{t.conversation.title}</h2>
               </div>
             </header>
 
             {conversationState.error === "unauthorized" ? (
               <StatusAlert
                 kind="unauthorized"
-                message={RAG_UNAUTHORIZED_MESSAGE}
+                message={t.errors.unauthorized}
               />
             ) : null}
 
             {conversationState.error === "technical" ? (
               <StatusAlert
                 kind="technical"
-                message={RAG_TECHNICAL_ERROR_MESSAGE}
+                message={t.errors.technical}
               />
             ) : null}
 
             {conversationState.error === "not_found" ? (
               <StatusAlert
                 kind="technical"
-                message="Conversa não encontrada ou indisponível para recarga."
+                message={t.conversation.notFound}
               />
             ) : null}
 
             {conversationState.status === "loading" ? (
-              <p className={styles.emptyPanel}>Carregando conversa...</p>
+              <p className={styles.emptyPanel}>{t.conversation.loading}</p>
             ) : null}
 
             {conversationState.conversation?.messages.length ||
@@ -1665,25 +1636,28 @@ export default function QueryPage() {
               {askState.kind === "invalid_request" ? (
                 <StatusAlert
                   kind="invalid"
-                  message={RAG_INVALID_REQUEST_MESSAGE}
+                  message={t.errors.invalidRequest}
                 />
               ) : null}
 
               {askState.kind === "unauthorized" ? (
                 <StatusAlert
                   kind="unauthorized"
-                  message={RAG_UNAUTHORIZED_MESSAGE}
+                  message={t.errors.unauthorized}
                 />
               ) : null}
 
               {askState.kind === "technical_error" ? (
-                <StatusAlert kind="technical" message={askState.message} />
+                <StatusAlert
+                  kind="technical"
+                  message={describeTechnicalError(t, askState.error)}
+                />
               ) : null}
 
               <form onSubmit={onSubmit} className={styles.composer}>
                 <div className={`${styles.field} ${styles.fieldQuestion}`}>
                   <label htmlFor="query-question" className={styles.label}>
-                    <span>Pergunta</span>
+                    <span>{t.conversation.questionLabel}</span>
                     <span className={styles.labelIndex}>[ 05 ]</span>
                   </label>
                   <textarea
@@ -1703,7 +1677,7 @@ export default function QueryPage() {
                       }
                     }}
                     rows={3}
-                    placeholder="Ex.: Quais técnicas aparecem com mais frequência nos estudos ou neste documento?"
+                    placeholder={t.conversation.questionPlaceholder}
                     className={styles.textarea}
                   />
                 </div>
@@ -1719,12 +1693,12 @@ export default function QueryPage() {
                         htmlFor="query-strategy"
                         className={styles.composerStrategyLabel}
                       >
-                        Estratégia
+                        {t.strategies.selectLabel}
                       </label>
                       <select
                         id="query-strategy"
                         name="query-strategy"
-                        aria-label="Estratégia"
+                        aria-label={t.strategies.selectLabel}
                         disabled={isFocused}
                         value={selectValue}
                         onChange={(event) => {
@@ -1735,15 +1709,15 @@ export default function QueryPage() {
                         }}
                         className={styles.composerStrategySelect}
                       >
-                        {GLOBAL_STRATEGY_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
+                        {GLOBAL_STRATEGIES.map((strategy) => (
+                          <option key={strategy} value={strategy}>
+                            {t.strategies[strategy].label}
                           </option>
                         ))}
                       </select>
                       {isFocused ? (
                         <p className={styles.composerStrategyNote}>
-                          {STRATEGY_FOCUSED_NOTE}
+                          {t.strategies.focusedNote}
                         </p>
                       ) : null}
                     </div>
@@ -1753,7 +1727,7 @@ export default function QueryPage() {
                 <div className={styles.composerFooter}>
                   <details className={styles.composerAdvanced}>
                     <summary className={styles.composerAdvancedSummary}>
-                      Avançado
+                      {t.conversation.advanced}
                     </summary>
                     <div className={styles.composerAdvancedFields}>
                       <label
@@ -1761,7 +1735,7 @@ export default function QueryPage() {
                         className={styles.composerAdvancedField}
                       >
                         <span className={styles.composerAdvancedLabel}>
-                          Fontes recuperadas
+                          {t.conversation.topKLabel}
                         </span>
                         <input
                           id="query-top-k"
@@ -1782,7 +1756,7 @@ export default function QueryPage() {
                           className={styles.composerAdvancedField}
                         >
                           <span className={styles.composerAdvancedLabel}>
-                            Candidatos para rerank
+                            {t.conversation.candidateTopKLabel}
                           </span>
                           <input
                             id="query-candidate-top-k"
@@ -1860,6 +1834,7 @@ function ConversationMessageItem({
   message,
   onViewAudit,
 }: ConversationMessageItemProps) {
+  const t = useQueryMessages();
   const isAssistant = message.role === "assistant";
 
   return (
@@ -1870,7 +1845,9 @@ function ConversationMessageItem({
     >
       <article className={styles.transcriptBubble}>
         <header className={styles.transcriptHeader}>
-          <span>{isAssistant ? "Assistente" : "Operador"}</span>
+          <span>
+            {isAssistant ? t.conversation.assistant : t.conversation.operator}
+          </span>
         </header>
         <p className={styles.transcriptText}>{message.content}</p>
 
@@ -1880,7 +1857,7 @@ function ConversationMessageItem({
             onClick={onViewAudit}
             className={`${styles.btn} ${styles.btnSecondary} ${styles.auditToggle}`}
           >
-            Ver auditoria
+            {t.conversation.viewAudit}
           </button>
         ) : null}
       </article>
@@ -1899,12 +1876,13 @@ function StreamingConversationMessageItem({
   sources: RagStreamSource[];
   relatedTerms: RelatedTerm[];
 }) {
+  const t = useQueryMessages();
   const phaseCopy =
     phase === "retrieving_sources"
-      ? RAG_PHASE_COPY_RETRIEVING
+      ? t.conversation.phaseRetrieving
       : phase === "reranking"
-        ? RAG_PHASE_COPY_RERANKING
-        : RAG_PHASE_COPY_GENERATING;
+        ? t.conversation.phaseReranking
+        : t.conversation.phaseGenerating;
 
   return (
     <li className={`${styles.transcriptItem} ${styles.transcriptAssistant}`}>
@@ -1912,8 +1890,8 @@ function StreamingConversationMessageItem({
         className={`${styles.transcriptBubble} ${styles.streamingTranscriptBubble}`}
       >
         <header className={styles.transcriptHeader}>
-          <span>Assistente</span>
-          <span>Ao vivo</span>
+          <span>{t.conversation.assistant}</span>
+          <span>{t.conversation.live}</span>
         </header>
 
         <p className={styles.streamingPhase}>{phaseCopy}</p>
@@ -1935,11 +1913,11 @@ function StreamingConversationMessageItem({
 
         {relatedTerms.length > 0 ? (
           <section
-            aria-label={RAG_STREAM_RELATED_TERMS_TITLE}
+            aria-label={t.conversation.relatedTermsTitle}
             className={styles.streamingRelatedTerms}
           >
             <p className={styles.streamingRelatedTermsTitle}>
-              {RAG_STREAM_RELATED_TERMS_TITLE}
+              {t.conversation.relatedTermsTitle}
             </p>
             <ul className={styles.streamingRelatedTermsList}>
               {relatedTerms.map((term) => (
@@ -1959,8 +1937,8 @@ function StreamingConversationMessageItem({
         ) : (
           <p className={styles.streamingHint}>
             {phase === "retrieving_sources"
-              ? "Selecionando os trechos finais para responder."
-              : "A resposta vai aparecendo abaixo conforme os tokens chegam."}
+              ? t.conversation.hintRetrieving
+              : t.conversation.hintGenerating}
           </p>
         )}
       </article>
@@ -1989,6 +1967,8 @@ function AuditSummaryBlock({
   errorCode,
   createdAt,
 }: AuditSummaryBlockProps) {
+  const t = useQueryMessages();
+
   return (
     <article className={`${styles.resultBlock} ${styles.metaBlockAccent}`}>
       <header className={styles.blockHeader}>
@@ -2013,7 +1993,7 @@ function AuditSummaryBlock({
           value={
             metadata.rerankerProvider && metadata.rerankerModel
               ? `${metadata.rerankerProvider} :: ${metadata.rerankerModel}`
-              : "não aplicado"
+              : t.audit.notApplied
           }
         />
         <MetaItem label="// latency" value={`${audit.latencyMs} ms`} />
@@ -2030,7 +2010,7 @@ function AuditSummaryBlock({
           value={
             audit.generation
               ? String(audit.generation.totalTokens)
-              : RAG_NO_GENERATION_AUDIT_MESSAGE
+              : t.audit.noGeneration
           }
         />
         <MetaItem
@@ -2038,13 +2018,15 @@ function AuditSummaryBlock({
           value={
             audit.generation
               ? formatUsd(audit.generation.estimatedCostUsd)
-              : RAG_NO_GENERATION_AUDIT_MESSAGE
+              : t.audit.noGeneration
           }
         />
         <MetaItem
           label="// rerank latency"
           value={
-            audit.reranking ? `${audit.reranking.latencyMs} ms` : "não aplicado"
+            audit.reranking
+              ? `${audit.reranking.latencyMs} ms`
+              : t.audit.notApplied
           }
         />
         <MetaItem
@@ -2052,7 +2034,7 @@ function AuditSummaryBlock({
           value={
             audit.reranking
               ? String(audit.reranking.inputTokens)
-              : "não aplicado"
+              : t.audit.notApplied
           }
         />
         <MetaItem
@@ -2060,12 +2042,12 @@ function AuditSummaryBlock({
           value={
             audit.reranking
               ? formatUsd(audit.reranking.estimatedCostUsd)
-              : "não aplicado"
+              : t.audit.notApplied
           }
         />
         <MetaItem label="// total cost" value={formatUsd(audit.totalCostUsd)} />
         {status ? (
-          <MetaItem label="// status" value={formatRunStatus(status)} />
+          <MetaItem label="// status" value={t.audit.runStatus[status]} />
         ) : null}
         {errorCode ? (
           <MetaItem label="// error code" value={errorCode} />
@@ -2094,6 +2076,8 @@ function RelatedTermsBlock({
   blockIndex: string;
   terms: RelatedTerm[];
 }) {
+  const t = useQueryMessages();
+
   return (
     <article className={`${styles.resultBlock} ${styles.termsBlockAccent}`}>
       <header className={styles.blockHeader}>
@@ -2102,9 +2086,7 @@ function RelatedTermsBlock({
       </header>
       <div className={styles.blockBody}>
         {terms.length === 0 ? (
-          <p className={styles.emptyPanel}>
-            Nenhum termo relacionado auditavel foi encontrado.
-          </p>
+          <p className={styles.emptyPanel}>{t.audit.relatedTermsEmpty}</p>
         ) : (
           <ul className={styles.termList}>
             {terms.map((term) => (
@@ -2146,6 +2128,8 @@ function SourcesBlock({
   onStartFocusedConversation?: (source: SourceCard) => void;
   handoffState?: HandoffState;
 }) {
+  const t = useQueryMessages();
+
   return (
     <article className={`${styles.resultBlock} ${styles.sourcesBlockAccent}`}>
       <header className={styles.blockHeader}>
@@ -2154,7 +2138,7 @@ function SourcesBlock({
       </header>
       <div className={styles.blockBody}>
         {sources.length === 0 ? (
-          <p className={styles.emptySources}>{RAG_EMPTY_SOURCES_MESSAGE}</p>
+          <p className={styles.emptySources}>{t.audit.emptySources}</p>
         ) : (
           <ol className={styles.sources}>
             {sources.map((source) => {
@@ -2191,7 +2175,8 @@ function SourcesBlock({
                       </span>
                       {showCitationFlags ? (
                         <span className={styles.sourceChip}>
-                          citado :: {source.citedInAnswer ? "sim" : "não"}
+                          {t.audit.cited} ::{" "}
+                          {source.citedInAnswer ? t.audit.yes : t.audit.no}
                         </span>
                       ) : null}
                     </div>
@@ -2204,8 +2189,8 @@ function SourcesBlock({
                           className={`${styles.btn} ${styles.btnSecondary} ${styles.sourceActionButton}`}
                         >
                           {isStartingFocusedConversation
-                            ? "Preparando foco..."
-                            : SOURCE_FOCUS_ACTION_LABEL}
+                            ? t.audit.focusStarting
+                            : t.audit.focusAction}
                         </button>
                       </div>
                     ) : null}
@@ -2390,31 +2375,19 @@ function parseConversationStreamChunk(
   return parsed.data;
 }
 
-function formatStreamErrorMessage(
+function toStreamTechnicalError(
   status:
     | "generation_failed"
     | "generation_unavailable"
     | "document_not_found"
     | "document_not_focusable"
     | "strategy_not_allowed_for_focused_conversation",
-): string {
-  if (status === "generation_failed") {
-    return RAG_GENERATION_FAILED_MESSAGE;
+): QueryTechnicalError {
+  if (status === "strategy_not_allowed_for_focused_conversation") {
+    return { code: "technical" };
   }
 
-  if (status === "generation_unavailable") {
-    return RAG_GENERATION_UNAVAILABLE_MESSAGE;
-  }
-
-  if (status === "document_not_found") {
-    return RAG_FOCUSED_DOCUMENT_NOT_FOUND_MESSAGE;
-  }
-
-  if (status === "document_not_focusable") {
-    return RAG_FOCUSED_DOCUMENT_NOT_FOCUSABLE_MESSAGE;
-  }
-
-  return RAG_TECHNICAL_ERROR_MESSAGE;
+  return { code: status };
 }
 
 function formatUsd(value: number): string {
@@ -2429,23 +2402,6 @@ function formatStrategy(strategy: RagRetrievalStrategy): string {
       return "explore";
     case "rerank":
       return "rerank";
-  }
-}
-
-function formatRunStatus(status: RagQueryRunSummaryResponse["status"]): string {
-  switch (status) {
-    case "answered":
-      return "respondida";
-    case "answered_no_evidence":
-      return "respondida sem evidência";
-    case "generation_failed":
-      return "falha segura";
-    case "generation_unavailable":
-      return "geração indisponível";
-    case "reranking_failed":
-      return "reranking com falha segura";
-    case "reranking_unavailable":
-      return "reranking indisponível";
   }
 }
 

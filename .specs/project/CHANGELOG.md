@@ -2,6 +2,43 @@
 
 This changelog summarizes the project history commit by commit. Entries are listed from newest to oldest.
 
+## (unreleased) - feat(i18n): localize home, /ingestion, /indexing, and footer
+
+Date: 2026-10-22
+
+Changed:
+
+- Added typed PT/EN dictionaries for the home page (`src/app/messages.ts`),
+  `/ingestion`, and `/indexing`, plus inline PT/EN copy in the shared
+  `Footer`. Each page header now shows the `LocaleSwitcher`.
+- `/ingestion` now defaults to PT-BR (previously English-only per F-01
+  RN-B04-08, now superseded by AD-023). PT copy on `/` and `/indexing`
+  gained proper accents.
+- Run errors on `/ingestion` and `/indexing` are stored as codes, so an
+  alert on screen re-renders when the locale changes. Run/item statuses are
+  shown as translated labels.
+- The home content moved to `src/app/components/HomeContent.tsx` (client)
+  so it follows locale changes without a reload.
+
+## (unreleased) - feat(i18n): PT/EN language selector on /query
+
+Date: 2026-10-22
+
+Changed:
+
+- Added a `pt-BR` | `en` locale stored in a `locale` cookie. The root
+  layout sets it on `<html lang>` and in a `LocaleProvider`, and a shared
+  `LocaleSwitcher` (PT | EN) sits in the `/query` header.
+- Moved all `/query` copy into a typed dictionary
+  (`src/app/query/messages.ts`) and translated it to English.
+  `constants.ts` now keeps only the non-copy excerpt helpers.
+- `POST /api/rag/conversations/:id/messages` accepts an optional
+  `answerLanguage`. Generation is asked to answer in that language, the
+  insufficient-evidence answer is localized, and English runs persist
+  `promptVersion` with a `.en` suffix.
+- Recorded `AD-023` in `.specs/project/STATE.md` and relaxed the "no i18n
+  in v1" rule in `CLAUDE.md`, `ARCHITECTURE.md`, and `DESIGN.md`.
+
 ## (unreleased) - docs(specs): introduce F-12 unified conversational query
 
 Date: 2026-05-02
